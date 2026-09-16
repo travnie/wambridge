@@ -303,6 +303,8 @@ class AudioStreamServer:
         self._started = False
         self._closing = threading.Event()
         self._process_lock = threading.Lock()
+        self._claim_lock = threading.Lock()
+        self._claimed = False
         self._server = ThreadingHTTPServer((bind, port), self._make_handler())
         self._thread = threading.Thread(target=self._server.serve_forever, daemon=True)
 
@@ -360,6 +362,23 @@ class AudioStreamServer:
         self._thread.start()
         self._started = True
 
+    def _claim_stream(self) -> bool:
+        """Reserve the stream for one client, before any 200 goes out.
+
+        `request_started` / `request_finished` are one-shot events and `error`
+        is a single field, so the server has always served exactly one request.
+        Claiming here makes that explicit *and* atomic: an extra GET is refused
+        without ever reaching the handler's except/finally, where it would
+        otherwise write `error` and set `request_finished` and so end the
+        owner's session. The speaker issuing a second GET is normal, and the
+        PCM path already logs it as merely "refusing a second stream request".
+        """
+        with self._claim_lock:
+            if self._claimed:
+                return False
+            self._claimed = True
+            return True
+
     def release_audio(self) -> None:
         """Allow a connected speaker to receive audio after safety checks."""
         self.audio_released.set()
@@ -391,6 +410,16 @@ class AudioStreamServer:
                 requested = self.path.encode("utf-8", errors="replace")
                 if not secrets.compare_digest(requested, owner.path.encode()):
                     self.send_error(404)
+                    return
+
+                # Claim before the 200, not after: refusing an extra client
+                # must not touch the owning request's state.
+                if not owner._claim_stream():
+                    LOGGER.warning(
+                        "Refusing a second stream request: this stream is "
+                        "already being served"
+                    )
+                    self.send_error(409, "Stream already being served")
                     return
 
                 self.send_response(200)
