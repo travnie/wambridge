@@ -259,7 +259,7 @@ class MainTests(unittest.TestCase):
 
     def test_ctrl_c_closes_the_server_and_releases_the_speaker(self) -> None:
         server = MagicMock()
-        server.requested.wait.side_effect = KeyboardInterrupt
+        server.finished.wait.side_effect = KeyboardInterrupt
 
         with (
             patch("wambridge.share_cli.start_share_playback", return_value=server),
@@ -280,7 +280,7 @@ class MainTests(unittest.TestCase):
 
     def test_a_speaker_unreachable_at_shutdown_is_not_fatal(self) -> None:
         server = MagicMock()
-        server.requested.wait.side_effect = KeyboardInterrupt
+        server.finished.wait.side_effect = KeyboardInterrupt
 
         with (
             patch("wambridge.share_cli.start_share_playback", return_value=server),
@@ -296,7 +296,7 @@ class MainTests(unittest.TestCase):
 
     def test_resolves_a_saved_device_alias(self) -> None:
         server = MagicMock()
-        server.requested.wait.side_effect = KeyboardInterrupt
+        server.finished.wait.side_effect = KeyboardInterrupt
 
         with (
             patch(

@@ -122,6 +122,10 @@ class ShareServer:
         self.object_id = object_id_for(self.path)
         self.size = self.path.stat().st_size
         self.requested = threading.Event()
+        # `requested` is never cleared, so it is a "has been fetched at least
+        # once" flag, not something a caller can block on twice. Waiting for
+        # the server to stop needs its own event.
+        self.finished = threading.Event()
         self._requests = 0
         self._lock = threading.Lock()
         self._server = ThreadingHTTPServer(("0.0.0.0", port), self._build_handler())  # noqa: S104
@@ -145,6 +149,7 @@ class ShareServer:
         LOGGER.info("Serving %s as %s", self.path.name, self.object_id)
 
     def close(self) -> None:
+        self.finished.set()
         self._server.shutdown()
         self._server.server_close()
         if self._thread is not None:

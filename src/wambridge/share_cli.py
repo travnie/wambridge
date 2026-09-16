@@ -264,8 +264,11 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f"Playing {args.media.name}. Press Ctrl+C to stop.")
     try:
-        while True:
-            server.requested.wait(timeout=1.0)
+        # Keep the timeout: a bare wait() is not interruptible by Ctrl+C on
+        # Windows. Waiting on `requested` here spun the CPU, because that event
+        # stays set from the speaker's first GET onwards.
+        while not server.finished.wait(timeout=1.0):
+            pass
     except KeyboardInterrupt:
         print("\nStopping")
     finally:
