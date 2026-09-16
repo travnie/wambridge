@@ -91,3 +91,71 @@ class AudioStreamServerTests(TestCase):
 
         self.assertEqual(chunk, b"fLaC")
         self.assertEqual(pipe.requested_size, 4096)
+
+
+class SecondRequestTests(TestCase):
+    """An extra GET must not end the session the first one owns.
+
+    The handler used to send 200 before anything reserved the stream, so a
+    refusal raised inside `_serve_audio` landed in the shared `except`/`finally`
+    - writing `owner.error` and setting `request_finished`, which is exactly
+    what the PCM main loop watches to decide the session is over. The existing
+    `test_pcm_stream` cases exercise the guard function itself and never go
+    through the HTTP handler, so they stayed green while this was broken.
+    """
+
+    @patch("wambridge.stream.shutil.which", return_value="C:/ffmpeg/bin/ffmpeg.exe")
+    def test_second_get_is_refused_without_ending_the_first(self, _which_mock) -> None:
+        import threading
+        import urllib.error
+        import urllib.request
+
+        server = AudioStreamServer("track.opus")
+        serving = threading.Event()
+        holding = threading.Event()
+
+        def hold_the_stream(_output) -> None:
+            serving.set()
+            holding.wait(timeout=10)
+
+        server._serve_audio = hold_the_stream  # type: ignore[method-assign]
+        url = f"http://127.0.0.1:{server.port}{server.path}"
+        first_status: list[int] = []
+
+        def first_request() -> None:
+            with urllib.request.urlopen(url, timeout=10) as response:  # noqa: S310
+                first_status.append(response.status)
+                response.read()
+
+        try:
+            server.start()
+            server.release_audio()
+            owner = threading.Thread(target=first_request, daemon=True)
+            owner.start()
+            self.assertTrue(serving.wait(timeout=10), "first request never began serving")
+
+            # Read the status either way rather than asserting on the exception
+            # type: without the claim the extra GET is answered 200, and this
+            # way that shows up as a plain 200 != 409 instead of a hang.
+            try:
+                with urllib.request.urlopen(url, timeout=10) as extra:  # noqa: S310
+                    second_status = extra.status
+            except urllib.error.HTTPError as refused:
+                second_status = refused.code
+
+            # Sample the owner's state while its stream is still open, but do
+            # not assert yet - a failed assertion here would leave the serving
+            # thread blocked and turn a clear failure into a stuck test.
+            error_after_refusal = server.error
+            finished_after_refusal = server.request_finished.is_set()
+
+            holding.set()
+            owner.join(timeout=10)
+
+            self.assertEqual(second_status, 409)
+            self.assertIsNone(error_after_refusal)
+            self.assertFalse(finished_after_refusal)
+            self.assertEqual(first_status, [200])
+        finally:
+            holding.set()
+            server.close()
