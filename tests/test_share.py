@@ -109,6 +109,28 @@ class ShareServerTests(unittest.TestCase):
     def _url(self) -> str:
         return f"{self.base}/DLNA/{self.server.object_id}"
 
+    def test_requested_stays_set_so_it_cannot_be_waited_on_twice(self) -> None:
+        """`requested` is a latch, `finished` is what a caller may block on.
+
+        The share CLI used to idle in `while True: server.requested.wait(1.0)`.
+        That event is set on the first GET and never cleared, so every later
+        wait returned instantly and the loop spun a core for the whole of
+        playback. Anything waiting for the server to stop has to use
+        `finished`.
+        """
+        self.assertFalse(self.server.requested.is_set())
+        self.assertFalse(self.server.finished.is_set())
+
+        with urllib.request.urlopen(self._url(), timeout=5) as response:
+            response.read()
+
+        # Serving a request must not look like the server finishing.
+        self.assertTrue(self.server.requested.is_set())
+        self.assertFalse(self.server.finished.wait(timeout=0.1))
+
+        self.server.close()
+        self.assertTrue(self.server.finished.is_set())
+
     def test_serves_object_under_dlna_prefix(self) -> None:
         with urllib.request.urlopen(self._url(), timeout=5) as response:
             body = response.read()
