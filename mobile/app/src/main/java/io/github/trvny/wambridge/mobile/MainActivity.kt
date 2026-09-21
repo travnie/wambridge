@@ -37,6 +37,7 @@ class MainActivity : Activity() {
     private lateinit var speakerIp: EditText
     private lateinit var statusView: TextView
     private val speakerControlButtons = mutableListOf<Button>()
+    private var speakerControlRunning = false
     private var manualDiscoveryRunning = false
 
     private val autoDiscoveryGeneration = AtomicInteger()
@@ -483,21 +484,21 @@ class MainActivity : Activity() {
             MobileUi.setEnabled(startRendererButton, !RendererService.active)
             MobileUi.setEnabled(stopRendererButton, RendererService.busy)
         }
-        if (speakerControlButtons.isNotEmpty()) {
-            setSpeakerControlsEnabled(!RendererService.busy)
-        }
+        refreshSpeakerControlButtons()
     }
 
     private fun runSpeakerControl(action: SpeakerControls.Action) {
-        if (controlExecutor.isShutdown) return
-        setSpeakerControlsEnabled(false)
+        if (controlExecutor.isShutdown || speakerControlRunning) return
+        speakerControlRunning = true
+        refreshSpeakerControlButtons()
         MobileUi.setStatus(statusView, "Sending speaker command…")
 
         controlExecutor.execute {
             val result = runCatching { SpeakerControls.perform(applicationContext, action) }
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
-                setSpeakerControlsEnabled(true)
+                speakerControlRunning = false
+                refreshSpeakerControlButtons()
                 result.fold(
                     onSuccess = { outcome ->
                         when (outcome.destination) {
@@ -530,6 +531,10 @@ class MainActivity : Activity() {
                 )
             }
         }
+    }
+
+    private fun refreshSpeakerControlButtons() {
+        setSpeakerControlsEnabled(!RendererService.busy && !speakerControlRunning)
     }
 
     private fun setSpeakerControlsEnabled(enabled: Boolean) {
