@@ -200,6 +200,6 @@ internal class RadioStationStore(context: Context) {
         private const val KEY_TUNEIN_ID = "tunein_id"
         private const val KEY_HIDDEN_BUNDLED = "radio_hidden_bundled"
         private const val BUNDLED_ASSET = "station_packs.json"
-        private const val DEFAULT_PACK = "favorites"
+        private const val DEFAULT_PACK = "top3"
     }
 }
