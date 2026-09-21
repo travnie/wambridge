@@ -36,12 +36,16 @@ class MainActivity : Activity() {
     private lateinit var stopRendererButton: Button
     private lateinit var speakerIp: EditText
     private lateinit var statusView: TextView
+    private val speakerControlButtons = mutableListOf<Button>()
     private var manualDiscoveryRunning = false
 
     private val autoDiscoveryGeneration = AtomicInteger()
     private val speakerInputRevision = AtomicInteger()
     private val discoveryExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "wam-mobile-auto-discovery").apply { isDaemon = true }
+    }
+    private val controlExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "wam-mobile-speaker-control").apply { isDaemon = true }
     }
     private val autoDiscoveryRetry = Runnable {
         if (!isFinishing && !isDestroyed) autoDiscoverSpeaker()
@@ -112,6 +116,44 @@ class MainActivity : Activity() {
         })
         content.addView(rendererCard)
 
+        content.addView(MobileUi.sectionTitle(this, "Speaker controls"))
+        val controlsCard = MobileUi.card(this)
+        controlsCard.addView(
+            MobileUi.body(
+                this,
+                "Control native TuneIn or the M5 directly. While DLNA owns the speaker, use the player that started playback.",
+            ),
+        )
+        fun controlButton(label: String, action: SpeakerControls.Action): Button =
+            MobileUi.button(this, label) { runSpeakerControl(action) }.also {
+                speakerControlButtons += it
+            }
+        controlsCard.addView(MobileUi.row(this).apply {
+            setPadding(0, MobileUi.dp(this@MainActivity, 12), 0, 0)
+            MobileUi.addWeighted(
+                this,
+                controlButton("Play / pause", SpeakerControls.Action.PLAY_PAUSE),
+            )
+            MobileUi.addWeighted(
+                this,
+                controlButton("Mute", SpeakerControls.Action.MUTE),
+                marginDp = 0,
+            )
+        })
+        controlsCard.addView(MobileUi.row(this).apply {
+            setPadding(0, MobileUi.dp(this@MainActivity, 8), 0, 0)
+            MobileUi.addWeighted(
+                this,
+                controlButton("Volume −", SpeakerControls.Action.VOLUME_DOWN),
+            )
+            MobileUi.addWeighted(
+                this,
+                controlButton("Volume +", SpeakerControls.Action.VOLUME_UP),
+                marginDp = 0,
+            )
+        })
+        content.addView(controlsCard)
+
         content.addView(MobileUi.sectionTitle(this, "Radio"))
         val radioCard = MobileUi.card(this)
         radioCard.addView(MobileUi.body(this, "Native TuneIn presets, the speaker catalogue, and your saved direct streams."))
@@ -151,6 +193,7 @@ class MainActivity : Activity() {
         autoDiscoveryGeneration.incrementAndGet()
         window.decorView.removeCallbacks(autoDiscoveryRetry)
         discoveryExecutor.shutdownNow()
+        controlExecutor.shutdownNow()
         super.onDestroy()
     }
 
@@ -440,6 +483,54 @@ class MainActivity : Activity() {
             MobileUi.setEnabled(startRendererButton, !RendererService.active)
             MobileUi.setEnabled(stopRendererButton, RendererService.busy)
         }
+    }
+
+    private fun runSpeakerControl(action: SpeakerControls.Action) {
+        if (controlExecutor.isShutdown) return
+        setSpeakerControlsEnabled(false)
+        MobileUi.setStatus(statusView, "Sending speaker command…")
+
+        controlExecutor.execute {
+            val result = runCatching { SpeakerControls.perform(applicationContext, action) }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                setSpeakerControlsEnabled(true)
+                result.fold(
+                    onSuccess = { outcome ->
+                        when (outcome.destination) {
+                            SpeakerControls.Destination.TUNEIN ->
+                                startActivity(Intent(this, TuneInActivity::class.java))
+                            SpeakerControls.Destination.SETTINGS -> speakerIp.requestFocus()
+                            null -> Unit
+                        }
+                        val message = outcome.message
+                            ?: if (outcome.destination == null) "Radio control sent." else null
+                        if (message != null) {
+                            MobileUi.setStatus(
+                                statusView,
+                                message,
+                                if (outcome.destination == SpeakerControls.Destination.SETTINGS) {
+                                    MobileUi.StatusKind.ERROR
+                                } else {
+                                    MobileUi.StatusKind.SUCCESS
+                                },
+                            )
+                        }
+                    },
+                    onFailure = { error ->
+                        MobileUi.setStatus(
+                            statusView,
+                            error.message ?: error.javaClass.simpleName,
+                            MobileUi.StatusKind.ERROR,
+                        )
+                    },
+                )
+            }
+        }
+    }
+
+    private fun setSpeakerControlsEnabled(enabled: Boolean) {
+        speakerControlButtons.forEach { MobileUi.setEnabled(it, enabled) }
     }
 
     private fun requestQuickSettingsTile() {
