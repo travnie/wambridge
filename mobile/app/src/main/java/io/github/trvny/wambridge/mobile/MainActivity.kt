@@ -1,5 +1,6 @@
 package io.github.trvny.wambridge.mobile
 
+import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.StatusBarManager
@@ -28,6 +29,7 @@ import java.util.concurrent.atomic.AtomicInteger
  * `setComponentEnabledSetting` on a component that does not exist is a silent no-op.
  */
 internal const val LAUNCHER_ALIAS_CLASS = "trvny.wambridge.mobile.LauncherAlias"
+private const val REQUEST_NOTIFICATIONS = 4101
 
 class MainActivity : Activity() {
     private lateinit var launcherButton: Button
@@ -59,6 +61,7 @@ class MainActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         MobileUi.applyWindow(this)
+        requestNotificationPermission()
 
         val content = MobileUi.page(this)
         content.addView(
@@ -183,6 +186,15 @@ class MainActivity : Activity() {
         refreshLauncherButton()
         refreshStatus()
         window.decorView.post(autoDiscoveryRetry)
+    }
+
+    private fun requestNotificationPermission() {
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+        ) {
+            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQUEST_NOTIFICATIONS)
+        }
     }
 
     override fun onResume() {
