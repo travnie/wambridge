@@ -359,7 +359,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     private fun stopRenderer(
         removeForeground: Boolean = true,
         updatePhase: Boolean = true,
-    ) {
+    ) = SpeakerControlGate.serial {
         if (updatePhase && phase != Phase.STOPPED) setPhase(Phase.STOPPING)
         cancelIdleRelease()
         rendererState?.transportState = "STOPPED"
@@ -392,13 +392,13 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     private fun runOnWorker(action: () -> Unit) {
         if (destroyed) return
         if (Thread.currentThread().name == WORKER_THREAD_NAME) {
-            action()
+            SpeakerControlGate.serial(action)
             return
         }
 
         try {
             worker.submit {
-                if (!destroyed) action()
+                if (!destroyed) SpeakerControlGate.serial(action)
             }.get(CONTROL_ACTION_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         } catch (error: Exception) {
             throw IllegalStateException("Adapter control action failed", error)
