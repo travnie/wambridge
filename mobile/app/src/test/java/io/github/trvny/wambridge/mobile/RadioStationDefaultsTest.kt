@@ -58,7 +58,7 @@ class RadioStationDefaultsTest {
 
     @Test
     fun aSavedAliasIsPlayedFromWhatWasSaved() {
-        assertEquals(bundled[0], radioStationToPlay("Trojka", null, bundled))
+        assertEquals(bundled.first { it.alias == "trojka" }, radioStationToPlay("Trojka", null, bundled))
     }
 
     @Test
