@@ -345,10 +345,15 @@ internal object SamsungCatalogue {
     }
 
     private fun parseXml(body: String, what: String): Element {
+        // Android's built-in parser does not implement the Apache
+        // disallow-doctype-decl feature by name on every device. Reject the
+        // construct ourselves, then ask for every parser hardening knob it does
+        // support instead of turning an unsupported feature into a UI error.
+        if (body.contains("<!DOCTYPE", ignoreCase = true)) {
+            throw IOException("Samsung WAM returned invalid $what XML: DOCTYPE is not allowed")
+        }
         val factory = DocumentBuilderFactory.newInstance().apply {
-            // Fail closed: untrusted network XML must not allow any DOCTYPE.
-            // If this parser cannot enforce it, refuse to parse.
-            setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+            harden("http://apache.org/xml/features/disallow-doctype-decl")
             harden("http://xml.org/sax/features/external-general-entities", false)
             harden("http://xml.org/sax/features/external-parameter-entities", false)
             isExpandEntityReferences = false
