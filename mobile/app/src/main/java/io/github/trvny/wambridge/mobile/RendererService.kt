@@ -145,6 +145,8 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         releaseRadio()
         if (!shouldKeepStarting(generation)) return
 
+        SpeakerControlGate.enter()
+        try {
         val preferences = getSharedPreferences(PREFS, MODE_PRIVATE)
         lastStatus = "Finding WAM speaker on Wi-Fi…"
         publish(lastStatus)
@@ -222,6 +224,9 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
             } catch (_: Exception) {
                 // Best effort while abandoning a partially started renderer.
             }
+        }
+        } finally {
+            SpeakerControlGate.exit()
         }
     }
 
@@ -332,16 +337,18 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
                 try {
                     worker.execute {
                         if (destroyed || !ownsPlayback) return@execute
-                        try {
-                            wamChannel?.pause()
-                        } catch (_: Exception) {
-                            // Closing the channel still prevents the adapter from holding resources.
-                        } finally {
-                            ownsPlayback = false
-                            safeVolumeApplied = false
-                            closeWamChannel()
-                            rendererState?.transportState = "STOPPED"
-                            publish("Stream ended · speaker released")
+                        SpeakerControlGate.serial {
+                            try {
+                                wamChannel?.pause()
+                            } catch (_: Exception) {
+                                // Closing the channel still prevents the adapter from holding resources.
+                            } finally {
+                                ownsPlayback = false
+                                safeVolumeApplied = false
+                                closeWamChannel()
+                                rendererState?.transportState = "STOPPED"
+                                publish("Stream ended · speaker released")
+                            }
                         }
                     }
                 } catch (_: RejectedExecutionException) {
@@ -354,7 +361,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     private fun stopRenderer(
         removeForeground: Boolean = true,
         updatePhase: Boolean = true,
-    ) {
+    ) = SpeakerControlGate.serial {
         if (updatePhase && phase != Phase.STOPPED) setPhase(Phase.STOPPING)
         cancelIdleRelease()
         rendererState?.transportState = "STOPPED"
@@ -387,13 +394,13 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     private fun runOnWorker(action: () -> Unit) {
         if (destroyed) return
         if (Thread.currentThread().name == WORKER_THREAD_NAME) {
-            action()
+            SpeakerControlGate.serial(action)
             return
         }
 
         try {
             worker.submit {
-                if (!destroyed) action()
+                if (!destroyed) SpeakerControlGate.serial(action)
             }.get(CONTROL_ACTION_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         } catch (error: Exception) {
             throw IllegalStateException("Adapter control action failed", error)

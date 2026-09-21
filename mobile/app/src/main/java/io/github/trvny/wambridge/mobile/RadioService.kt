@@ -149,6 +149,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         stopRadio(removeForeground = false, clearDesired = false)
         if (!releaseRendererForRadioStart()) return
 
+        SpeakerControlGate.enter()
+        try {
         val boundTarget = resolveRadioTarget() ?: return
         speakerIp = boundTarget.ip
 
@@ -204,6 +206,9 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                 "Could not start ${selected.alias}: ${error.message ?: error.javaClass.simpleName}",
                 retryable = wifiRecovery,
             )
+        }
+        } finally {
+            SpeakerControlGate.exit()
         }
     }
 
@@ -430,9 +435,9 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         }
     }
 
-    private fun togglePause() {
-        if (!running) return
-        val activeChannel = channel ?: return
+    private fun togglePause() = SpeakerControlGate.serial {
+        if (!running) return@serial
+        val activeChannel = channel ?: return@serial
         val alias = station?.alias ?: "Radio"
         paused = !paused
         if (safeVolumeApplied) activeChannel.setVolumeRaw(audibleVolume())
@@ -440,18 +445,18 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         publish(lastStatus)
     }
 
-    private fun toggleMute() {
-        if (!running) return
-        val activeChannel = channel ?: return
+    private fun toggleMute() = SpeakerControlGate.serial {
+        if (!running) return@serial
+        val activeChannel = channel ?: return@serial
         muted = !muted
         if (safeVolumeApplied) activeChannel.setVolumeRaw(audibleVolume())
         lastStatus = "${station?.alias ?: "Radio"} · ${if (muted) "muted" else "unmuted"}"
         publish(lastStatus)
     }
 
-    private fun changeVolume(delta: Int) {
-        if (!running) return
-        val activeChannel = channel ?: return
+    private fun changeVolume(delta: Int) = SpeakerControlGate.serial {
+        if (!running) return@serial
+        val activeChannel = channel ?: return@serial
         targetVolume = (targetVolume + delta)
             .coerceIn(SamsungWamChannel.MIN_VOLUME_STEP, SamsungWamChannel.MAX_VOLUME_STEP)
         if (safeVolumeApplied) activeChannel.setVolumeRaw(audibleVolume())
@@ -464,7 +469,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
     private fun stopRadio(
         removeForeground: Boolean = true,
         clearDesired: Boolean = true,
-    ) {
+    ) = SpeakerControlGate.serial {
         if (channel != null) {
             runCatching { channel?.pause() }
         }

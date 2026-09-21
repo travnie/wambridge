@@ -89,53 +89,28 @@ class WamBridgeWidget : AppWidgetProvider() {
     }
 
     private fun runRemoteAction(context: Context, action: String) {
+        val control = when (action) {
+            ACTION_PLAY_PAUSE -> SpeakerControls.Action.PLAY_PAUSE
+            ACTION_MUTE -> SpeakerControls.Action.MUTE
+            ACTION_VOLUME_DOWN -> SpeakerControls.Action.VOLUME_DOWN
+            ACTION_VOLUME_UP -> SpeakerControls.Action.VOLUME_UP
+            else -> return
+        }
         val pending = goAsync()
         val appContext = context.applicationContext
         Thread({
             try {
-                if (RadioService.active) {
-                    val radioAction = when (action) {
-                        ACTION_PLAY_PAUSE -> RadioService.ACTION_TOGGLE_PAUSE
-                        ACTION_MUTE -> RadioService.ACTION_MUTE
-                        ACTION_VOLUME_DOWN -> RadioService.ACTION_VOLUME_DOWN
-                        ACTION_VOLUME_UP -> RadioService.ACTION_VOLUME_UP
-                        else -> null
-                    }
-                    if (radioAction != null) {
-                        appContext.startService(
-                            Intent(appContext, RadioService::class.java).apply { this.action = radioAction },
+                val outcome = SpeakerControls.perform(appContext, control)
+                outcome.message?.let { showToast(appContext, it) }
+                when (outcome.destination) {
+                    SpeakerControls.Destination.SETTINGS -> openSettings(appContext)
+                    SpeakerControls.Destination.TUNEIN ->
+                        appContext.startActivity(
+                            Intent(appContext, TuneInActivity::class.java)
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
                         )
-                        return@Thread
-                    }
+                    null -> Unit
                 }
-                check(!RendererService.busy) {
-                    "The local adapter currently owns speaker control"
-                }
-                val target = SpeakerTarget.resolve(appContext)
-                if (target == null) {
-                    showToast(appContext, "No WAM speaker found")
-                    openSettings(appContext)
-                    return@Thread
-                }
-                val message = when (action) {
-                    ACTION_PLAY_PAUSE -> when (SpeakerRemote.toggleNativePlayback(appContext, target)) {
-                        SpeakerRemote.PlaybackToggleResult.PAUSED -> "TuneIn paused"
-                        SpeakerRemote.PlaybackToggleResult.PLAYING -> "TuneIn playing"
-                        SpeakerRemote.PlaybackToggleResult.NO_NATIVE_PLAYBACK -> {
-                            appContext.startActivity(
-                                Intent(appContext, TuneInActivity::class.java)
-                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                            )
-                            null
-                        }
-                    }
-
-                    ACTION_MUTE -> if (SpeakerRemote.toggleMute(appContext, target)) "Muted" else "Unmuted"
-                    ACTION_VOLUME_DOWN -> "Volume ${SpeakerRemote.changeVolume(appContext, target, -1)}"
-                    ACTION_VOLUME_UP -> "Volume ${SpeakerRemote.changeVolume(appContext, target, 1)}"
-                    else -> null
-                }
-                message?.let { showToast(appContext, it) }
             } catch (error: Exception) {
                 showToast(appContext, error.message ?: error.javaClass.simpleName)
             } finally {

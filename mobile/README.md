@@ -25,7 +25,9 @@ The Android adapter provides:
 - safe first-start volume capped at M5 raw step `3`;
 - idle/session release so stopped playback does not keep the M5 awake;
 - a Quick Settings tile: tap toggles the renderer, long-press opens settings;
-- a compact toggle widget plus an expanded widget with play/pause, mute and raw-volume controls;
+- an in-app speaker remote plus a compact renderer-toggle widget and an expanded controls
+  widget; the in-app remote and expanded widget share play/pause, mute and raw-volume routing
+  for radio and native speaker playback;
 - optional launcher-icon hiding;
 - native TuneIn preset browsing and safe playback through the speaker CPM API, with station
   artwork/metadata when TuneIn exposes it and play/pause, mute, raw-volume and confirmed Stop
