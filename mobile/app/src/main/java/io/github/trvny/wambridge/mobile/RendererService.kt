@@ -337,16 +337,18 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
                 try {
                     worker.execute {
                         if (destroyed || !ownsPlayback) return@execute
-                        try {
-                            wamChannel?.pause()
-                        } catch (_: Exception) {
-                            // Closing the channel still prevents the adapter from holding resources.
-                        } finally {
-                            ownsPlayback = false
-                            safeVolumeApplied = false
-                            closeWamChannel()
-                            rendererState?.transportState = "STOPPED"
-                            publish("Stream ended · speaker released")
+                        SpeakerControlGate.serial {
+                            try {
+                                wamChannel?.pause()
+                            } catch (_: Exception) {
+                                // Closing the channel still prevents the adapter from holding resources.
+                            } finally {
+                                ownsPlayback = false
+                                safeVolumeApplied = false
+                                closeWamChannel()
+                                rendererState?.transportState = "STOPPED"
+                                publish("Stream ended · speaker released")
+                            }
                         }
                     }
                 } catch (_: RejectedExecutionException) {
