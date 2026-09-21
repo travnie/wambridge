@@ -18,7 +18,7 @@ internal object SpeakerControls {
         val destination: Destination? = null,
     )
 
-    fun perform(context: Context, action: Action): Outcome {
+    fun perform(context: Context, action: Action): Outcome = SpeakerControlGate.serial {
         val appContext = context.applicationContext
         if (RadioService.active) {
             appContext.startService(
@@ -31,7 +31,7 @@ internal object SpeakerControls {
                     }
                 },
             )
-            return Outcome()
+            return@serial Outcome()
         }
 
         check(!RendererService.busy) {
@@ -39,12 +39,12 @@ internal object SpeakerControls {
         }
 
         val target = SpeakerTarget.resolve(appContext)
-            ?: return Outcome(
+            ?: return@serial Outcome(
                 message = "No WAM speaker found",
                 destination = Destination.SETTINGS,
             )
 
-        return when (action) {
+        when (action) {
             Action.PLAY_PAUSE -> when (SpeakerRemote.toggleNativePlayback(appContext, target)) {
                 SpeakerRemote.PlaybackToggleResult.PAUSED -> Outcome("TuneIn paused")
                 SpeakerRemote.PlaybackToggleResult.PLAYING -> Outcome("TuneIn playing")
