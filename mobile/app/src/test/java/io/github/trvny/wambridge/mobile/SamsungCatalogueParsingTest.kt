@@ -81,6 +81,14 @@ class SamsungCatalogueParsingTest {
     }
 
     @Test
+    fun doctypeIsRejectedBeforeParserSpecificFeaturesMatter() {
+        val body = "<!DOCTYPE foo [<!ENTITY xxe SYSTEM=\"file:///etc/passwd\">]><CPM>&xxe;</CPM>"
+        val error = runCatching { SamsungCatalogue.parsePage(body) }.exceptionOrNull()
+
+        assertTrue(error?.message.orEmpty().contains("DOCTYPE is not allowed"))
+    }
+
+    @Test
     fun malformedXmlIsReportedRatherThanReturnedEmpty() {
         val error = runCatching { SamsungCatalogue.parsePage("<CPM><response") }.exceptionOrNull()
 

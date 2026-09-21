@@ -169,6 +169,18 @@ class WamBridgeWidget : AppWidgetProvider() {
             val manager = AppWidgetManager.getInstance(context)
             val ids = manager.getAppWidgetIds(ComponentName(context, WamBridgeWidget::class.java))
             ids.forEach { update(context, manager, it, active) }
+            val controlIds = manager.getAppWidgetIds(
+                ComponentName(context, WamBridgeControlsWidget::class.java),
+            )
+            controlIds.forEach { updateControls(context, manager, it) }
+        }
+
+        internal fun updateControlsWidget(
+            context: Context,
+            manager: AppWidgetManager,
+            appWidgetId: Int,
+        ) {
+            updateControls(context, manager, appWidgetId)
         }
 
         private fun update(

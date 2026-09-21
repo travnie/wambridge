@@ -609,12 +609,12 @@ operating system records.
     tile, compact and expanded widgets, native TuneIn controls with artwork, and saved direct
     radio stations.
 
-    **Extended on 2026-08-27:** Android now consumes the same bundled
-    `src/wambridge/station_packs.json` as the desktop CLI, so the radio screen is useful on a
-    fresh install instead of opening empty. User edits override bundled entries and deletions stay
-    deleted. The mobile list currently exposes 14 relay-compatible favorites with their ordered
-    URL fallbacks and TuneIn ids; the three HLS/Ogg-only entries (`bbc1`, `bbc6`, `falloutfm5`)
-    remain desktop-only until the phone has a transcoding path.
+    **Extended on 2026-09-21:** Android still consumes the shared
+    `src/wambridge/station_packs.json`, but a fresh install now starts with the focused `top3`
+    pack: BBC Radio 1 (`s24939`), Trójka (`s15984`) and Czwórka (`s118200`), each with its
+    ordered fallback URLs. User edits override bundled entries and deletions stay deleted. BBC
+    and Trójka still have HLS/Ogg fallbacks, so mobile tries their TuneIn resolution first while
+    the phone-side relay remains non-transcoding; `bbc6` and `falloutfm5` stay desktop-only.
 
     Renderer startup is also an explicit `STARTING/RUNNING/STOPPING/STOPPED` lifecycle now.
     Discovery can be cancelled by Stop, saved speakers are re-found by stable `GetDeviceId` after

@@ -25,15 +25,18 @@ The Android adapter provides:
 - safe first-start volume capped at M5 raw step `3`;
 - idle/session release so stopped playback does not keep the M5 awake;
 - a Quick Settings tile: tap toggles the renderer, long-press opens settings;
-- an in-app speaker remote plus a compact renderer-toggle widget and an expanded controls
-  widget; the in-app remote and expanded widget share play/pause, mute and raw-volume routing
-  for radio and native speaker playback;
+- an in-app speaker remote plus two explicit home-screen widget choices: a compact
+  DLNA toggle and a full remote; the app and remote widget share play/pause, mute and
+  raw-volume routing for radio and native speaker playback;
 - optional launcher-icon hiding;
 - native TuneIn preset browsing and safe playback through the speaker CPM API, with station
   artwork/metadata when TuneIn exposes it and play/pause, mute, raw-volume and confirmed Stop
   controls on the standalone screen;
 - saved direct radio stations with optional TuneIn station IDs, resolved at play time ahead of
-  ordered fallback URLs and relayed locally by the phone;
+  ordered fallback URLs and relayed locally by the phone; a fresh install starts with the
+  BBC Radio 1, Trójka and Czwórka bundle;
+- Android 13+ notification permission is requested on launch so renderer/radio foreground
+  controls can actually appear in the notification shade;
 - an M5-style app/renderer icon exposed through UPnP for players such as Neutron;
 
 Physical phone + M5 playback through Neutron is confirmed. The direct mobile radio relay intentionally rejects HLS and Ogg until a phone-side transcoding layer exists; the desktop bridge remains the fully transcoding radio path.

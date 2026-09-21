@@ -7,6 +7,7 @@ import org.junit.Test
 
 class RadioStationDefaultsTest {
     private val bundled = listOf(
+        MobileRadioStation("bbc1", listOf("http://builtin/bbc1"), "s24939"),
         MobileRadioStation("trojka", listOf("http://builtin/trojka"), "s15984"),
         MobileRadioStation("czworka", listOf("http://builtin/czworka"), "s118200"),
     )
@@ -22,7 +23,7 @@ class RadioStationDefaultsTest {
         val merged = mergeRadioStations(listOf(custom), bundled)
 
         assertEquals(custom, merged.first { it.alias == "trojka" })
-        assertEquals(2, merged.size)
+        assertEquals(3, merged.size)
     }
     @Test
     fun hiddenBundledStationStaysDeleted() {
@@ -33,7 +34,7 @@ class RadioStationDefaultsTest {
         )
 
         assertFalse(merged.any { it.alias.equals("trojka", ignoreCase = true) })
-        assertEquals(listOf("czworka"), merged.map { it.alias })
+        assertEquals(listOf("bbc1", "czworka"), merged.map { it.alias })
     }
 
     @Test
@@ -52,12 +53,12 @@ class RadioStationDefaultsTest {
         val custom = MobileRadioStation("my-radio", listOf("http://custom/radio"))
         val merged = mergeRadioStations(listOf(custom), bundled)
 
-        assertEquals(listOf("trojka", "czworka", "my-radio"), merged.map { it.alias })
+        assertEquals(listOf("bbc1", "trojka", "czworka", "my-radio"), merged.map { it.alias })
     }
 
     @Test
     fun aSavedAliasIsPlayedFromWhatWasSaved() {
-        assertEquals(bundled[0], radioStationToPlay("Trojka", null, bundled))
+        assertEquals(bundled.first { it.alias == "trojka" }, radioStationToPlay("Trojka", null, bundled))
     }
 
     @Test
