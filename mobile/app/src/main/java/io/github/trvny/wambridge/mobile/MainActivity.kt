@@ -483,6 +483,9 @@ class MainActivity : Activity() {
             MobileUi.setEnabled(startRendererButton, !RendererService.active)
             MobileUi.setEnabled(stopRendererButton, RendererService.busy)
         }
+        if (speakerControlButtons.isNotEmpty()) {
+            setSpeakerControlsEnabled(!RendererService.busy)
+        }
     }
 
     private fun runSpeakerControl(action: SpeakerControls.Action) {
