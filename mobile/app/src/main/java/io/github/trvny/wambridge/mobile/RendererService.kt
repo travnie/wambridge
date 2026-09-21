@@ -145,6 +145,8 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         releaseRadio()
         if (!shouldKeepStarting(generation)) return
 
+        SpeakerControlGate.enter()
+        try {
         val preferences = getSharedPreferences(PREFS, MODE_PRIVATE)
         lastStatus = "Finding WAM speaker on Wi-Fi…"
         publish(lastStatus)
@@ -222,6 +224,9 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
             } catch (_: Exception) {
                 // Best effort while abandoning a partially started renderer.
             }
+        }
+        } finally {
+            SpeakerControlGate.exit()
         }
     }
 
