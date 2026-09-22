@@ -170,6 +170,45 @@ internal object MobileUi {
         gravity = Gravity.CENTER_VERTICAL
     }
 
+    fun bottomNavigation(context: Context): LinearLayout = row(context).apply {
+        setPadding(dp(context, 12), dp(context, 8), dp(context, 12), dp(context, 10))
+        background = rounded(
+            context,
+            fill = context.getColor(R.color.wam_surface),
+            stroke = context.getColor(R.color.wam_border),
+            radiusDp = 18,
+        )
+    }
+
+    fun navigationButton(
+        context: Context,
+        text: String,
+        click: () -> Unit,
+    ): Button = button(context, text, ButtonKind.QUIET, click).apply {
+        minHeight = dp(context, 44)
+    }
+
+    fun setNavigationSelected(button: Button, selected: Boolean) {
+        val context = button.context
+        button.background = RippleDrawable(
+            ColorStateList.valueOf(Color.argb(24, 0, 0, 0)),
+            rounded(
+                context,
+                fill = context.getColor(
+                    if (selected) R.color.wam_accent_soft else R.color.wam_surface,
+                ),
+                stroke = context.getColor(
+                    if (selected) R.color.wam_accent_soft else R.color.wam_surface,
+                ),
+                radiusDp = 14,
+            ),
+            null,
+        )
+        button.setTextColor(
+            context.getColor(if (selected) R.color.wam_accent else R.color.wam_muted),
+        )
+    }
+
     fun setEnabled(view: View, enabled: Boolean) {
         view.isEnabled = enabled
         view.alpha = if (enabled) 1f else 0.45f

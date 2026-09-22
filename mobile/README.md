@@ -41,6 +41,14 @@ The Android adapter provides:
 
 Physical phone + M5 playback through Neutron is confirmed. The direct mobile radio relay intentionally rejects HLS and Ogg until a phone-side transcoding layer exists; the desktop bridge remains the fully transcoding radio path.
 
+### Android navigation
+
+The launcher now opens a persistent **Home · Radio · Settings** shell. Home is the default
+landing screen and reads the shared runtime speaker snapshot, Radio keeps the existing Presets,
+Browse and Stations tools, and Settings owns speaker setup, renderer controls, direct speaker
+controls and system integration. Switching root destinations reuses the same panes instead of
+recreating Activities.
+
 ### Speaker discovery
 
 All Android start surfaces use the same target resolution path:

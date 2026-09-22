@@ -38,4 +38,17 @@ class AndroidUxContractTest {
             assertTrue(!source.contains("SpeakerTarget.resolve"))
         }
     }
+
+    @Test
+    fun widgetSettingsRouteUsesTheSettingsDestination() {
+        val widget = File(
+            "src/main/java/io/github/trvny/wambridge/mobile/WamBridgeWidget.kt",
+        ).readText()
+
+        assertTrue(
+            widget.contains(
+                "MainNavigation.intent(context, MainDestination.SETTINGS)",
+            ),
+        )
+    }
 }
