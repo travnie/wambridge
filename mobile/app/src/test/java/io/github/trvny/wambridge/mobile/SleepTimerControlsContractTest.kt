@@ -38,11 +38,13 @@ class SleepTimerControlsContractTest {
     }
 
     @Test
-    fun servicesCanQueueTimerIntentUntilTheirChannelExists() {
-        assertTrue(radio.contains("pendingSleepTimerSeconds"))
-        assertTrue(renderer.contains("pendingSleepTimerSeconds"))
-        assertTrue(radio.contains("applyPendingSleepTimer"))
-        assertTrue(renderer.contains("applyPendingSleepTimer"))
+    fun servicesExplicitlyAcknowledgeStableOwnerRequests() {
+        assertTrue(radio.contains("SleepTimerOwnerRequests.complete"))
+        assertTrue(renderer.contains("SleepTimerOwnerRequests.complete"))
+        assertTrue(radio.contains("if (!running"))
+        assertTrue(renderer.contains("phase != Phase.RUNNING"))
+        assertFalse(radio.contains("pendingSleepTimerSeconds"))
+        assertFalse(renderer.contains("pendingSleepTimerSeconds"))
     }
 
     @Test
@@ -92,6 +94,7 @@ class SleepTimerControlsContractTest {
         val text = controls.readText()
         assertTrue(text.contains("restoreRequestedState"))
         assertTrue(text.contains("val previous = SpeakerStateStore.current().sleepTimer"))
+        assertTrue(text.contains("SleepTimerOwnerRequests.await"))
         assertTrue(text.contains("catch (error: Exception)"))
     }
 
