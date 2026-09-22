@@ -32,4 +32,18 @@ class SleepTimerSurfaceContractTest {
         assertTrue(main.contains("snapshot.sleepTimer"))
         assertFalse(main.contains("CountDownTimer"))
     }
+    @Test
+    fun requestedTimerIsNotRenderedAsConfirmedSuccess() {
+        assertTrue(main.contains("outcome.state.phase"))
+        assertTrue(
+            main.contains(
+                "SleepTimerPhase.REQUESTED, SleepTimerPhase.UNKNOWN -> MobileUi.StatusKind.INFO",
+            ),
+        )
+        assertTrue(
+            main.contains(
+                "SleepTimerPhase.ARMED, SleepTimerPhase.OFF -> MobileUi.StatusKind.SUCCESS",
+            ),
+        )
+    }
 }
