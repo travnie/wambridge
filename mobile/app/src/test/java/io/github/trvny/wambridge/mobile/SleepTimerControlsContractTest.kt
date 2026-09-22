@@ -19,7 +19,7 @@ class SleepTimerControlsContractTest {
     @Test
     fun activeOwnersReceiveTimerCommandsInsideTheirServices() {
         val text = controls.readText()
-        assertTrue(text.contains("RadioService.running"))
+        assertTrue(text.contains("RadioService.acceptsSleepTimerCommands"))
         assertTrue(text.contains("RadioService.ACTION_SET_SLEEP_TIMER"))
         assertTrue(text.contains("RendererService.phase == RendererService.Phase.RUNNING"))
         assertTrue(text.contains("RendererService.ACTION_SET_SLEEP_TIMER"))
@@ -31,7 +31,7 @@ class SleepTimerControlsContractTest {
     fun idlePathRechecksOwnershipInsideSpeakerGate() {
         val text = controls.readText()
         assertTrue(text.contains("SpeakerControlGate.serial"))
-        assertTrue(text.contains("RadioService.running"))
+        assertTrue(text.contains("RadioService.acceptsSleepTimerCommands"))
         assertTrue(text.contains("RendererService.phase == RendererService.Phase.RUNNING"))
         assertTrue(text.contains("SpeakerTarget.resolve("))
         assertTrue(text.contains("SpeakerRemote.setSleepTimer"))
@@ -41,7 +41,7 @@ class SleepTimerControlsContractTest {
     fun servicesExplicitlyAcknowledgeStableOwnerRequests() {
         assertTrue(radio.contains("SleepTimerOwnerRequests.complete"))
         assertTrue(renderer.contains("SleepTimerOwnerRequests.complete"))
-        assertTrue(radio.contains("if (!running"))
+        assertTrue(radio.contains("if (!acceptsSleepTimerCommands"))
         assertTrue(renderer.contains("phase != Phase.RUNNING"))
         assertFalse(radio.contains("pendingSleepTimerSeconds"))
         assertFalse(renderer.contains("pendingSleepTimerSeconds"))
@@ -83,7 +83,7 @@ class SleepTimerControlsContractTest {
         val setStart = text.indexOf("private fun dispatchSetToOwner")
         val setEnd = text.indexOf("private fun dispatchRefreshToOwner", setStart)
         val setBlock = text.substring(setStart, setEnd)
-        assertTrue(setBlock.contains("RadioService.running"))
+        assertTrue(setBlock.contains("RadioService.acceptsSleepTimerCommands"))
         assertTrue(setBlock.contains("RendererService.phase == RendererService.Phase.RUNNING"))
         assertFalse(setBlock.contains("RadioService.active ->"))
         assertFalse(setBlock.contains("RendererService.busy ->"))
