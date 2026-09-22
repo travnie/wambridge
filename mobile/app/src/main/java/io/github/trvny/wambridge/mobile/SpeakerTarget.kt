@@ -117,6 +117,7 @@ internal object SpeakerTarget {
         context: Context,
         verifySaved: Boolean = true,
         persist: Boolean = true,
+        forceDiscovery: Boolean = false,
         shouldContinue: () -> Boolean = { true },
         onStage: (SpeakerDiscoveryStage) -> Unit = {},
     ): ResolveOutcome = withDiscoveryLock {
@@ -131,7 +132,7 @@ internal object SpeakerTarget {
         // Keep the deliberate fast path used by native TuneIn controls while an
         // owner already holds the speaker. Those callers explicitly opt out of
         // verification so discovery never opens a competing control connection.
-        if (savedIsValid && (RadioService.running || !verifySaved)) {
+        if (!forceDiscovery && savedIsValid && (RadioService.running || !verifySaved)) {
             return@withDiscoveryLock finishFound(
                 appContext,
                 Resolution(savedIp, savedId.ifBlank { null }),
@@ -145,7 +146,7 @@ internal object SpeakerTarget {
             return@withDiscoveryLock ResolveOutcome.NotFound(WamDiscovery.Scan.NotRun)
         }
 
-        if (savedIsValid) {
+        if (!forceDiscovery && savedIsValid) {
             onStage(SpeakerDiscoveryStage.CHECKING_SAVED)
             resolveSaved(appContext, savedIp, savedId, shouldContinue)?.let { resolution ->
                 return@withDiscoveryLock finishFound(
@@ -167,8 +168,18 @@ internal object SpeakerTarget {
         )
         if (!shouldContinue()) return@withDiscoveryLock ResolveOutcome.Cancelled
 
-        val selected = selectCandidate(savedIp, savedId, discovery.speakers) { ip ->
-            if (!shouldContinue()) null else identify(appContext, ip)
+        val identities = mutableMapOf<String, String?>()
+        fun identified(ip: String): String? {
+            if (!identities.containsKey(ip)) identities[ip] = identify(appContext, ip)
+            return identities[ip]
+        }
+
+        val selected = if (forceDiscovery) {
+            discovery.speakers.singleOrNull()
+        } else {
+            selectCandidate(savedIp, savedId, discovery.speakers) { ip ->
+                if (!shouldContinue()) null else identified(ip)
+            }
         }
         if (!shouldContinue()) return@withDiscoveryLock ResolveOutcome.Cancelled
 
@@ -180,7 +191,7 @@ internal object SpeakerTarget {
             }
         }
 
-        val selectedId = identify(appContext, selected.ip)
+        val selectedId = identified(selected.ip)
         if (!shouldContinue()) return@withDiscoveryLock ResolveOutcome.Cancelled
 
         finishFound(
@@ -233,13 +244,28 @@ internal object SpeakerTarget {
 
     /** Persist a validated automatic result together with its stable device id. */
     fun rememberResolved(context: Context, result: Resolution) {
-        val editor = context.applicationContext
+        val preferences = context.applicationContext
             .getSharedPreferences(RendererService.PREFS, Context.MODE_PRIVATE)
-            .edit()
-            .putString(RendererService.KEY_SPEAKER_IP, result.ip)
-        if (!result.deviceId.isNullOrBlank()) editor.putString(KEY_SPEAKER_DEVICE_ID, result.deviceId)
+        val previousIp = preferences.getString(RendererService.KEY_SPEAKER_IP, "").orEmpty().trim()
+        val previousDeviceId = preferences.getString(KEY_SPEAKER_DEVICE_ID, "").orEmpty().trim()
+        val rememberedDeviceId = deviceIdToPersist(previousIp, previousDeviceId, result)
+
+        val editor = preferences.edit().putString(RendererService.KEY_SPEAKER_IP, result.ip)
+        if (rememberedDeviceId == null) {
+            editor.remove(KEY_SPEAKER_DEVICE_ID)
+        } else {
+            editor.putString(KEY_SPEAKER_DEVICE_ID, rememberedDeviceId)
+        }
         editor.apply()
     }
+
+    internal fun deviceIdToPersist(
+        previousIp: String,
+        previousDeviceId: String,
+        result: Resolution,
+    ): String? =
+        result.deviceId?.takeIf { it.isNotBlank() }
+            ?: previousDeviceId.takeIf { previousIp == result.ip && it.isNotBlank() }
 
     fun acceptDiscovered(
         context: Context,
