@@ -637,10 +637,16 @@ class MainActivity : Activity() {
                 renderSleepTimerState(SpeakerStateStore.current().sleepTimer)
                 result.fold(
                     onSuccess = { outcome ->
+                        val kind = when (outcome.state.phase) {
+                            SleepTimerPhase.REQUESTED, SleepTimerPhase.UNKNOWN ->
+                                MobileUi.StatusKind.INFO
+                            SleepTimerPhase.ARMED, SleepTimerPhase.OFF ->
+                                MobileUi.StatusKind.SUCCESS
+                        }
                         MobileUi.setStatus(
                             homeStatusView,
                             outcome.message,
-                            MobileUi.StatusKind.SUCCESS,
+                            kind,
                         )
                     },
                     onFailure = { error ->
