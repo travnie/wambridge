@@ -67,4 +67,12 @@ class SleepTimerControlsContractTest {
         assertFalse(standby.contains("RadioService.ACTION_PLAY"))
         assertFalse(standby.contains("RendererService.ACTION_START"))
     }
+    @Test
+    fun rendererClearsTemporaryTimerChannelOwnershipWhenChannelCloses() {
+        assertTrue(renderer.contains("releaseTimerChannelAfterReply = false"))
+        val closeStart = renderer.indexOf("private fun closeWamChannel()")
+        val closeEnd = renderer.indexOf("private fun", closeStart + 12)
+        val closeBlock = renderer.substring(closeStart, closeEnd)
+        assertTrue(closeBlock.contains("releaseTimerChannelAfterReply = false"))
+    }
 }
