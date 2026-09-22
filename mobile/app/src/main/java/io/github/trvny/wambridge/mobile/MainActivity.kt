@@ -169,16 +169,16 @@ class MainActivity : Activity() {
                 LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f),
             )
         })
+        fun homeControl(
+            label: String,
+            action: SpeakerControls.Action,
+            kind: MobileUi.ButtonKind = MobileUi.ButtonKind.SECONDARY,
+        ): Button = MobileUi.button(this, label, kind) {
+            runSpeakerControl(action, homeStatusView)
+        }.also { speakerControlButtons += it }
+
         nowPlaying.addView(MobileUi.row(this).apply {
             setPadding(0, MobileUi.dp(this@MainActivity, 14), 0, 0)
-            fun homeControl(
-                label: String,
-                action: SpeakerControls.Action,
-                kind: MobileUi.ButtonKind = MobileUi.ButtonKind.SECONDARY,
-            ): Button = MobileUi.button(this@MainActivity, label, kind) {
-                runSpeakerControl(action, homeStatusView)
-            }.also { speakerControlButtons += it }
-
             val stopButton = MobileUi.button(
                 this@MainActivity,
                 "Stop",
@@ -190,13 +190,21 @@ class MainActivity : Activity() {
                 MobileUi.ButtonKind.PRIMARY,
             )
             homeMuteButton = homeControl("Mute", SpeakerControls.Action.MUTE)
-            val volumeDown = homeControl("−", SpeakerControls.Action.VOLUME_DOWN)
-            val volumeUp = homeControl("+", SpeakerControls.Action.VOLUME_UP)
-            MobileUi.addWeighted(this, stopButton, 0.75f)
+            MobileUi.addWeighted(this, stopButton, 0.85f)
             MobileUi.addWeighted(this, homePlayPauseButton, 1.35f)
-            MobileUi.addWeighted(this, homeMuteButton, 1f)
-            MobileUi.addWeighted(this, volumeDown, 0.55f)
-            MobileUi.addWeighted(this, volumeUp, 0.55f, marginDp = 0)
+            MobileUi.addWeighted(this, homeMuteButton, 1f, marginDp = 0)
+        })
+        nowPlaying.addView(MobileUi.row(this).apply {
+            setPadding(0, MobileUi.dp(this@MainActivity, 8), 0, 0)
+            MobileUi.addWeighted(
+                this,
+                homeControl("Volume −", SpeakerControls.Action.VOLUME_DOWN),
+            )
+            MobileUi.addWeighted(
+                this,
+                homeControl("Volume +", SpeakerControls.Action.VOLUME_UP),
+                marginDp = 0,
+            )
         })
         content.addView(nowPlaying)
 
