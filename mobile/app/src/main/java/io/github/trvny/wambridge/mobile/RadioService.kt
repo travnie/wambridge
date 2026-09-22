@@ -27,6 +27,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         Thread(runnable, WORKER_THREAD_NAME).apply { isDaemon = true }
     }
     private val startPending = AtomicBoolean(false)
+    private lateinit var mediaSession: RadioMediaSession
 
     private var proxy: RadioProxyServer? = null
     private var channel: SamsungWamChannel? = null
@@ -48,6 +49,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
 
     override fun onCreate() {
         super.onCreate()
+        mediaSession = RadioMediaSession(this)
         createNotificationChannel()
         wifiWatcher = runCatching { WifiLan.watch(this, ::onWifiChanged) }.getOrElse {
             wifiFallback = worker.scheduleWithFixedDelay(
@@ -75,6 +77,16 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
 
             ACTION_TOGGLE_PAUSE -> {
                 execute { togglePause() }
+                return START_NOT_STICKY
+            }
+
+            ACTION_PAUSE -> {
+                execute { setPaused(true) }
+                return START_NOT_STICKY
+            }
+
+            ACTION_RESUME -> {
+                execute { setPaused(false) }
                 return START_NOT_STICKY
             }
 
@@ -141,6 +153,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             // Best effort during process teardown.
         }
         worker.shutdownNow()
+        mediaSession.close()
         super.onDestroy()
     }
 
@@ -437,11 +450,15 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         }
     }
 
-    private fun togglePause() = SpeakerControlGate.serial {
-        if (!running) return@serial
+    private fun togglePause() {
+        setPaused(!paused)
+    }
+
+    private fun setPaused(value: Boolean) = SpeakerControlGate.serial {
+        if (!running || paused == value) return@serial
         val activeChannel = channel ?: return@serial
         val alias = station?.alias ?: "Radio"
-        paused = !paused
+        paused = value
         if (safeVolumeApplied) activeChannel.setVolumeRaw(audibleVolume())
         lastStatus = if (paused) "Paused $alias" else "Resuming $alias…"
         publish(lastStatus)
@@ -549,6 +566,16 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                 current = it,
             )
         }
+        mediaSession.update(
+            state = radioMediaState(
+                starting = starting || (running && !safeVolumeApplied),
+                running = running && safeVolumeApplied,
+                recovering = wifiRecovery,
+                paused = paused,
+            ),
+            title = station?.alias ?: desiredStation?.alias,
+            source = "Samsung M5",
+        )
     }
 
     private fun publish(message: String) {
@@ -606,7 +633,11 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             .addAction(Notification.Action.Builder(null, "+", action(34, ACTION_VOLUME_UP)).build())
             .addAction(Notification.Action.Builder(null, "Mute", action(35, ACTION_MUTE)).build())
             .addAction(Notification.Action.Builder(null, "Stop", action(36, ACTION_STOP)).build())
-            .setStyle(Notification.MediaStyle().setShowActionsInCompactView(0, 3, 4))
+            .setStyle(
+                Notification.MediaStyle()
+                    .setMediaSession(mediaSession.sessionToken)
+                    .setShowActionsInCompactView(0, 3, 4),
+            )
             .build()
     }
 
@@ -614,6 +645,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         const val ACTION_PLAY = "trvny.wambridge.mobile.RADIO_PLAY"
         const val ACTION_STOP = "trvny.wambridge.mobile.RADIO_STOP"
         const val ACTION_TOGGLE_PAUSE = "trvny.wambridge.mobile.RADIO_TOGGLE_PAUSE"
+        const val ACTION_PAUSE = "trvny.wambridge.mobile.RADIO_PAUSE"
+        const val ACTION_RESUME = "trvny.wambridge.mobile.RADIO_RESUME"
         const val ACTION_MUTE = "trvny.wambridge.mobile.RADIO_MUTE"
         const val ACTION_VOLUME_DOWN = "trvny.wambridge.mobile.RADIO_VOLUME_DOWN"
         const val ACTION_VOLUME_UP = "trvny.wambridge.mobile.RADIO_VOLUME_UP"

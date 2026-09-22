@@ -20,6 +20,9 @@ Turn the main screen into a daily-driver view instead of a service panel.
 
 ## 2. Android MediaSession
 
+**Shipped 2026-09-22 for radio.** RadioService owns the Android MediaSession and MediaStyle
+notification token; DLNA remains owned by the external player.
+
 Use a proper MediaSession for radio playback so controls can appear naturally in Android:
 
 - notification shade
