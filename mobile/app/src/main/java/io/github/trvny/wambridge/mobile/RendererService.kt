@@ -361,6 +361,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
 
     private fun closeWamChannel() {
         synchronized(channelLock) {
+            releaseTimerChannelAfterReply = false
             try {
                 wamChannel?.close()
             } catch (_: Exception) {
@@ -604,8 +605,9 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     override fun onSleepTimerChanged(source: Any, state: SleepTimerState) = dispatchWamEvent {
         if (source !== wamChannel) return@dispatchWamEvent
         SpeakerStateStore.update { it.copy(sleepTimer = state) }
-        if (releaseTimerChannelAfterReply && !ownsPlayback) {
-            releaseTimerChannelAfterReply = false
+        val releaseAfterReply = releaseTimerChannelAfterReply
+        releaseTimerChannelAfterReply = false
+        if (releaseAfterReply && !ownsPlayback) {
             closeWamChannel()
         }
     }
