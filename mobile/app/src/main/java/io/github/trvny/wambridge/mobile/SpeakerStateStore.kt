@@ -68,7 +68,11 @@ internal object SpeakerStateStore {
         update {
             it.copy(
                 speakerIp = ip,
-                deviceId = deviceId ?: it.deviceId,
+                deviceId = when {
+                    !deviceId.isNullOrBlank() -> deviceId
+                    it.speakerIp == ip -> it.deviceId
+                    else -> null
+                },
                 discovery = SpeakerDiscoveryStage.READY,
                 lastError = null,
             )
@@ -159,4 +163,9 @@ internal fun discoveryStatus(stage: SpeakerDiscoveryStage): String = when (stage
     SpeakerDiscoveryStage.READY -> "M5 ready"
     SpeakerDiscoveryStage.FAILED -> "M5 not found"
     SpeakerDiscoveryStage.IDLE -> "Starting…"
+}
+
+internal fun finalDiscoveryStage(scan: WamDiscovery.Scan): SpeakerDiscoveryStage = when (scan) {
+    WamDiscovery.Scan.NotRun -> SpeakerDiscoveryStage.WAITING_FOR_WIFI
+    else -> SpeakerDiscoveryStage.FAILED
 }
