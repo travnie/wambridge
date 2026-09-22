@@ -30,6 +30,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".AdvancedSettingsActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".TuneInActivity"
             android:exported="false" />
 
