@@ -647,6 +647,13 @@ operating system records.
     commands are hardware-validated. Physical follow-up: confirm all three displayed slots
     match the button order and start correctly from both Home and Radio.
 
+    **Settings/Diagnostics 2026-09-22:** normal Settings now keeps speaker discovery/testing,
+    renderer/system controls and Radio entry points visible while manual IPv4 and dedicated
+    low-level troubleshooting move under Advanced. Diagnostics reads the existing shared
+    runtime/network state into one copyable report and provides a controlled Fix connection
+    flow: stop active owners, force the shared discovery path, then refresh. No parallel
+    diagnostics state store or background polling loop was added.
+
     ~~The renderer serves its stream to any host on the Wi-Fi that guesses the per-session
     path.~~ **False, and it had been false for six days when this file repeated it on
     2026-08-25.** `ef2d273` ("Harden Android mobile adapter", 2026-08-19) put two rules on the

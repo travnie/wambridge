@@ -40,7 +40,7 @@ class HomeSurfaceContractTest {
     }
 
     @Test
-    fun homeKeepsSetupDetailsInSettings() {
+    fun homeKeepsManualSetupOutOfDailySurfaces() {
         val homeStart = main.indexOf("private fun buildHomePane")
         val radioStart = main.indexOf("private fun buildRadioPane")
         val settingsStart = main.indexOf("private fun buildSettingsPane")
@@ -51,11 +51,17 @@ class HomeSurfaceContractTest {
 
         val home = main.substring(homeStart, radioStart)
         val settings = main.substring(settingsStart)
+        val advanced = File(
+            "src/main/java/io/github/trvny/wambridge/mobile/AdvancedSettingsActivity.kt",
+        ).readText()
 
         assertFalse(home.contains("IPv4 address"))
         assertFalse(home.contains("Save + test"))
-        assertTrue(settings.contains("IPv4 address"))
-        assertTrue(settings.contains("Save + test"))
+        assertFalse(settings.contains("IPv4 address"))
+        assertFalse(settings.contains("Save + test"))
+        assertTrue(settings.contains("AdvancedSettingsActivity::class.java"))
+        assertTrue(advanced.contains("IPv4 address"))
+        assertTrue(advanced.contains("Save + test"))
     }
 
     @Test

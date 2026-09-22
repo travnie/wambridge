@@ -50,9 +50,10 @@ daily-driver screen: Now Playing, shared play/pause/mute/raw-volume controls, co
 and three always-visible physical preset slots. Radio shows the same three slots above Saved
 stations and TuneIn Explore; the slots are read directly from the M5 and match the speaker's
 physical Radio button. This release intentionally keeps those physical slots read-only until
-the write-side preset commands are hardware-validated. Settings owns speaker setup, renderer
-controls and system integration. Switching root destinations reuses the same panes instead of
-recreating Activities.
+the write-side preset commands are hardware-validated. Settings keeps normal speaker/system
+controls up front, while Diagnostics exposes copyable runtime/network state and a controlled
+Fix connection action. Manual IP and dedicated troubleshooting controls live under Advanced. Switching
+root destinations reuses the same panes instead of recreating Activities.
 
 ### Home and physical presets
 
@@ -64,6 +65,17 @@ Radio renders the same runtime preset snapshot above Saved stations and TuneIn E
 The slots are read-only in this release. Android can play them through the already measured
 `SetPlayPreset` path, but preset editing stays disabled until the write-side
 `SetSavePreset`/`SetMovePreset` behavior is hardware-validated on the physical M5.
+
+### Settings and diagnostics
+
+Settings keeps discovery, connection testing, renderer controls, Quick Settings, launcher
+visibility and Radio entry points in the normal surface. **Diagnostics** reports speaker IP /
+device ID, Android Wi-Fi endpoint, owner/playback/discovery, active source/fallback, renderer
+and radio state, last error and app version. The report can be copied as plain text.
+
+**Fix connection** stops active renderer/radio ownership, then runs the shared forced discovery
+path and refreshes the report. Manual IPv4 setup and dedicated low-level troubleshooting are kept under **Advanced** instead
+of occupying the daily Settings screen.
 
 ### Speaker discovery
 
