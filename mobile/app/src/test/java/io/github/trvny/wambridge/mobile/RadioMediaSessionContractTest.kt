@@ -48,4 +48,12 @@ class RadioMediaSessionContractTest {
         assertTrue(radio.contains("setMediaSession(mediaSession.sessionToken)"))
         assertTrue(radio.contains("mediaSession.close()"))
     }
+    @Test
+    fun lateRadioWorkerCannotPublishIntoReleasedSession() {
+        val text = source.readText()
+        assertTrue(text.contains("@Synchronized"))
+        assertTrue(text.contains("private var closed = false"))
+        assertTrue(text.contains("if (closed) return"))
+        assertTrue(text.contains("if (closed) return"))
+    }
 }
