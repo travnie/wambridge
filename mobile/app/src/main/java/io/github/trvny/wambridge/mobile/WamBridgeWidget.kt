@@ -228,10 +228,12 @@ class WamBridgeWidget : AppWidgetProvider() {
         ) {
             val views = RemoteViews(context.packageName, R.layout.widget_wam_bridge_controls)
             val rendererActive = RendererService.running
+            val snapshot = SpeakerStateStore.current()
             views.setTextViewText(
                 R.id.widget_status,
                 when {
                     RadioService.active -> RadioService.lastStatus
+                    RendererService.transitioning -> discoveryStatus(snapshot.discovery)
                     RendererService.busy -> RendererService.lastStatus
                     else -> "Speaker controls"
                 },
