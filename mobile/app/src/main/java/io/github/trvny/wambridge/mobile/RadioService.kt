@@ -80,6 +80,16 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                 return START_NOT_STICKY
             }
 
+            ACTION_PAUSE -> {
+                execute { setPaused(true) }
+                return START_NOT_STICKY
+            }
+
+            ACTION_RESUME -> {
+                execute { setPaused(false) }
+                return START_NOT_STICKY
+            }
+
             ACTION_MUTE -> {
                 execute { toggleMute() }
                 return START_NOT_STICKY
@@ -440,11 +450,15 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         }
     }
 
-    private fun togglePause() = SpeakerControlGate.serial {
-        if (!running) return@serial
+    private fun togglePause() {
+        setPaused(!paused)
+    }
+
+    private fun setPaused(value: Boolean) = SpeakerControlGate.serial {
+        if (!running || paused == value) return@serial
         val activeChannel = channel ?: return@serial
         val alias = station?.alias ?: "Radio"
-        paused = !paused
+        paused = value
         if (safeVolumeApplied) activeChannel.setVolumeRaw(audibleVolume())
         lastStatus = if (paused) "Paused $alias" else "Resuming $alias…"
         publish(lastStatus)
@@ -631,6 +645,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         const val ACTION_PLAY = "trvny.wambridge.mobile.RADIO_PLAY"
         const val ACTION_STOP = "trvny.wambridge.mobile.RADIO_STOP"
         const val ACTION_TOGGLE_PAUSE = "trvny.wambridge.mobile.RADIO_TOGGLE_PAUSE"
+        const val ACTION_PAUSE = "trvny.wambridge.mobile.RADIO_PAUSE"
+        const val ACTION_RESUME = "trvny.wambridge.mobile.RADIO_RESUME"
         const val ACTION_MUTE = "trvny.wambridge.mobile.RADIO_MUTE"
         const val ACTION_VOLUME_DOWN = "trvny.wambridge.mobile.RADIO_VOLUME_DOWN"
         const val ACTION_VOLUME_UP = "trvny.wambridge.mobile.RADIO_VOLUME_UP"
