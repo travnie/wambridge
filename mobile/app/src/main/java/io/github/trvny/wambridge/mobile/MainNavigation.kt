@@ -6,6 +6,19 @@ import android.service.quicksettings.TileService
 
 internal enum class MainDestination { HOME, RADIO, SETTINGS }
 
+internal data class MainPaneVisibility(
+    val home: Boolean,
+    val radio: Boolean,
+    val settings: Boolean,
+)
+
+internal fun mainPaneVisibility(destination: MainDestination): MainPaneVisibility =
+    MainPaneVisibility(
+        home = destination == MainDestination.HOME,
+        radio = destination == MainDestination.RADIO,
+        settings = destination == MainDestination.SETTINGS,
+    )
+
 internal fun mainDestination(
     action: String?,
     requested: String?,
