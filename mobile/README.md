@@ -46,8 +46,11 @@ Physical phone + M5 playback through Neutron is confirmed. The direct mobile rad
 ### Android navigation
 
 The launcher now opens a persistent **Home · Radio · Settings** shell. Home is the default
-landing screen and reads the shared runtime speaker snapshot, Radio keeps the existing Presets,
-Browse and Stations tools, and Settings owns speaker setup, renderer controls, direct speaker
+daily-driver screen: Now Playing, shared play/pause/mute/raw-volume controls, connection state,
+and three always-visible physical preset slots. Radio shows the same three slots above Saved
+stations and TuneIn Explore; the slots are read directly from the M5 and match the speaker's
+physical Radio button. This release intentionally keeps those physical slots read-only until
+the write-side preset commands are hardware-validated. Settings owns speaker setup, renderer
 controls and system integration. Switching root destinations reuses the same panes instead of
 recreating Activities.
 
