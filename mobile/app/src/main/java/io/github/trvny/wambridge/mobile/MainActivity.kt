@@ -269,15 +269,7 @@ class MainActivity : Activity() {
                         SpeakerStateStore.update {
                             it.copy(
                                 discovery = stage,
-                                status = when (stage) {
-                                    SpeakerDiscoveryStage.WAITING_FOR_WIFI -> "Waiting for Wi-Fi…"
-                                    SpeakerDiscoveryStage.CHECKING_SAVED -> "Checking saved M5…"
-                                    SpeakerDiscoveryStage.SSDP -> "Finding M5…"
-                                    SpeakerDiscoveryStage.LAN_SCAN -> "Scanning Wi-Fi…"
-                                    SpeakerDiscoveryStage.READY -> "M5 ready"
-                                    SpeakerDiscoveryStage.FAILED -> "M5 not found"
-                                    SpeakerDiscoveryStage.IDLE -> "Starting…"
-                                },
+                                status = discoveryStatus(stage),
                                 lastError = null,
                             )
                         }
