@@ -103,5 +103,11 @@ class SleepTimerControlsContractTest {
         assertTrue(renderer.contains("TIMER_REPLY_TIMEOUT_MS"))
         assertTrue(renderer.contains("wamChannel === activeChannel"))
         assertTrue(renderer.contains("!ownsPlayback"))
+
+        val refreshStart = renderer.indexOf("private fun requestSleepTimerFromOwner()")
+        val refreshEnd = renderer.indexOf("private fun scheduleTimerChannelRelease", refreshStart)
+        val refreshBlock = renderer.substring(refreshStart, refreshEnd)
+        assertTrue(refreshBlock.contains("catch (error: Exception)"))
+        assertTrue(refreshBlock.contains("closeWamChannel()"))
     }
 }
