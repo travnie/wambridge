@@ -122,7 +122,6 @@ jobs:
             --target "$GITHUB_SHA"
             --title "$TITLE"
             --generate-notes
-            --notes "foobar2000 component and signed Android APK built from the same commit."
           )
           if [[ "$PRERELEASE" == "true" ]]; then
             flags+=(--prerelease)
