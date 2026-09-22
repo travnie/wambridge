@@ -27,15 +27,11 @@ internal class RadioMediaSession(
         setCallback(
             object : MediaSession.Callback() {
                 override fun onPlay() {
-                    if (RadioService.running && RadioService.paused) {
-                        dispatch(RadioService.ACTION_TOGGLE_PAUSE)
-                    }
+                    if (RadioService.active) dispatch(RadioService.ACTION_RESUME)
                 }
 
                 override fun onPause() {
-                    if (RadioService.running && !RadioService.paused) {
-                        dispatch(RadioService.ACTION_TOGGLE_PAUSE)
-                    }
+                    if (RadioService.active) dispatch(RadioService.ACTION_PAUSE)
                 }
 
                 override fun onStop() {
