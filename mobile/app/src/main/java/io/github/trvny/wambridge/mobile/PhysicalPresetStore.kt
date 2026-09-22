@@ -8,16 +8,19 @@ internal const val PHYSICAL_PRESET_SLOTS = 3
 internal fun physicalPresetSlots(
     presets: List<SamsungTuneIn.Preset>,
 ): List<SamsungTuneIn.Preset?> {
-    val speakerPresets = presets
+    val slots = MutableList<SamsungTuneIn.Preset?>(PHYSICAL_PRESET_SLOTS) { null }
+    presets
+        .asSequence()
         .filter { it.kind.equals("speaker", ignoreCase = true) }
         .mapNotNull { preset ->
             preset.contentId.toIntOrNull()?.let { index -> index to preset }
         }
+        .filter { (index, _) -> index in 0 until PHYSICAL_PRESET_SLOTS }
         .sortedBy { it.first }
-        .take(PHYSICAL_PRESET_SLOTS)
-        .map { it.second }
-
-    return List(PHYSICAL_PRESET_SLOTS) { index -> speakerPresets.getOrNull(index) }
+        .forEach { (index, preset) ->
+            if (slots[index] == null) slots[index] = preset
+        }
+    return slots
 }
 
 internal data class PhysicalPresetSnapshot(
