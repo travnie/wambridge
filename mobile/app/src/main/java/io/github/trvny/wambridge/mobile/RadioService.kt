@@ -27,6 +27,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         Thread(runnable, WORKER_THREAD_NAME).apply { isDaemon = true }
     }
     private val startPending = AtomicBoolean(false)
+    private lateinit var mediaSession: RadioMediaSession
 
     private var proxy: RadioProxyServer? = null
     private var channel: SamsungWamChannel? = null
@@ -48,6 +49,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
 
     override fun onCreate() {
         super.onCreate()
+        mediaSession = RadioMediaSession(this)
         createNotificationChannel()
         wifiWatcher = runCatching { WifiLan.watch(this, ::onWifiChanged) }.getOrElse {
             wifiFallback = worker.scheduleWithFixedDelay(
@@ -141,6 +143,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             // Best effort during process teardown.
         }
         worker.shutdownNow()
+        mediaSession.close()
         super.onDestroy()
     }
 
@@ -549,6 +552,16 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                 current = it,
             )
         }
+        mediaSession.update(
+            state = radioMediaState(
+                starting = starting || (running && !safeVolumeApplied),
+                running = running && safeVolumeApplied,
+                recovering = wifiRecovery,
+                paused = paused,
+            ),
+            title = station?.alias ?: desiredStation?.alias,
+            source = "Samsung M5",
+        )
     }
 
     private fun publish(message: String) {
@@ -606,7 +619,11 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             .addAction(Notification.Action.Builder(null, "+", action(34, ACTION_VOLUME_UP)).build())
             .addAction(Notification.Action.Builder(null, "Mute", action(35, ACTION_MUTE)).build())
             .addAction(Notification.Action.Builder(null, "Stop", action(36, ACTION_STOP)).build())
-            .setStyle(Notification.MediaStyle().setShowActionsInCompactView(0, 3, 4))
+            .setStyle(
+                Notification.MediaStyle()
+                    .setMediaSession(mediaSession.sessionToken)
+                    .setShowActionsInCompactView(0, 3, 4),
+            )
             .build()
     }
 
