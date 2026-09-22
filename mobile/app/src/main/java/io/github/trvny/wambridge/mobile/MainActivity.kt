@@ -369,13 +369,13 @@ class MainActivity : Activity() {
 
     private fun showDestination(destination: MainDestination) {
         currentDestination = destination
-        homePane.visibility = if (destination == MainDestination.HOME) View.VISIBLE else View.GONE
-        radioPane.visibility = if (destination == MainDestination.RADIO) View.VISIBLE else View.GONE
-        settingsPane.visibility =
-            if (destination == MainDestination.SETTINGS) View.VISIBLE else View.GONE
-        MobileUi.setNavigationSelected(homeNavButton, destination == MainDestination.HOME)
-        MobileUi.setNavigationSelected(radioNavButton, destination == MainDestination.RADIO)
-        MobileUi.setNavigationSelected(settingsNavButton, destination == MainDestination.SETTINGS)
+        val visibility = mainPaneVisibility(destination)
+        homePane.visibility = if (visibility.home) View.VISIBLE else View.GONE
+        radioPane.visibility = if (visibility.radio) View.VISIBLE else View.GONE
+        settingsPane.visibility = if (visibility.settings) View.VISIBLE else View.GONE
+        MobileUi.setNavigationSelected(homeNavButton, visibility.home)
+        MobileUi.setNavigationSelected(radioNavButton, visibility.radio)
+        MobileUi.setNavigationSelected(settingsNavButton, visibility.settings)
     }
 
     private fun renderHomeState(snapshot: SpeakerSnapshot) {
