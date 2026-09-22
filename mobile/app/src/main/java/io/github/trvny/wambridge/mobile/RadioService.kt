@@ -14,7 +14,6 @@ import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import java.util.concurrent.atomic.AtomicReference
 
 internal fun radioOwnerActive(starting: Boolean, running: Boolean, recovering: Boolean): Boolean =
     starting || running || recovering
@@ -28,7 +27,6 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         Thread(runnable, WORKER_THREAD_NAME).apply { isDaemon = true }
     }
     private val startPending = AtomicBoolean(false)
-    private val pendingSleepTimerSeconds = AtomicReference<Int?>(null)
     private lateinit var mediaSession: RadioMediaSession
 
     private var proxy: RadioProxyServer? = null
@@ -108,27 +106,63 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             }
 
             ACTION_SET_SLEEP_TIMER -> {
+                val requestId = intent.getLongExtra(SleepTimerOwnerRequests.EXTRA_REQUEST_ID, 0L)
                 val seconds = intent.getIntExtra(EXTRA_SLEEP_TIMER_SECONDS, -1)
                 val command = runCatching { sleepTimerCommand(seconds) }.getOrElse {
+                    SleepTimerOwnerRequests.complete(requestId, false)
                     lastStatus = "Invalid sleep timer."
                     publishRuntimeState(lastStatus)
                     return START_NOT_STICKY
                 }
-                pendingSleepTimerSeconds.set(command.seconds)
-                SpeakerStateStore.update {
-                    it.copy(
-                        sleepTimer = SleepTimerState(
-                            phase = SleepTimerPhase.REQUESTED,
-                            seconds = command.seconds,
-                        ),
-                    )
+                if (!running || destroyed || channel == null) {
+                    SleepTimerOwnerRequests.complete(requestId, false)
+                    return START_NOT_STICKY
                 }
-                execute { applyPendingSleepTimer() }
+                val accepted = try {
+                    worker.execute {
+                        if (!destroyed) {
+                            runSleepTimerTask { applyAcceptedSleepTimer(command.seconds) }
+                        }
+                    }
+                    true
+                } catch (_: RejectedExecutionException) {
+                    false
+                }
+                SleepTimerOwnerRequests.complete(requestId, accepted)
+                if (accepted) {
+                    SpeakerStateStore.update {
+                        it.copy(
+                            sleepTimer = SleepTimerState(
+                                phase = SleepTimerPhase.REQUESTED,
+                                seconds = command.seconds,
+                            ),
+                        )
+                    }
+                }
                 return START_NOT_STICKY
             }
 
             ACTION_GET_SLEEP_TIMER -> {
-                execute { channel?.requestSleepTimer() }
+                val requestId = intent.getLongExtra(SleepTimerOwnerRequests.EXTRA_REQUEST_ID, 0L)
+                if (!running || destroyed || channel == null) {
+                    SleepTimerOwnerRequests.complete(requestId, false)
+                    return START_NOT_STICKY
+                }
+                val accepted = try {
+                    worker.execute {
+                        if (!destroyed) {
+                            runSleepTimerTask {
+                                val activeChannel = channel
+                                    ?: error("Radio control channel unavailable")
+                                activeChannel.requestSleepTimer()
+                            }
+                        }
+                    }
+                    true
+                } catch (_: RejectedExecutionException) {
+                    false
+                }
+                SleepTimerOwnerRequests.complete(requestId, accepted)
                 return START_NOT_STICKY
             }
 
@@ -225,7 +259,6 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             desiredStation = requestForStation(selected)
             proxy = activeProxy
             channel = activeChannel
-            applyPendingSleepTimer()
             activeProxy = null
             activeChannel = null
             // Start state belongs to the command, not to delayed speaker/proxy callbacks.
@@ -486,15 +519,22 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         }
     }
 
-    private fun applyPendingSleepTimer() {
-        val activeChannel = channel ?: return
-        val seconds = pendingSleepTimerSeconds.getAndSet(null) ?: return
+    private fun applyAcceptedSleepTimer(seconds: Int) {
+        val activeChannel = channel ?: error("Radio control channel unavailable")
+        activeChannel.setSleepTimer(seconds)
+        activeChannel.requestSleepTimer()
+    }
+
+    private fun runSleepTimerTask(action: () -> Unit) {
         try {
-            activeChannel.setSleepTimer(seconds)
-            activeChannel.requestSleepTimer()
+            action()
         } catch (error: Exception) {
-            pendingSleepTimerSeconds.compareAndSet(null, seconds)
-            throw error
+            SpeakerStateStore.update {
+                it.copy(
+                    sleepTimer = SleepTimerState(),
+                    lastError = "Sleep timer: ${error.message ?: error.javaClass.simpleName}",
+                )
+            }
         }
     }
 
