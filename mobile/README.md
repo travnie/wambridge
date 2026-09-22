@@ -25,6 +25,8 @@ The Android adapter provides:
 - safe first-start volume capped at M5 raw step `3`;
 - idle/session release so stopped playback does not keep the M5 awake;
 - a Quick Settings tile: tap toggles the renderer, long-press opens settings;
+- a daily-driver Home screen with shared Now Playing state, play/pause, mute and raw-volume
+  controls, plus the M5's three speaker-owned physical Radio presets;
 - an in-app speaker remote plus two explicit home-screen widget choices: a compact
   DLNA toggle and a full remote; the app and remote widget share play/pause, mute and
   raw-volume routing for radio and native speaker playback;
@@ -44,10 +46,24 @@ Physical phone + M5 playback through Neutron is confirmed. The direct mobile rad
 ### Android navigation
 
 The launcher now opens a persistent **Home · Radio · Settings** shell. Home is the default
-landing screen and reads the shared runtime speaker snapshot, Radio keeps the existing Presets,
-Browse and Stations tools, and Settings owns speaker setup, renderer controls, direct speaker
+daily-driver screen: Now Playing, shared play/pause/mute/raw-volume controls, connection state,
+and three always-visible physical preset slots. Radio shows the same three slots above Saved
+stations and TuneIn Explore; the slots are read directly from the M5 and match the speaker's
+physical Radio button. This release intentionally keeps those physical slots read-only until
+the write-side preset commands are hardware-validated. Settings owns speaker setup, renderer
 controls and system integration. Switching root destinations reuses the same panes instead of
 recreating Activities.
+
+### Home and physical presets
+
+Home renders Now Playing from the same runtime snapshot used by renderer/radio controls and
+shows exactly three physical preset slots read from the M5. These are the speaker-owned
+`kind=speaker` presets cycled by the physical Radio button, not another local favourites list.
+Radio renders the same runtime preset snapshot above Saved stations and TuneIn Explore.
+
+The slots are read-only in this release. Android can play them through the already measured
+`SetPlayPreset` path, but preset editing stays disabled until the write-side
+`SetSavePreset`/`SetMovePreset` behavior is hardware-validated on the physical M5.
 
 ### Speaker discovery
 

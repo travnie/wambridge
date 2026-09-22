@@ -111,6 +111,36 @@ internal object MobileUi {
         setLineSpacing(0f, 1.08f)
     }
 
+    fun heroBadge(context: Context, text: String): TextView = TextView(context).apply {
+        this.text = text
+        textSize = 34f
+        typeface = Typeface.DEFAULT_BOLD
+        gravity = Gravity.CENTER
+        setTextColor(context.getColor(R.color.wam_accent))
+        background = rounded(
+            context,
+            fill = context.getColor(R.color.wam_accent_soft),
+            stroke = context.getColor(R.color.wam_accent_soft),
+            radiusDp = 22,
+        )
+    }
+
+    fun heroTitle(context: Context, text: String): TextView = TextView(context).apply {
+        this.text = text
+        textSize = 22f
+        typeface = Typeface.DEFAULT_BOLD
+        setTextColor(context.getColor(R.color.wam_text))
+        maxLines = 2
+    }
+
+    fun heroMeta(context: Context, text: String): TextView = TextView(context).apply {
+        this.text = text
+        textSize = 13f
+        setTextColor(context.getColor(R.color.wam_muted))
+        setPadding(0, dp(context, 4), 0, 0)
+        maxLines = 3
+    }
+
     fun label(context: Context, text: String): TextView = TextView(context).apply {
         this.text = text
         textSize = 13f

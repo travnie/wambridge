@@ -329,6 +329,20 @@ class TuneInActivity : Activity() {
                 setButtonsEnabled(true)
                 result.fold(
                     onSuccess = { report ->
+                        if (report.startsWith("Playback stopped")) {
+                            SpeakerStateStore.update {
+                                it.copy(
+                                    owner = SpeakerOwner.IDLE,
+                                    playback = SpeakerPlaybackState.STOPPED,
+                                    stationAlias = null,
+                                    metadata = null,
+                                    source = null,
+                                    fallback = null,
+                                    status = report,
+                                    lastError = null,
+                                )
+                            }
+                        }
                         MobileUi.setStatus(statusView, report, MobileUi.StatusKind.SUCCESS)
                         playPauseButton.text = "Play / pause"
                     },

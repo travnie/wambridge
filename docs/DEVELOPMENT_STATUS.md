@@ -45,9 +45,13 @@ branch or implementing another timing layer.
   app, Quick Settings tile and widget all auto-resolve/discover the WAM target; the native
   TuneIn screen exposes station artwork/metadata plus play/pause, mute, raw-volume and Stop.
   **Root UI 2026-09-22:** the launcher is now a persistent Home · Radio · Settings shell.
-  Home consumes the shared runtime speaker snapshot, Radio routes to the existing deep tools,
-  and the former technical launcher controls live under Settings. Full Now Playing and the
-  three physical M5 preset tiles are the next Home slice.
+  Home consumes the shared runtime speaker snapshot for Now Playing and direct controls, and
+  Home/Radio share one runtime view of the three `kind=speaker` presets read from the M5.
+  Those three tiles are the same slots cycled by the physical Radio button; no local duplicate
+  is persisted. Preset editing is deliberately not shipped yet: `SetSavePreset` /
+  `SetMovePreset` remain behind the existing hardware-validation gate. Real-device follow-up
+  is to confirm the displayed slot order against the physical button and start all three from
+  the phone.
 
 The stable universal transport is local HTTP started through `SetUrlPlayback`. The speaker
 paces the HTTP side through TCP backpressure. Finite share/DLNA playback is proven as a
@@ -634,6 +638,14 @@ operating system records.
     JVM/CI coverage is complete. Real-device validation is still required: start DLNA from the
     widget and Quick Settings after clearing or staling the saved target, and repeat across a
     real Wi-Fi/DHCP move on the physical M5.
+
+    **Home 3.5 added 2026-09-22:** Home now consumes the shared speaker snapshot for
+    Now Playing and direct controls, and Home + Radio consume one runtime list of exactly three
+    `kind=speaker` TuneIn presets read from the M5. Those are the same slots cycled by the
+    physical Radio button; there is no second local copy. Playback reuses the measured
+    `SetPlayPreset` path. Editing remains deliberately absent until the write-side preset
+    commands are hardware-validated. Physical follow-up: confirm all three displayed slots
+    match the button order and start correctly from both Home and Radio.
 
     ~~The renderer serves its stream to any host on the Wi-Fi that guesses the per-session
     path.~~ **False, and it had been false for six days when this file repeated it on
