@@ -45,14 +45,19 @@ internal class RadioMediaSession(
         )
     }
 
-    val sessionToken: MediaSession.Token
-        get() = session.sessionToken
+    private val token: MediaSession.Token = session.sessionToken
+    private var closed = false
 
+    val sessionToken: MediaSession.Token
+        get() = token
+
+    @Synchronized
     fun update(
         state: RadioMediaState,
         title: String?,
         source: String?,
     ) {
+        if (closed) return
         session.setPlaybackState(
             PlaybackState.Builder()
                 .setActions(playbackActions(state.actions))
@@ -78,12 +83,17 @@ internal class RadioMediaSession(
         session.isActive = state.playback != RadioMediaPlayback.STOPPED
     }
 
+    @Synchronized
     override fun close() {
+        if (closed) return
+        closed = true
         session.isActive = false
         session.release()
     }
 
+    @Synchronized
     private fun dispatch(action: String) {
+        if (closed) return
         appContext.startService(
             Intent(appContext, RadioService::class.java).apply {
                 this.action = action
