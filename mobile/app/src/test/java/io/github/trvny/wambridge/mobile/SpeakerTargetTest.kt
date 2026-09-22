@@ -46,6 +46,28 @@ class SpeakerTargetTest {
     }
 
     @Test
+    fun changedIpWithoutIdentityClearsPreviouslySavedIdentity() {
+        val remembered = SpeakerTarget.deviceIdToPersist(
+            previousIp = old.ip,
+            previousDeviceId = "A1B2C3D4E5F6",
+            result = SpeakerTarget.Resolution(moved.ip, null),
+        )
+
+        assertNull(remembered)
+    }
+
+    @Test
+    fun sameIpWithoutIdentityKeepsPreviouslySavedIdentity() {
+        val remembered = SpeakerTarget.deviceIdToPersist(
+            previousIp = old.ip,
+            previousDeviceId = "A1B2C3D4E5F6",
+            result = SpeakerTarget.Resolution(old.ip, null),
+        )
+
+        assertEquals("A1B2C3D4E5F6", remembered)
+    }
+
+    @Test
     fun legacySavedIpStillDisambiguatesMultipleSpeakers() {
         val selected = SpeakerTarget.selectCandidate(
             savedIp = moved.ip,
