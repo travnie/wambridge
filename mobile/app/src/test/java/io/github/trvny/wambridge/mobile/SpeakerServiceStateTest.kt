@@ -132,4 +132,24 @@ class SpeakerServiceStateTest {
         assertEquals(SpeakerOwner.IDLE, snapshot.owner)
         assertEquals(SpeakerPlaybackState.STOPPED, snapshot.playback)
     }
+
+    @Test
+    fun nativePresetPlaybackPublishesRadioPlayingState() {
+        val preset = SamsungTuneIn.Preset(
+            contentId = "2",
+            title = "BBC Radio 1",
+            kind = "speaker",
+        )
+
+        val snapshot = nativePresetPlayingSnapshot(
+            speakerIp = "10.0.0.44",
+            preset = preset,
+        )
+
+        assertEquals(SpeakerOwner.RADIO, snapshot.owner)
+        assertEquals(SpeakerPlaybackState.PLAYING, snapshot.playback)
+        assertEquals("BBC Radio 1", snapshot.stationAlias)
+        assertEquals("TuneIn preset", snapshot.source)
+        assertEquals("10.0.0.44", snapshot.speakerIp)
+    }
 }
