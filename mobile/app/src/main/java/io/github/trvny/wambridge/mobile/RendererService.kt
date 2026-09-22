@@ -551,6 +551,8 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         SpeakerStateStore.update {
             speakerSnapshotForRenderer(
                 phase = phase,
+                ownsPlayback = ownsPlayback,
+                transportState = rendererState?.transportState,
                 status = message,
                 speakerIp = speakerIp.takeIf(String::isNotBlank),
                 current = it,
@@ -570,6 +572,8 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         SpeakerStateStore.update {
             speakerSnapshotForRenderer(
                 phase = value,
+                ownsPlayback = ownsPlayback,
+                transportState = rendererState?.transportState,
                 status = lastStatus,
                 speakerIp = speakerIp.takeIf(String::isNotBlank),
                 current = it,
