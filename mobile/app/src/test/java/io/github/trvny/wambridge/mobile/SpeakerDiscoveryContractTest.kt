@@ -39,6 +39,7 @@ class SpeakerDiscoveryContractTest {
         assertTrue(source.contains("runDiscovery(manual = false)"))
         assertTrue(source.contains("runDiscovery(manual = true)"))
         assertTrue(source.contains("SpeakerTarget.resolveDetailed("))
+        assertTrue(source.contains("forceDiscovery = manual"))
         assertFalse(source.contains("WamDiscovery.discover("))
     }
 }
