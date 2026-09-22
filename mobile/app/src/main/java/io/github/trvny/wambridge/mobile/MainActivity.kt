@@ -262,6 +262,7 @@ class MainActivity : Activity() {
                 SpeakerTarget.resolveDetailed(
                     context = applicationContext,
                     persist = false,
+                    forceDiscovery = manual,
                     shouldContinue = {
                         autoDiscoveryStillCurrent(generation, inputRevision, savedBefore)
                     },
@@ -373,17 +374,22 @@ class MainActivity : Activity() {
 
             is SpeakerTarget.ResolveOutcome.NotFound -> {
                 val message = emptyScanMessage(outcome.scan)
+                val stage = finalDiscoveryStage(outcome.scan)
                 SpeakerStateStore.update {
                     it.copy(
-                        discovery = SpeakerDiscoveryStage.FAILED,
-                        status = "M5 not found",
-                        lastError = message,
+                        discovery = stage,
+                        status = discoveryStatus(stage),
+                        lastError = message.takeIf { stage == SpeakerDiscoveryStage.FAILED },
                     )
                 }
                 MobileUi.setStatus(
                     statusView,
                     message,
-                    MobileUi.StatusKind.ERROR,
+                    if (stage == SpeakerDiscoveryStage.FAILED) {
+                        MobileUi.StatusKind.ERROR
+                    } else {
+                        MobileUi.StatusKind.INFO
+                    },
                 )
             }
 
