@@ -53,6 +53,13 @@ branch or implementing another timing layer.
   is to confirm the displayed slot order against the physical button and start all three from
   the phone.
 
+  **Radio MediaSession 2026-09-22:** RadioService now owns one framework MediaSession while
+  radio is starting/recovering/playing. It mirrors the existing runtime state into Android
+  BUFFERING/PLAYING/PAUSED/STOPPED, attaches the session token to the MediaStyle notification,
+  and routes system play/pause/stop callbacks through the existing RadioService actions.
+  RendererService creates no MediaSession, so DLNA ownership remains with the external player.
+  Physical follow-up: verify notification, lock-screen and headset/Bluetooth actions on the M5.
+
 The stable universal transport is local HTTP started through `SetUrlPlayback`. The speaker
 paces the HTTP side through TCP backpressure. Finite share/DLNA playback is proven as a
 separate optional path but is not integrated into the foobar output.
