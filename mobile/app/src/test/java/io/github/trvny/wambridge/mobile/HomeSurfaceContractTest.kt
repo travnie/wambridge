@@ -56,4 +56,39 @@ class HomeSurfaceContractTest {
         assertTrue(settings.contains("IPv4 address"))
         assertTrue(settings.contains("Save + test"))
     }
+    @Test
+    fun radioUsesTheSamePhysicalPresetStoreAsHome() {
+        val radioStart = main.indexOf("private fun buildRadioPane")
+        val settingsStart = main.indexOf("private fun buildSettingsPane")
+        assertTrue(radioStart >= 0)
+        assertTrue(settingsStart > radioStart)
+
+        val radio = main.substring(radioStart, settingsStart)
+        assertTrue(radio.contains("radioPresetButtons"))
+        assertTrue(radio.contains("PHYSICAL_PRESET_SLOTS"))
+        assertTrue(main.contains("renderPhysicalPresets"))
+        assertTrue(main.contains("PhysicalPresetStore.current()"))
+    }
+
+    @Test
+    fun radioKeepsSavedStationsAndTuneInExploreEntrypoints() {
+        val radioStart = main.indexOf("private fun buildRadioPane")
+        val settingsStart = main.indexOf("private fun buildSettingsPane")
+        val radio = main.substring(radioStart, settingsStart)
+
+        assertTrue(radio.contains("RadioStationsActivity::class.java"))
+        assertTrue(radio.contains("CatalogueActivity::class.java"))
+    }
+
+    @Test
+    fun thisReleaseDoesNotAddPresetWriteCommandsToMobileProductionCode() {
+        val productionRoot = File("src/main/java/io/github/trvny/wambridge/mobile")
+        val source = productionRoot.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .joinToString("\n") { it.readText() }
+
+        assertFalse(source.contains("SetSavePreset"))
+        assertFalse(source.contains("SetMovePreset"))
+        assertFalse(source.contains("SetRemovePreset"))
+    }
 }
