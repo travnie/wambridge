@@ -648,8 +648,8 @@ operating system records.
     match the button order and start correctly from both Home and Radio.
 
     **Settings/Diagnostics 2026-09-22:** normal Settings now keeps speaker discovery/testing,
-    renderer/system controls and Radio entry points visible while manual IPv4 and explicit
-    low-level renderer controls move under Advanced. Diagnostics reads the existing shared
+    renderer/system controls and Radio entry points visible while manual IPv4 and dedicated
+    low-level troubleshooting move under Advanced. Diagnostics reads the existing shared
     runtime/network state into one copyable report and provides a controlled Fix connection
     flow: stop active owners, force the shared discovery path, then refresh. No parallel
     diagnostics state store or background polling loop was added.
