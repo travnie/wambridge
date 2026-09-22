@@ -403,9 +403,20 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
             releaseTimerChannelAfterReply = !ownsPlayback
             ensureChannel()
         }
-        activeChannel.requestSleepTimer()
-        if (releaseTimerChannelAfterReply) {
-            scheduleTimerChannelRelease(activeChannel)
+        try {
+            activeChannel.requestSleepTimer()
+            if (releaseTimerChannelAfterReply) {
+                scheduleTimerChannelRelease(activeChannel)
+            }
+        } catch (error: Exception) {
+            if (
+                releaseTimerChannelAfterReply &&
+                wamChannel === activeChannel &&
+                !ownsPlayback
+            ) {
+                closeWamChannel()
+            }
+            throw error
         }
     }
 
