@@ -17,7 +17,7 @@ but not integrated.
 Everything here was measured against one physical Shape M5 (`SPK-WAM550`,
 firmware `WAM550WWB-3117.1`). Other models in the family are untested.
 
-## Status: working [`alpha`](https://github.com/travnie/wambridge/releases/tag/alpha)
+## Status: working **beta**
 
 Both paths play audio on real hardware. The foobar component passed its full
 physical checklist on 2026-08-02: a complete 213-second track start to finish at
@@ -65,13 +65,16 @@ facts from a physical `SPK-WAM550` are in
 
 ## Foobar2000 output
 
-Rolling prerelease,
-[`alpha`](https://github.com/travnie/wambridge/releases/tag/alpha), rebuilt whenever `main`
-moves. The link does not change and both halves always come from the same commit. The
-version comes from `version` in `pyproject.toml`, the only place it is written down:
+Versioned beta releases are published from tested `main` when the version in
+`pyproject.toml` is bumped. Releases are fixed in place: tags and assets are not rewritten.
+The project version is still the single source of truth for the component/APK pair.
+
+Current release line: **0.2 beta**. See [GitHub Releases](https://github.com/travnie/wambridge/releases).
+
+Each release contains:
 
 - `foo_out_wam.fb2k-component` - the foobar2000 output
-- `wambridge-<version>-alpha.<date>.<commit>.apk` - the Android adapter
+- `wambridge-<version>.apk` - the signed Android adapter
 - a source archive
 
 Open the `.fb2k-component` file with foobar2000 2.x x64, then select:
@@ -80,10 +83,11 @@ Open the `.fb2k-component` file with foobar2000 2.x x64, then select:
 Preferences → Playback → Output → Samsung M5 (Wi-Fi)
 ```
 
-This is alpha software built by one person against one speaker. It works, and it
-is not polished: the preferences page is new and the INI is still the fuller
-file, and the control latency above is real. If you own a Shape speaker and were
-looking for exactly this, it should serve you — just read the limitation first.
+This is beta software built primarily against one physical M5. The core transport has
+repeated hardware validation and Android now covers discovery, renderer/radio controls,
+MediaSession, widgets and speaker-side sleep controls, but other Shape models remain largely
+untested and some hardware-specific follow-up is still documented. If you own a Shape speaker
+and were looking for exactly this, read the limitation above and the release notes first.
 
 Configuration, known limitations and the physical checklist are documented in
 [`foobar/README.md`](foobar/README.md).
