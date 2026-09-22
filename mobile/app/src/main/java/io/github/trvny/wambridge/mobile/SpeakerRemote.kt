@@ -74,7 +74,7 @@ internal object SpeakerRemote {
 
     fun setSleepTimer(context: Context, speakerIp: String, seconds: Int): SleepTimerState {
         val command = sleepTimerCommand(seconds)
-        val values = request(
+        request(
             context,
             speakerIp,
             method = "SetSleepTimer",
@@ -83,7 +83,7 @@ internal object SpeakerRemote {
                 Argument("sleeptime", command.seconds.toString(), Kind.DEC),
             ),
         )
-        return sleepTimerState(values)
+        return readSleepTimer(context, speakerIp)
     }
 
     fun readSleepTimer(context: Context, speakerIp: String): SleepTimerState =
