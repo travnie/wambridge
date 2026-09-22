@@ -87,6 +87,8 @@ internal object SpeakerStateStore {
 
 internal fun speakerSnapshotForRenderer(
     phase: RendererService.Phase,
+    ownsPlayback: Boolean,
+    transportState: String?,
     status: String,
     speakerIp: String?,
     current: SpeakerSnapshot = SpeakerStateStore.current(),
@@ -100,8 +102,13 @@ internal fun speakerSnapshotForRenderer(
     )
 
     RendererService.Phase.RUNNING -> current.copy(
-        owner = SpeakerOwner.RENDERER,
-        playback = SpeakerPlaybackState.PLAYING,
+        owner = if (ownsPlayback) SpeakerOwner.RENDERER else SpeakerOwner.IDLE,
+        playback = when (transportState) {
+            "TRANSITIONING" -> SpeakerPlaybackState.STARTING
+            "PLAYING" -> SpeakerPlaybackState.PLAYING
+            "PAUSED_PLAYBACK" -> SpeakerPlaybackState.PAUSED
+            else -> SpeakerPlaybackState.STOPPED
+        },
         status = status,
         speakerIp = speakerIp ?: current.speakerIp,
         lastError = null,
@@ -126,7 +133,9 @@ internal fun speakerSnapshotForRenderer(
 }
 
 internal fun speakerSnapshotForRadio(
-    active: Boolean,
+    starting: Boolean,
+    running: Boolean,
+    recovering: Boolean,
     paused: Boolean,
     muted: Boolean,
     volume: Int,
@@ -134,8 +143,8 @@ internal fun speakerSnapshotForRadio(
     status: String,
     current: SpeakerSnapshot = SpeakerStateStore.current(),
 ): SpeakerSnapshot =
-    if (active) {
-        current.copy(
+    when {
+        running -> current.copy(
             owner = SpeakerOwner.RADIO,
             playback = if (paused) SpeakerPlaybackState.PAUSED else SpeakerPlaybackState.PLAYING,
             muted = muted,
@@ -144,10 +153,20 @@ internal fun speakerSnapshotForRadio(
             status = status,
             lastError = null,
         )
-    } else if (current.owner == SpeakerOwner.RENDERER) {
-        current
-    } else {
-        current.copy(
+
+        starting || recovering -> current.copy(
+            owner = SpeakerOwner.RADIO,
+            playback = SpeakerPlaybackState.STARTING,
+            muted = muted,
+            volume = volume,
+            stationAlias = stationAlias,
+            status = status,
+            lastError = null,
+        )
+
+        current.owner == SpeakerOwner.RENDERER -> current
+
+        else -> current.copy(
             owner = SpeakerOwner.IDLE,
             playback = SpeakerPlaybackState.STOPPED,
             stationAlias = null,
