@@ -34,6 +34,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     private val channelLock = Any()
     private val idleLock = Any()
     private var idleRelease: ScheduledFuture<*>? = null
+    private var timerReplyRelease: ScheduledFuture<*>? = null
     private var wifiWatcher: AutoCloseable? = null
     private var wifiFallback: ScheduledFuture<*>? = null
     private val startPending = AtomicBoolean(false)
@@ -360,6 +361,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     }
 
     private fun closeWamChannel() {
+        cancelTimerChannelRelease()
         synchronized(channelLock) {
             releaseTimerChannelAfterReply = false
             try {
@@ -382,6 +384,9 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         try {
             activeChannel.setSleepTimer(seconds)
             activeChannel.requestSleepTimer()
+            if (releaseTimerChannelAfterReply) {
+                scheduleTimerChannelRelease(activeChannel)
+            }
         } catch (error: Exception) {
             pendingSleepTimerSeconds.compareAndSet(null, seconds)
             if (releaseTimerChannelAfterReply && !ownsPlayback) {
@@ -399,6 +404,42 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
             ensureChannel()
         }
         activeChannel.requestSleepTimer()
+        if (releaseTimerChannelAfterReply) {
+            scheduleTimerChannelRelease(activeChannel)
+        }
+    }
+
+    private fun scheduleTimerChannelRelease(activeChannel: SamsungWamChannel) {
+        cancelTimerChannelRelease()
+        timerReplyRelease = idleScheduler.schedule({
+            try {
+                worker.execute {
+                    synchronized(channelLock) {
+                        val shouldClose =
+                            releaseTimerChannelAfterReply &&
+                                wamChannel === activeChannel &&
+                                !ownsPlayback
+                        releaseTimerChannelAfterReply = false
+                        timerReplyRelease = null
+                        if (shouldClose) {
+                            try {
+                                activeChannel.close()
+                            } catch (_: Exception) {
+                                // Best effort after an unanswered timer readback.
+                            }
+                            if (wamChannel === activeChannel) wamChannel = null
+                        }
+                    }
+                }
+            } catch (_: RejectedExecutionException) {
+                // Service teardown won the race.
+            }
+        }, TIMER_REPLY_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+    }
+
+    private fun cancelTimerChannelRelease() {
+        timerReplyRelease?.cancel(false)
+        timerReplyRelease = null
     }
 
     private fun cancelIdleRelease() {
@@ -605,6 +646,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     override fun onSleepTimerChanged(source: Any, state: SleepTimerState) = dispatchWamEvent {
         if (source !== wamChannel) return@dispatchWamEvent
         SpeakerStateStore.update { it.copy(sleepTimer = state) }
+        cancelTimerChannelRelease()
         val releaseAfterReply = releaseTimerChannelAfterReply
         releaseTimerChannelAfterReply = false
         if (releaseAfterReply && !ownsPlayback) {
@@ -733,6 +775,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         private const val DESTROY_RELEASE_TIMEOUT_MS = 1_500L
         private const val RADIO_STOP_TIMEOUT_MS = 2_500L
         private const val CONTROL_ACTION_TIMEOUT_MS = 5_000L
+        private const val TIMER_REPLY_TIMEOUT_MS = 3_000L
         private const val WORKER_THREAD_NAME = "wam-mobile-service"
         private const val WIFI_FALLBACK_SECONDS = 5L
         private const val TAG = "WamBridgeRenderer"
