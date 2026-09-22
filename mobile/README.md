@@ -25,6 +25,8 @@ The Android adapter provides:
 - safe first-start volume capped at M5 raw step `3`;
 - idle/session release so stopped playback does not keep the M5 awake;
 - a Quick Settings tile: tap toggles the renderer, long-press opens settings;
+- a daily-driver Home screen with shared Now Playing state, play/pause, mute and raw-volume
+  controls, plus the M5's three speaker-owned physical Radio presets;
 - an in-app speaker remote plus two explicit home-screen widget choices: a compact
   DLNA toggle and a full remote; the app and remote widget share play/pause, mute and
   raw-volume routing for radio and native speaker playback;
@@ -48,6 +50,17 @@ landing screen and reads the shared runtime speaker snapshot, Radio keeps the ex
 Browse and Stations tools, and Settings owns speaker setup, renderer controls, direct speaker
 controls and system integration. Switching root destinations reuses the same panes instead of
 recreating Activities.
+
+### Home and physical presets
+
+Home renders Now Playing from the same runtime snapshot used by renderer/radio controls and
+shows exactly three physical preset slots read from the M5. These are the speaker-owned
+`kind=speaker` presets cycled by the physical Radio button, not another local favourites list.
+Radio renders the same runtime preset snapshot above Saved stations and TuneIn Explore.
+
+The slots are read-only in this release. Android can play them through the already measured
+`SetPlayPreset` path, but preset editing stays disabled until the write-side
+`SetSavePreset`/`SetMovePreset` behavior is hardware-validated on the physical M5.
 
 ### Speaker discovery
 
