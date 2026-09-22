@@ -15,4 +15,19 @@ class MainNavigationContractTest {
         assertTrue(source.contains("fun navigationButton("))
         assertTrue(source.contains("fun setNavigationSelected("))
     }
+
+    @Test
+    fun mainActivityBuildsThreePersistentRootPanes() {
+        val source = File(
+            "src/main/java/io/github/trvny/wambridge/mobile/MainActivity.kt",
+        ).readText()
+
+        assertTrue(source.contains("buildHomePane()"))
+        assertTrue(source.contains("buildRadioPane()"))
+        assertTrue(source.contains("buildSettingsPane()"))
+        assertTrue(source.contains("showDestination("))
+        assertTrue(source.contains("\"Home\""))
+        assertTrue(source.contains("\"Radio\""))
+        assertTrue(source.contains("\"Settings\""))
+    }
 }
