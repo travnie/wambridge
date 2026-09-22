@@ -76,6 +76,7 @@ internal class SamsungWamChannel(
         fun onPlaybackStarted()
         fun onReportedError(method: String?, code: String)
         fun onVolumeChanged(source: Any, raw: Int) {}
+        fun onSleepTimerChanged(source: Any, state: SleepTimerState) {}
     }
 
     /** What `GetFunc` answered: the selected source and, on wifi, its submode. */
@@ -162,6 +163,21 @@ internal class SamsungWamChannel(
         )
     }
 
+    fun setSleepTimer(seconds: Int) {
+        val command = sleepTimerCommand(seconds)
+        send(
+            method = "SetSleepTimer",
+            arguments = listOf(
+                Argument("option", command.option, Kind.STR),
+                Argument("sleeptime", command.seconds.toString(), Kind.DEC),
+            ),
+        )
+    }
+
+    fun requestSleepTimer() {
+        send(method = "GetSleepTimer")
+    }
+
     private fun send(
         method: String,
         arguments: List<Argument> = emptyList(),
@@ -229,6 +245,19 @@ internal class SamsungWamChannel(
             VOLUME_REGEX.find(body)?.groupValues?.getOrNull(1)?.toIntOrNull()
                 ?.takeIf { it in MIN_VOLUME_STEP..MAX_VOLUME_STEP }
                 ?.let { listener?.onVolumeChanged(this, it) }
+        }
+        if (method.equals("SleepTime", ignoreCase = true)) {
+            listener?.onSleepTimerChanged(
+                this,
+                sleepTimerState(
+                    mapOf(
+                        "sleepoption" to SLEEP_OPTION_REGEX.find(body)
+                            ?.groupValues?.getOrNull(1).orEmpty(),
+                        "sleeptime" to SLEEP_TIME_REGEX.find(body)
+                            ?.groupValues?.getOrNull(1).orEmpty(),
+                    ),
+                ),
+            )
         }
     }
 
@@ -385,6 +414,14 @@ internal class SamsungWamChannel(
         private val FUNCTION_REGEX = Regex("<function>([^<]*)</function>", RegexOption.IGNORE_CASE)
         private val SUBMODE_REGEX = Regex("<submode>([^<]*)</submode>", RegexOption.IGNORE_CASE)
         private val VOLUME_REGEX = Regex("<volume>([0-9]{1,3})</volume>", RegexOption.IGNORE_CASE)
+        private val SLEEP_OPTION_REGEX = Regex(
+            "<sleepoption>\\s*([^<]+?)\\s*</sleepoption>",
+            RegexOption.IGNORE_CASE,
+        )
+        private val SLEEP_TIME_REGEX = Regex(
+            "<sleeptime>\\s*([^<]+?)\\s*</sleeptime>",
+            RegexOption.IGNORE_CASE,
+        )
         private val DEVICE_ID_REGEX = Regex("<device_id>([^<]+)</device_id>", RegexOption.IGNORE_CASE)
 
         fun newClientUuid(): String = UUID.randomUUID().toString()

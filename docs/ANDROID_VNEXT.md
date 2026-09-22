@@ -34,6 +34,11 @@ having two apps fight over the speaker.
 
 ## 3. Sleep Timer / Standby
 
+**Software implemented 2026-09-22; physical Standby-now validation pending.** Android now exposes
+15/30/45/60/Off, reads speaker timer state, and routes commands through the current radio/renderer
+owner. Standby now releases app-owned playback before arming a one-second speaker timer; do not
+upgrade that to hardware-validated until the M5 test pass is recorded.
+
 Expose the measured M5 sleep path through normal UI.
 
 - 15 / 30 / 45 / 60 minute presets

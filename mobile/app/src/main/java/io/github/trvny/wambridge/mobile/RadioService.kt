@@ -65,6 +65,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                stopping = true
                 desiredStation = null
                 execute {
                     cancelWifiRecovery()
@@ -102,6 +103,67 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
 
             ACTION_VOLUME_UP -> {
                 execute { changeVolume(1) }
+                return START_NOT_STICKY
+            }
+
+            ACTION_SET_SLEEP_TIMER -> {
+                val requestId = intent.getLongExtra(SleepTimerOwnerRequests.EXTRA_REQUEST_ID, 0L)
+                val seconds = intent.getIntExtra(EXTRA_SLEEP_TIMER_SECONDS, -1)
+                val command = runCatching { sleepTimerCommand(seconds) }.getOrElse {
+                    SleepTimerOwnerRequests.complete(requestId, false)
+                    lastStatus = "Invalid sleep timer."
+                    publishRuntimeState(lastStatus)
+                    return START_NOT_STICKY
+                }
+                if (!acceptsSleepTimerCommands || destroyed || channel == null) {
+                    SleepTimerOwnerRequests.complete(requestId, false)
+                    return START_NOT_STICKY
+                }
+                val accepted = try {
+                    worker.execute {
+                        if (!destroyed) {
+                            runSleepTimerTask { applyAcceptedSleepTimer(command.seconds) }
+                        }
+                    }
+                    true
+                } catch (_: RejectedExecutionException) {
+                    false
+                }
+                SleepTimerOwnerRequests.complete(requestId, accepted)
+                if (accepted) {
+                    SpeakerStateStore.update {
+                        it.copy(
+                            sleepTimer = SleepTimerState(
+                                phase = SleepTimerPhase.REQUESTED,
+                                seconds = command.seconds,
+                            ),
+                        )
+                    }
+                }
+                return START_NOT_STICKY
+            }
+
+            ACTION_GET_SLEEP_TIMER -> {
+                val requestId = intent.getLongExtra(SleepTimerOwnerRequests.EXTRA_REQUEST_ID, 0L)
+                if (!acceptsSleepTimerCommands || destroyed || channel == null) {
+                    SleepTimerOwnerRequests.complete(requestId, false)
+                    return START_NOT_STICKY
+                }
+                val accepted = try {
+                    worker.execute {
+                        if (!destroyed) {
+                            runSleepTimerTask {
+                                val activeChannel = channel
+                                    ?: error("Radio control channel unavailable")
+                                activeChannel.requestSleepTimer()
+                            }
+                        }
+                    }
+                    true
+                } catch (_: RejectedExecutionException) {
+                    false
+                }
+                SleepTimerOwnerRequests.complete(requestId, accepted)
                 return START_NOT_STICKY
             }
 
@@ -450,6 +512,33 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         }
     }
 
+    override fun onSleepTimerChanged(source: Any, state: SleepTimerState) {
+        if (destroyed || source !== channel) return
+        execute {
+            if (destroyed || source !== channel) return@execute
+            SpeakerStateStore.update { it.copy(sleepTimer = state) }
+        }
+    }
+
+    private fun applyAcceptedSleepTimer(seconds: Int) {
+        val activeChannel = channel ?: error("Radio control channel unavailable")
+        activeChannel.setSleepTimer(seconds)
+        activeChannel.requestSleepTimer()
+    }
+
+    private fun runSleepTimerTask(action: () -> Unit) {
+        try {
+            action()
+        } catch (error: Exception) {
+            SpeakerStateStore.update {
+                it.copy(
+                    sleepTimer = SleepTimerState(),
+                    lastError = "Sleep timer: ${error.message ?: error.javaClass.simpleName}",
+                )
+            }
+        }
+    }
+
     private fun togglePause() {
         setPaused(!paused)
     }
@@ -489,25 +578,30 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         removeForeground: Boolean = true,
         clearDesired: Boolean = true,
     ) = SpeakerControlGate.serial {
-        if (channel != null) {
-            runCatching { channel?.pause() }
+        stopping = true
+        try {
+            if (channel != null) {
+                runCatching { channel?.pause() }
+            }
+            safeVolumeApplied = false
+            targetVolume = SAFE_START_VOLUME
+            muted = false
+            paused = false
+            volumeChannel = null
+            runCatching { channel?.close() }
+            channel = null
+            runCatching { proxy?.close() }
+            proxy = null
+            station = null
+            if (clearDesired) desiredStation = null
+            speakerIp = ""
+            running = false
+            publishRuntimeState(if (active) lastStatus else "Stopped")
+            WamBridgeWidget.updateAll(applicationContext)
+            if (removeForeground) stopForeground(STOP_FOREGROUND_REMOVE)
+        } finally {
+            stopping = false
         }
-        safeVolumeApplied = false
-        targetVolume = SAFE_START_VOLUME
-        muted = false
-        paused = false
-        volumeChannel = null
-        runCatching { channel?.close() }
-        channel = null
-        runCatching { proxy?.close() }
-        proxy = null
-        station = null
-        if (clearDesired) desiredStation = null
-        speakerIp = ""
-        running = false
-        publishRuntimeState(if (active) lastStatus else "Stopped")
-        WamBridgeWidget.updateAll(applicationContext)
-        if (removeForeground) stopForeground(STOP_FOREGROUND_REMOVE)
     }
 
     private fun fail(message: String, retryable: Boolean = false) {
@@ -650,6 +744,9 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         const val ACTION_MUTE = "trvny.wambridge.mobile.RADIO_MUTE"
         const val ACTION_VOLUME_DOWN = "trvny.wambridge.mobile.RADIO_VOLUME_DOWN"
         const val ACTION_VOLUME_UP = "trvny.wambridge.mobile.RADIO_VOLUME_UP"
+        const val ACTION_SET_SLEEP_TIMER = "trvny.wambridge.mobile.RADIO_SET_SLEEP_TIMER"
+        const val ACTION_GET_SLEEP_TIMER = "trvny.wambridge.mobile.RADIO_GET_SLEEP_TIMER"
+        const val EXTRA_SLEEP_TIMER_SECONDS = "sleep_timer_seconds"
         const val EXTRA_ALIAS = "station_alias"
 
         /**
@@ -689,6 +786,9 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         @Volatile var running = false
             private set
         @Volatile private var wifiRecovery = false
+        @Volatile private var stopping = false
+        val acceptsSleepTimerCommands: Boolean
+            get() = running && !starting && !wifiRecovery && !stopping
         val active: Boolean
             get() = radioOwnerActive(starting, running, wifiRecovery)
         @Volatile var paused = false

@@ -60,6 +60,15 @@ branch or implementing another timing layer.
   RendererService creates no MediaSession, so DLNA ownership remains with the external player.
   Physical follow-up: verify notification, lock-screen and headset/Bluetooth actions on the M5.
 
+  **Sleep timer / standby 2026-09-22:** Android now models timer state in the shared speaker
+  snapshot and exposes 15/30/45/60 minute presets plus Off. The measured
+  `SetSleepTimer(option=start|off,sleeptime=<seconds>)` / `GetSleepTimer` path is used without
+  `pwron`. Requests stay on RadioService/RendererService when either owns the control plane;
+  idle requests go through the normal speaker gate/resolver. Standby now stops app-owned
+  playback and then arms a one-second speaker timer without restarting the prior owner.
+  Software/CI coverage is present; the one-second standby behavior and active-owner timer
+  routing still require the physical M5 checklist before being called hardware-validated.
+
 The stable universal transport is local HTTP started through `SetUrlPlayback`. The speaker
 paces the HTTP side through TCP backpressure. Finite share/DLNA playback is proven as a
 separate optional path but is not integrated into the foobar output.

@@ -40,6 +40,9 @@ The Android adapter provides:
 - radio playback owns an Android MediaSession, so its play/pause/stop state can appear in the
   notification shade, lock screen and compatible headset/Bluetooth controls; DLNA still belongs
   to the external player that started it;
+- speaker-owned sleep controls expose 15/30/45/60 minute presets, Off and Standby now; timer
+  requests stay on the current radio/renderer control owner and confirmed state is read back
+  from the M5 instead of running a phone-side countdown;
 - Android 13+ notification permission is requested on launch so renderer/radio foreground
   controls can actually appear in the notification shade;
 - an M5-style app/renderer icon exposed through UPnP for players such as Neutron;
@@ -76,6 +79,18 @@ The session mirrors the same radio runtime state used by Home and the foreground
 and routes system play/pause/stop actions back through the existing RadioService commands.
 It becomes inactive when radio stops. Renderer/DLNA playback deliberately creates no WAM Bridge
 MediaSession, so the external player remains the only system-media owner for DLNA.
+
+### Sleep timer and standby
+
+Home exposes **Sleep** with 15/30/45/60 minute presets, Off and Standby now. The M5 owns the
+countdown through the measured `SetSleepTimer` / `GetSleepTimer` path. While radio or the
+renderer owns port 55001, sleep commands stay inside that service instead of opening a competing
+client; idle commands use the normal shared target/gate path. Settings shows speaker-confirmed
+timer state when it can be read safely.
+
+**Standby now** releases WAM Bridge radio/renderer ownership and then arms a one-second speaker
+timer without waking the M5. The software path is implemented, but that one-second standby
+sequence remains hardware-unverified until the physical M5 checklist is completed.
 
 ### Settings and diagnostics
 

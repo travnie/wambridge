@@ -38,6 +38,7 @@ internal data class SpeakerSnapshot(
     val discovery: SpeakerDiscoveryStage = SpeakerDiscoveryStage.IDLE,
     val status: String = "Idle",
     val lastError: String? = null,
+    val sleepTimer: SleepTimerState = SleepTimerState(),
 )
 
 internal object SpeakerStateStore {

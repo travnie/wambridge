@@ -43,6 +43,7 @@ class MainActivity : Activity() {
     private lateinit var homePlayPauseButton: Button
     private lateinit var homeMuteButton: Button
     private lateinit var homePresetStatusView: TextView
+    private lateinit var sleepTimerStatusView: TextView
     private val homePresetButtons = mutableListOf<Button>()
     private lateinit var radioPresetStatusView: TextView
     private val radioPresetButtons = mutableListOf<Button>()
@@ -68,6 +69,9 @@ class MainActivity : Activity() {
     }
     private val presetExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "wam-mobile-physical-presets").apply { isDaemon = true }
+    }
+    private val timerExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "wam-mobile-sleep-timer").apply { isDaemon = true }
     }
     private val presetWorkRunning = AtomicBoolean(false)
     private val autoDiscoveryRetry = Runnable {
@@ -255,6 +259,12 @@ class MainActivity : Activity() {
             )
             MobileUi.addWeighted(
                 this,
+                MobileUi.button(this@MainActivity, "Sleep") {
+                    showSleepTimerChooser()
+                },
+            )
+            MobileUi.addWeighted(
+                this,
                 MobileUi.button(this@MainActivity, "Reconnect") {
                     runDiscovery(manual = false)
                 },
@@ -402,6 +412,8 @@ class MainActivity : Activity() {
                 "DLNA renderer status plus Android shortcuts. Playback controls live on Home.",
             ),
         )
+        sleepTimerStatusView = MobileUi.status(this, "Sleep timer · unknown")
+        playbackCard.addView(sleepTimerStatusView)
         playbackCard.addView(MobileUi.row(this).apply {
             setPadding(0, MobileUi.dp(this@MainActivity, 12), 0, 0)
             startRendererButton = MobileUi.button(
@@ -513,6 +525,7 @@ class MainActivity : Activity() {
                 refreshPhysicalPresets()
             }
         }
+        if (visibility.settings) refreshSleepTimerState()
     }
 
     private fun renderHomeState(snapshot: SpeakerSnapshot) {
@@ -572,6 +585,92 @@ class MainActivity : Activity() {
             else -> MobileUi.StatusKind.INFO
         }
         MobileUi.setStatus(homeStatusView, connectionText, kind)
+        renderSleepTimerState(snapshot.sleepTimer)
+    }
+
+    private fun renderSleepTimerState(state: SleepTimerState) {
+        if (!::sleepTimerStatusView.isInitialized) return
+        val text = when (state.phase) {
+            SleepTimerPhase.UNKNOWN -> "Sleep timer · unknown"
+            SleepTimerPhase.REQUESTED -> "Sleep timer · request sent"
+            SleepTimerPhase.OFF -> "Sleep timer · off"
+            SleepTimerPhase.ARMED -> "Sleep timer · M5 reports ${state.seconds ?: "?"}s"
+        }
+        MobileUi.setStatus(
+            sleepTimerStatusView,
+            text,
+            if (state.phase == SleepTimerPhase.ARMED) {
+                MobileUi.StatusKind.SUCCESS
+            } else {
+                MobileUi.StatusKind.INFO
+            },
+        )
+    }
+
+    private fun showSleepTimerChooser() {
+        val labels = arrayOf("15 min", "30 min", "45 min", "60 min", "Off", "Standby now")
+        AlertDialog.Builder(this)
+            .setTitle("Sleep timer")
+            .setItems(labels) { _, which ->
+                when (which) {
+                    0 -> runSleepTimerAction { SleepTimerControls.set(applicationContext, sleepTimerSeconds(15)) }
+                    1 -> runSleepTimerAction { SleepTimerControls.set(applicationContext, sleepTimerSeconds(30)) }
+                    2 -> runSleepTimerAction { SleepTimerControls.set(applicationContext, sleepTimerSeconds(45)) }
+                    3 -> runSleepTimerAction { SleepTimerControls.set(applicationContext, sleepTimerSeconds(60)) }
+                    4 -> runSleepTimerAction { SleepTimerControls.set(applicationContext, 0) }
+                    5 -> runSleepTimerAction { SleepTimerControls.standbyNow(applicationContext) }
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun runSleepTimerAction(action: () -> SleepTimerControls.Outcome) {
+        if (timerExecutor.isShutdown) return
+        if (::homeStatusView.isInitialized) {
+            MobileUi.setStatus(homeStatusView, "Updating M5 sleep timer…")
+        }
+        timerExecutor.execute {
+            val result = runCatching(action)
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                renderSleepTimerState(SpeakerStateStore.current().sleepTimer)
+                result.fold(
+                    onSuccess = { outcome ->
+                        val kind = when (outcome.state.phase) {
+                            SleepTimerPhase.REQUESTED, SleepTimerPhase.UNKNOWN ->
+                                MobileUi.StatusKind.INFO
+                            SleepTimerPhase.ARMED, SleepTimerPhase.OFF ->
+                                MobileUi.StatusKind.SUCCESS
+                        }
+                        MobileUi.setStatus(
+                            homeStatusView,
+                            outcome.message,
+                            kind,
+                        )
+                    },
+                    onFailure = { error ->
+                        MobileUi.setStatus(
+                            homeStatusView,
+                            error.message ?: error.javaClass.simpleName,
+                            MobileUi.StatusKind.ERROR,
+                        )
+                    },
+                )
+            }
+        }
+    }
+
+    private fun refreshSleepTimerState() {
+        if (timerExecutor.isShutdown) return
+        timerExecutor.execute {
+            runCatching { SleepTimerControls.refresh(applicationContext) }
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) {
+                    renderSleepTimerState(SpeakerStateStore.current().sleepTimer)
+                }
+            }
+        }
     }
 
     private fun renderPhysicalPresets(snapshot: PhysicalPresetSnapshot) {
@@ -706,6 +805,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         if (::statusView.isInitialized) refreshStatus()
+        if (currentDestination == MainDestination.SETTINGS) refreshSleepTimerState()
     }
 
     override fun onDestroy() {
@@ -714,6 +814,7 @@ class MainActivity : Activity() {
         discoveryExecutor.shutdownNow()
         controlExecutor.shutdownNow()
         presetExecutor.shutdownNow()
+        timerExecutor.shutdownNow()
         super.onDestroy()
     }
 

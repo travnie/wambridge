@@ -72,6 +72,29 @@ internal object SpeakerRemote {
         return next
     }
 
+    fun setSleepTimer(context: Context, speakerIp: String, seconds: Int): SleepTimerState {
+        val command = sleepTimerCommand(seconds)
+        request(
+            context,
+            speakerIp,
+            method = "SetSleepTimer",
+            arguments = listOf(
+                Argument("option", command.option, Kind.STR),
+                Argument("sleeptime", command.seconds.toString(), Kind.DEC),
+            ),
+        )
+        return readSleepTimer(context, speakerIp)
+    }
+
+    fun readSleepTimer(context: Context, speakerIp: String): SleepTimerState =
+        sleepTimerState(
+            request(
+                context,
+                speakerIp,
+                method = "GetSleepTimer",
+            ),
+        )
+
     private fun readVolume(context: Context, speakerIp: String): Int {
         val values = request(context, speakerIp, method = "GetVolume")
         val raw = values["volume"] ?: values["volumelevel"] ?: values["level"]
