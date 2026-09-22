@@ -20,15 +20,7 @@ internal object SleepTimerControls {
         SpeakerStateStore.update { it.copy(sleepTimer = requested) }
 
         return try {
-            val appContext = context.applicationContext
-            SpeakerControlGate.serial {
-                dispatchSetToOwner(appContext, command.seconds)?.let { return@serial it }
-                val target = SpeakerTarget.resolve(appContext)
-                    ?: error("No WAM speaker found")
-                val confirmed = SpeakerRemote.setSleepTimer(appContext, target, command.seconds)
-                SpeakerStateStore.update { it.copy(sleepTimer = confirmed) }
-                Outcome(timerMessage(confirmed), confirmed)
-            }
+            routeSet(context.applicationContext, command.seconds)
         } catch (error: Exception) {
             restoreRequestedState(requested, previous)
             throw error
@@ -82,15 +74,54 @@ internal object SleepTimerControls {
         }
     }
 
-    fun refresh(context: Context): Outcome {
-        val appContext = context.applicationContext
-        return SpeakerControlGate.serial {
-            dispatchRefreshToOwner(appContext)?.let { return@serial it }
-            val target = SpeakerTarget.resolve(appContext)
-                ?: error("No WAM speaker found")
-            val confirmed = SpeakerRemote.readSleepTimer(appContext, target)
-            SpeakerStateStore.update { it.copy(sleepTimer = confirmed) }
-            Outcome(timerMessage(confirmed), confirmed)
+    fun refresh(context: Context): Outcome =
+        routeRefresh(context.applicationContext)
+
+    private fun routeSet(context: Context, seconds: Int): Outcome {
+        val deadline = SystemClock.elapsedRealtime() + OWNER_ROUTE_TIMEOUT_MS
+        while (true) {
+            dispatchSetToOwner(context, seconds)?.let { return it }
+
+            var direct: Outcome? = null
+            SpeakerControlGate.serial {
+                if (!RadioService.active && !RendererService.busy) {
+                    val target = SpeakerTarget.resolve(context)
+                        ?: error("No WAM speaker found")
+                    val confirmed = SpeakerRemote.setSleepTimer(context, target, seconds)
+                    SpeakerStateStore.update { it.copy(sleepTimer = confirmed) }
+                    direct = Outcome(timerMessage(confirmed), confirmed)
+                }
+            }
+            direct?.let { return it }
+
+            if (SystemClock.elapsedRealtime() >= deadline) {
+                error("M5 control owner did not settle for sleep timer")
+            }
+            SystemClock.sleep(OWNER_ROUTE_POLL_MS)
+        }
+    }
+
+    private fun routeRefresh(context: Context): Outcome {
+        val deadline = SystemClock.elapsedRealtime() + OWNER_ROUTE_TIMEOUT_MS
+        while (true) {
+            dispatchRefreshToOwner(context)?.let { return it }
+
+            var direct: Outcome? = null
+            SpeakerControlGate.serial {
+                if (!RadioService.active && !RendererService.busy) {
+                    val target = SpeakerTarget.resolve(context)
+                        ?: error("No WAM speaker found")
+                    val confirmed = SpeakerRemote.readSleepTimer(context, target)
+                    SpeakerStateStore.update { it.copy(sleepTimer = confirmed) }
+                    direct = Outcome(timerMessage(confirmed), confirmed)
+                }
+            }
+            direct?.let { return it }
+
+            if (SystemClock.elapsedRealtime() >= deadline) {
+                error("M5 control owner did not settle for sleep timer refresh")
+            }
+            SystemClock.sleep(OWNER_ROUTE_POLL_MS)
         }
     }
 
@@ -98,23 +129,27 @@ internal object SleepTimerControls {
         val requested = SleepTimerState(SleepTimerPhase.REQUESTED, seconds)
         return when {
             RadioService.running -> {
-                context.startService(
+                val accepted = sendOwnerRequest(
+                    context,
                     Intent(context, RadioService::class.java).apply {
                         action = RadioService.ACTION_SET_SLEEP_TIMER
                         putExtra(RadioService.EXTRA_SLEEP_TIMER_SECONDS, seconds)
                     },
+                    "radio",
                 )
-                Outcome("Sleep timer request sent to radio.", requested)
+                if (accepted) Outcome("Sleep timer request sent to radio.", requested) else null
             }
 
             RendererService.phase == RendererService.Phase.RUNNING -> {
-                context.startService(
+                val accepted = sendOwnerRequest(
+                    context,
                     Intent(context, RendererService::class.java).apply {
                         action = RendererService.ACTION_SET_SLEEP_TIMER
                         putExtra(RendererService.EXTRA_SLEEP_TIMER_SECONDS, seconds)
                     },
+                    "renderer",
                 )
-                Outcome("Sleep timer request sent to renderer.", requested)
+                if (accepted) Outcome("Sleep timer request sent to renderer.", requested) else null
             }
 
             else -> null
@@ -125,24 +160,43 @@ internal object SleepTimerControls {
         val current = SpeakerStateStore.current().sleepTimer
         return when {
             RadioService.running -> {
-                context.startService(
+                val accepted = sendOwnerRequest(
+                    context,
                     Intent(context, RadioService::class.java).apply {
                         action = RadioService.ACTION_GET_SLEEP_TIMER
                     },
+                    "radio",
                 )
-                Outcome("Sleep timer refresh requested from radio.", current)
+                if (accepted) Outcome("Sleep timer refresh requested from radio.", current) else null
             }
 
             RendererService.phase == RendererService.Phase.RUNNING -> {
-                context.startService(
+                val accepted = sendOwnerRequest(
+                    context,
                     Intent(context, RendererService::class.java).apply {
                         action = RendererService.ACTION_GET_SLEEP_TIMER
                     },
+                    "renderer",
                 )
-                Outcome("Sleep timer refresh requested from renderer.", current)
+                if (accepted) Outcome("Sleep timer refresh requested from renderer.", current) else null
             }
 
             else -> null
+        }
+    }
+
+    private fun sendOwnerRequest(
+        context: Context,
+        intent: Intent,
+        owner: String,
+    ): Boolean {
+        val ticket = SleepTimerOwnerRequests.create()
+        intent.putExtra(SleepTimerOwnerRequests.EXTRA_REQUEST_ID, ticket.id)
+        context.startService(intent)
+        return when (val accepted = SleepTimerOwnerRequests.await(ticket)) {
+            true -> true
+            false -> false
+            null -> error("M5 $owner did not acknowledge sleep timer request")
         }
     }
 
@@ -181,4 +235,6 @@ internal object SleepTimerControls {
 
     private const val STANDBY_TIMER_SECONDS = 1
     private const val OWNER_RELEASE_TIMEOUT_MS = 4_000L
+    private const val OWNER_ROUTE_TIMEOUT_MS = 4_000L
+    private const val OWNER_ROUTE_POLL_MS = 50L
 }
