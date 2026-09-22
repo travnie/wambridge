@@ -46,18 +46,76 @@ internal object SpeakerControls {
 
         when (action) {
             Action.PLAY_PAUSE -> when (SpeakerRemote.toggleNativePlayback(appContext, target)) {
-                SpeakerRemote.PlaybackToggleResult.PAUSED -> Outcome("TuneIn paused")
-                SpeakerRemote.PlaybackToggleResult.PLAYING -> Outcome("TuneIn playing")
+                SpeakerRemote.PlaybackToggleResult.PAUSED -> {
+                    SpeakerStateStore.update {
+                        it.copy(
+                            owner = SpeakerOwner.RADIO,
+                            playback = SpeakerPlaybackState.PAUSED,
+                            speakerIp = target,
+                            source = it.source ?: "TuneIn",
+                            status = "TuneIn paused",
+                            lastError = null,
+                        )
+                    }
+                    Outcome("TuneIn paused")
+                }
+
+                SpeakerRemote.PlaybackToggleResult.PLAYING -> {
+                    SpeakerStateStore.update {
+                        it.copy(
+                            owner = SpeakerOwner.RADIO,
+                            playback = SpeakerPlaybackState.PLAYING,
+                            speakerIp = target,
+                            source = it.source ?: "TuneIn",
+                            status = "TuneIn playing",
+                            lastError = null,
+                        )
+                    }
+                    Outcome("TuneIn playing")
+                }
+
                 SpeakerRemote.PlaybackToggleResult.NO_NATIVE_PLAYBACK ->
                     Outcome(destination = Destination.TUNEIN)
             }
 
-            Action.MUTE ->
-                Outcome(if (SpeakerRemote.toggleMute(appContext, target)) "Muted" else "Unmuted")
-            Action.VOLUME_DOWN ->
-                Outcome("Volume ${SpeakerRemote.changeVolume(appContext, target, -1)}")
-            Action.VOLUME_UP ->
-                Outcome("Volume ${SpeakerRemote.changeVolume(appContext, target, 1)}")
+            Action.MUTE -> {
+                val muted = SpeakerRemote.toggleMute(appContext, target)
+                SpeakerStateStore.update {
+                    it.copy(
+                        speakerIp = target,
+                        muted = muted,
+                        status = if (muted) "Muted" else "Unmuted",
+                        lastError = null,
+                    )
+                }
+                Outcome(if (muted) "Muted" else "Unmuted")
+            }
+
+            Action.VOLUME_DOWN -> {
+                val volume = SpeakerRemote.changeVolume(appContext, target, -1)
+                SpeakerStateStore.update {
+                    it.copy(
+                        speakerIp = target,
+                        volume = volume,
+                        status = "Volume $volume",
+                        lastError = null,
+                    )
+                }
+                Outcome("Volume $volume")
+            }
+
+            Action.VOLUME_UP -> {
+                val volume = SpeakerRemote.changeVolume(appContext, target, 1)
+                SpeakerStateStore.update {
+                    it.copy(
+                        speakerIp = target,
+                        volume = volume,
+                        status = "Volume $volume",
+                        lastError = null,
+                    )
+                }
+                Outcome("Volume $volume")
+            }
         }
     }
 }
