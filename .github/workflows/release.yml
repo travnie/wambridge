@@ -49,6 +49,14 @@ jobs:
       title: ${{ steps.parse.outputs.title }}
       rolling: ${{ steps.parse.outputs.rolling }}
     steps:
+      - name: Require main for releases
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Releases must be built from main, got $GITHUB_REF" >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
@@ -93,6 +101,7 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
 
   component:
+    needs: version
     uses: ./.github/workflows/build.yml
 
   apk:
@@ -152,6 +161,14 @@ jobs:
             fi
           else
             echo "foobar2000 component and signed Android APK for ${VERSION}." > release-notes.md
+          fi
+
+          if [[ "$ROLLING" != "true" ]]; then
+            existing_tag="$(gh api "repos/${GH_REPO}/git/ref/tags/${TAG}" --jq '.object.sha' 2>/dev/null || true)"
+            if [[ -n "$existing_tag" && "$existing_tag" != "$GITHUB_SHA" ]]; then
+              echo "Tag $TAG already points to $existing_tag, refusing to publish this commit." >&2
+              exit 1
+            fi
           fi
 
           if gh release view "$TAG" >/dev/null 2>&1; then
