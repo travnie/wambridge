@@ -42,4 +42,18 @@ class SpeakerDiscoveryContractTest {
         assertTrue(source.contains("forceDiscovery = manual"))
         assertFalse(source.contains("WamDiscovery.discover("))
     }
+
+    @Test
+    fun manuallyChosenSpeakerIdentityIsResolvedOffTheUiThread() {
+        val source = File(
+            "src/main/java/io/github/trvny/wambridge/mobile/MainActivity.kt",
+        ).readText()
+        val selectionBody = source
+            .substringAfter("private fun useDiscoveredSpeaker")
+            .substringBefore("private fun testSpeaker")
+
+        assertTrue(selectionBody.contains("discoveryExecutor.execute"))
+        assertTrue(selectionBody.contains("SpeakerTarget.acceptDiscovered"))
+        assertTrue(selectionBody.indexOf("discoveryExecutor.execute") < selectionBody.indexOf("SpeakerTarget.acceptDiscovered"))
+    }
 }
