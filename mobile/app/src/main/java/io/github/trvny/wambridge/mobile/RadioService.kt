@@ -65,6 +65,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ACTION_STOP -> {
+                stopping = true
                 desiredStation = null
                 execute {
                     cancelWifiRecovery()
@@ -114,7 +115,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                     publishRuntimeState(lastStatus)
                     return START_NOT_STICKY
                 }
-                if (!running || destroyed || channel == null) {
+                if (!acceptsSleepTimerCommands || destroyed || channel == null) {
                     SleepTimerOwnerRequests.complete(requestId, false)
                     return START_NOT_STICKY
                 }
@@ -144,7 +145,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
 
             ACTION_GET_SLEEP_TIMER -> {
                 val requestId = intent.getLongExtra(SleepTimerOwnerRequests.EXTRA_REQUEST_ID, 0L)
-                if (!running || destroyed || channel == null) {
+                if (!acceptsSleepTimerCommands || destroyed || channel == null) {
                     SleepTimerOwnerRequests.complete(requestId, false)
                     return START_NOT_STICKY
                 }
@@ -593,6 +594,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         if (clearDesired) desiredStation = null
         speakerIp = ""
         running = false
+        stopping = false
         publishRuntimeState(if (active) lastStatus else "Stopped")
         WamBridgeWidget.updateAll(applicationContext)
         if (removeForeground) stopForeground(STOP_FOREGROUND_REMOVE)
@@ -780,6 +782,9 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         @Volatile var running = false
             private set
         @Volatile private var wifiRecovery = false
+        @Volatile private var stopping = false
+        val acceptsSleepTimerCommands: Boolean
+            get() = running && !starting && !wifiRecovery && !stopping
         val active: Boolean
             get() = radioOwnerActive(starting, running, wifiRecovery)
         @Volatile var paused = false
