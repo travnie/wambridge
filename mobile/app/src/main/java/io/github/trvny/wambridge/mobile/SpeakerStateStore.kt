@@ -188,3 +188,22 @@ internal fun finalDiscoveryStage(scan: WamDiscovery.Scan): SpeakerDiscoveryStage
     WamDiscovery.Scan.NotRun -> SpeakerDiscoveryStage.WAITING_FOR_WIFI
     else -> SpeakerDiscoveryStage.FAILED
 }
+
+internal fun nativePresetPlayingSnapshot(
+    speakerIp: String,
+    preset: SamsungTuneIn.Preset,
+    current: SpeakerSnapshot = SpeakerStateStore.current(),
+): SpeakerSnapshot = current.copy(
+    owner = SpeakerOwner.RADIO,
+    playback = SpeakerPlaybackState.PLAYING,
+    speakerIp = speakerIp,
+    volume = 3,
+    muted = false,
+    stationAlias = preset.title,
+    metadata = preset.description,
+    source = "TuneIn preset",
+    fallback = null,
+    discovery = SpeakerDiscoveryStage.READY,
+    status = "Playing · ${preset.title}",
+    lastError = null,
+)
