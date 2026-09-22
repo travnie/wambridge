@@ -40,6 +40,20 @@ class PhysicalPresetStoreTest {
     }
 
     @Test
+    fun missingPhysicalIndexStaysEmptyInsteadOfCompressingLaterSlots() {
+        val slots = physicalPresetSlots(
+            listOf(
+                preset("0", "One"),
+                preset("2", "Three"),
+            ),
+        )
+
+        assertEquals("One", slots[0]?.title)
+        assertNull(slots[1])
+        assertEquals("Three", slots[2]?.title)
+    }
+
+    @Test
     fun physicalSlotsAlwaysContainExactlyThreeEntries() {
         val slots = physicalPresetSlots(
             listOf(
