@@ -29,6 +29,10 @@ internal object SleepTimerOwnerRequests {
         pending.remove(id)?.complete(accepted)
     }
 
+    fun cancel(ticket: Ticket) {
+        pending.remove(ticket.id)?.cancel(false)
+    }
+
     fun await(ticket: Ticket, timeoutMs: Long = ACK_TIMEOUT_MS): Boolean? = try {
         ticket.result.get(timeoutMs, TimeUnit.MILLISECONDS)
     } catch (_: TimeoutException) {
