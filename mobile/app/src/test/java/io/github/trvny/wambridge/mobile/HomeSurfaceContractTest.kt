@@ -36,6 +36,7 @@ class HomeSurfaceContractTest {
         assertTrue(main.contains("snapshot.owner"))
         assertTrue(main.contains("snapshot.playback"))
         assertTrue(main.contains("snapshot.discovery"))
+        assertTrue(main.contains("snapshot.speakerIp"))
     }
 
     @Test
@@ -56,28 +57,32 @@ class HomeSurfaceContractTest {
         assertTrue(settings.contains("IPv4 address"))
         assertTrue(settings.contains("Save + test"))
     }
+
     @Test
-    fun radioUsesTheSamePhysicalPresetStoreAsHome() {
+    fun radioUsesTheSamePhysicalPresetStoreAndKeepsLibraryEntrypoints() {
         val radioStart = main.indexOf("private fun buildRadioPane")
         val settingsStart = main.indexOf("private fun buildSettingsPane")
         assertTrue(radioStart >= 0)
         assertTrue(settingsStart > radioStart)
 
         val radio = main.substring(radioStart, settingsStart)
+        assertTrue(radio.contains("Physical presets"))
         assertTrue(radio.contains("radioPresetButtons"))
         assertTrue(radio.contains("PHYSICAL_PRESET_SLOTS"))
-        assertTrue(main.contains("renderPhysicalPresets"))
+        assertTrue(radio.contains("playPhysicalPreset"))
         assertTrue(main.contains("PhysicalPresetStore.current()"))
+        assertTrue(main.contains("renderPhysicalPresets"))
+        assertTrue(radio.contains("Saved stations"))
+        assertTrue(radio.contains("Browse TuneIn"))
+        assertTrue(radio.contains("RadioStationsActivity::class.java"))
+        assertTrue(radio.contains("CatalogueActivity::class.java"))
     }
 
     @Test
-    fun radioKeepsSavedStationsAndTuneInExploreEntrypoints() {
-        val radioStart = main.indexOf("private fun buildRadioPane")
-        val settingsStart = main.indexOf("private fun buildSettingsPane")
-        val radio = main.substring(radioStart, settingsStart)
-
-        assertTrue(radio.contains("RadioStationsActivity::class.java"))
-        assertTrue(radio.contains("CatalogueActivity::class.java"))
+    fun presetIoRunsOnDedicatedBackgroundExecutor() {
+        assertTrue(main.contains("presetExecutor"))
+        assertTrue(main.contains("wam-mobile-physical-presets"))
+        assertTrue(main.contains("isFinishing || isDestroyed"))
     }
 
     @Test
@@ -90,33 +95,5 @@ class HomeSurfaceContractTest {
         assertFalse(source.contains("SetSavePreset"))
         assertFalse(source.contains("SetMovePreset"))
         assertFalse(source.contains("SetRemovePreset"))
-    }
-
-    @Test
-    fun radioUsesTheSameSpeakerOwnedPhysicalPresetStore() {
-        val radioStart = main.indexOf("private fun buildRadioPane")
-        val settingsStart = main.indexOf("private fun buildSettingsPane")
-        assertTrue(radioStart >= 0)
-        assertTrue(settingsStart > radioStart)
-
-        val radio = main.substring(radioStart, settingsStart)
-        assertTrue(radio.contains("Physical presets"))
-        assertTrue(radio.contains("radioPresetButtons"))
-        assertTrue(radio.contains("playPhysicalPreset"))
-        assertTrue(main.contains("PhysicalPresetStore.current()"))
-        assertTrue(radio.contains("Saved stations"))
-        assertTrue(radio.contains("Browse TuneIn"))
-    }
-
-    @Test
-    fun mobileDoesNotShipUnvalidatedPresetWrites() {
-        val root = File("src/main/java/io/github/trvny/wambridge/mobile")
-        val production = root.walkTopDown()
-            .filter { it.isFile && it.extension == "kt" }
-            .joinToString("\n") { it.readText() }
-
-        assertFalse(production.contains("SetSavePreset"))
-        assertFalse(production.contains("SetMovePreset"))
-        assertFalse(production.contains("SetRemovePreset"))
     }
 }
