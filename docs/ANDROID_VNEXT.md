@@ -5,6 +5,10 @@ first in-app speaker controls and fresh-install fixes.
 
 ## 1. Home / Now Playing
 
+**Foundation shipped 2026-09-22.** Home is now the daily-driver surface with shared Now Playing
+state, direct controls and the three speaker-owned physical presets. Artwork/ICY metadata remain
+follow-up work.
+
 Turn the main screen into a daily-driver view instead of a service panel.
 
 - artwork or station logo
@@ -90,6 +94,9 @@ Make common actions reachable without opening the app.
 - reuse the same command/state routing as the app instead of duplicating control logic
 
 ## 10. Human-friendly Diagnostics
+
+**Shipped 2026-09-22.** Diagnostics now exposes the shared speaker/network/runtime state,
+copyable text output and controlled Fix connection recovery; manual IP moved under Advanced.
 
 Keep protocol archaeology out of the normal UI while still making failures explainable.
 
