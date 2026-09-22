@@ -128,7 +128,7 @@ internal object SleepTimerControls {
     private fun dispatchSetToOwner(context: Context, seconds: Int): Outcome? {
         val requested = SleepTimerState(SleepTimerPhase.REQUESTED, seconds)
         return when {
-            RadioService.running -> {
+            RadioService.acceptsSleepTimerCommands -> {
                 val accepted = sendOwnerRequest(
                     context,
                     Intent(context, RadioService::class.java).apply {
@@ -159,7 +159,7 @@ internal object SleepTimerControls {
     private fun dispatchRefreshToOwner(context: Context): Outcome? {
         val current = SpeakerStateStore.current().sleepTimer
         return when {
-            RadioService.running -> {
+            RadioService.acceptsSleepTimerCommands -> {
                 val accepted = sendOwnerRequest(
                     context,
                     Intent(context, RadioService::class.java).apply {
@@ -192,7 +192,12 @@ internal object SleepTimerControls {
     ): Boolean {
         val ticket = SleepTimerOwnerRequests.create()
         intent.putExtra(SleepTimerOwnerRequests.EXTRA_REQUEST_ID, ticket.id)
-        context.startService(intent)
+        try {
+            context.startService(intent)
+        } catch (error: Exception) {
+            SleepTimerOwnerRequests.cancel(ticket)
+            throw error
+        }
         return when (val accepted = SleepTimerOwnerRequests.await(ticket)) {
             true -> true
             false -> false
