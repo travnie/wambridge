@@ -1,6 +1,7 @@
 package io.github.trvny.wambridge.mobile
 
 import java.io.File
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -48,5 +49,22 @@ class SleepTimerControlsContractTest {
     fun retiredChannelsCannotPublishSleepState() {
         assertTrue(radio.contains("source !== channel"))
         assertTrue(renderer.contains("source !== wamChannel"))
+    }
+    @Test
+    fun standbyStopsOwnersBeforeOneSecondSpeakerTimer() {
+        val text = controls.readText()
+        assertTrue(text.contains("fun standbyNow("))
+        assertTrue(text.contains("RadioService.ACTION_STOP"))
+        assertTrue(text.contains("RendererService.ACTION_STOP"))
+        assertTrue(text.contains("waitForOwnerRelease"))
+        assertTrue(text.contains("SpeakerTarget.resolve("))
+        assertTrue(text.contains("SpeakerRemote.setSleepTimer"))
+        assertTrue(text.contains("STANDBY_TIMER_SECONDS = 1"))
+
+        val start = text.indexOf("fun standbyNow(")
+        val end = text.indexOf("private fun", start)
+        val standby = text.substring(start, end)
+        assertFalse(standby.contains("RadioService.ACTION_PLAY"))
+        assertFalse(standby.contains("RendererService.ACTION_START"))
     }
 }
