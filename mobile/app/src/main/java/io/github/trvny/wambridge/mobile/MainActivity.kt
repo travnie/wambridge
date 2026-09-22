@@ -179,6 +179,11 @@ class MainActivity : Activity() {
                 runSpeakerControl(action, homeStatusView)
             }.also { speakerControlButtons += it }
 
+            val stopButton = MobileUi.button(
+                this@MainActivity,
+                "Stop",
+                MobileUi.ButtonKind.DANGER,
+            ) { stopHomePlayback() }
             homePlayPauseButton = homeControl(
                 "Play / pause",
                 SpeakerControls.Action.PLAY_PAUSE,
@@ -187,10 +192,11 @@ class MainActivity : Activity() {
             homeMuteButton = homeControl("Mute", SpeakerControls.Action.MUTE)
             val volumeDown = homeControl("−", SpeakerControls.Action.VOLUME_DOWN)
             val volumeUp = homeControl("+", SpeakerControls.Action.VOLUME_UP)
+            MobileUi.addWeighted(this, stopButton, 0.75f)
             MobileUi.addWeighted(this, homePlayPauseButton, 1.35f)
             MobileUi.addWeighted(this, homeMuteButton, 1f)
-            MobileUi.addWeighted(this, volumeDown, 0.6f)
-            MobileUi.addWeighted(this, volumeUp, 0.6f, marginDp = 0)
+            MobileUi.addWeighted(this, volumeDown, 0.55f)
+            MobileUi.addWeighted(this, volumeUp, 0.55f, marginDp = 0)
         })
         content.addView(nowPlaying)
 
@@ -979,7 +985,7 @@ class MainActivity : Activity() {
                     },
                     onFailure = { error ->
                         MobileUi.setStatus(
-                            statusView,
+                            feedbackView,
                             error.message ?: error.javaClass.simpleName,
                             MobileUi.StatusKind.ERROR,
                         )
@@ -1063,6 +1069,35 @@ class MainActivity : Activity() {
             MobileUi.setEnabled(stopRendererButton, RendererService.busy)
         }
         refreshSpeakerControlButtons()
+    }
+
+    private fun stopHomePlayback() {
+        MobileUi.setStatus(homeStatusView, "Stopping playback…")
+        when {
+            RadioService.active -> {
+                startService(
+                    Intent(this, RadioService::class.java).apply {
+                        action = RadioService.ACTION_STOP
+                    },
+                )
+            }
+
+            RendererService.busy -> {
+                startService(
+                    Intent(this, RendererService::class.java).apply {
+                        action = RendererService.ACTION_STOP
+                    },
+                )
+            }
+
+            else -> {
+                startActivity(
+                    Intent(this, TuneInActivity::class.java).apply {
+                        action = TuneInActivity.ACTION_STOP_PLAYBACK
+                    },
+                )
+            }
+        }
     }
 
     private fun runSpeakerControl(
