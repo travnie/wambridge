@@ -52,7 +52,7 @@ stations and TuneIn Explore; the slots are read directly from the M5 and match t
 physical Radio button. This release intentionally keeps those physical slots read-only until
 the write-side preset commands are hardware-validated. Settings keeps normal speaker/system
 controls up front, while Diagnostics exposes copyable runtime/network state and a controlled
-Fix connection action. Manual IP and low-level renderer controls live under Advanced. Switching
+Fix connection action. Manual IP and dedicated troubleshooting controls live under Advanced. Switching
 root destinations reuses the same panes instead of recreating Activities.
 
 ### Home and physical presets
@@ -74,8 +74,8 @@ device ID, Android Wi-Fi endpoint, owner/playback/discovery, active source/fallb
 and radio state, last error and app version. The report can be copied as plain text.
 
 **Fix connection** stops active renderer/radio ownership, then runs the shared forced discovery
-path and refreshes the report. Manual IPv4 setup and explicit low-level renderer Start/Stop are
-kept under **Advanced** instead of occupying the daily Settings screen.
+path and refreshes the report. Manual IPv4 setup and dedicated low-level troubleshooting are kept under **Advanced** instead
+of occupying the daily Settings screen.
 
 ### Speaker discovery
 
