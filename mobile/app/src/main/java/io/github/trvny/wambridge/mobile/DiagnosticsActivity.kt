@@ -109,6 +109,10 @@ class DiagnosticsActivity : Activity() {
 
     private fun copyDiagnostics() {
         val clipboard = getSystemService(ClipboardManager::class.java)
+        if (clipboard == null) {
+            Toast.makeText(this, "Clipboard unavailable.", Toast.LENGTH_SHORT).show()
+            return
+        }
         clipboard.setPrimaryClip(
             ClipData.newPlainText(
                 "WAM Bridge diagnostics",
