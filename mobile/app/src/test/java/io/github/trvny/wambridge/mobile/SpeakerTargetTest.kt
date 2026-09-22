@@ -35,6 +35,17 @@ class SpeakerTargetTest {
     }
 
     @Test
+    fun savedIpSurvivesTemporaryIdentityTimeoutWhenItIsTheOnlySpeaker() {
+        val selected = SpeakerTarget.selectCandidate(
+            savedIp = old.ip,
+            savedId = "A1B2C3D4E5F6",
+            speakers = listOf(old),
+            identify = { null },
+        )
+        assertEquals(old, selected)
+    }
+
+    @Test
     fun legacySavedIpStillDisambiguatesMultipleSpeakers() {
         val selected = SpeakerTarget.selectCandidate(
             savedIp = moved.ip,
