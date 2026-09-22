@@ -84,7 +84,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
             }
 
             ACTION_SET_SLEEP_TIMER -> {
-                val seconds = intent.getIntExtra(EXTRA_SLEEP_TIMER_SECONDS, -1)
+                val seconds = intent?.getIntExtra(EXTRA_SLEEP_TIMER_SECONDS, -1) ?: -1
                 val command = runCatching { sleepTimerCommand(seconds) }.getOrElse {
                     lastStatus = "Invalid sleep timer."
                     publish(lastStatus)
