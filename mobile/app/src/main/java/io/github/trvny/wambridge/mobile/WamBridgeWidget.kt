@@ -145,7 +145,8 @@ class WamBridgeWidget : AppWidgetProvider() {
 
     private fun openSettings(context: Context) {
         context.startActivity(
-            Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+            MainNavigation.intent(context, MainDestination.SETTINGS)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
         )
     }
 
