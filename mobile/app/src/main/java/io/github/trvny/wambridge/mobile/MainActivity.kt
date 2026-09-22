@@ -13,8 +13,10 @@ import android.os.Bundle
 import android.text.Editable
 import android.text.InputType
 import android.text.TextWatcher
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -39,6 +41,14 @@ class MainActivity : Activity() {
     private lateinit var stopRendererButton: Button
     private lateinit var speakerIp: EditText
     private lateinit var statusView: TextView
+    private lateinit var homeStatusView: TextView
+    private lateinit var homePane: View
+    private lateinit var radioPane: View
+    private lateinit var settingsPane: View
+    private lateinit var homeNavButton: Button
+    private lateinit var radioNavButton: Button
+    private lateinit var settingsNavButton: Button
+    private var currentDestination = MainDestination.HOME
     private val speakerControlButtons = mutableListOf<Button>()
     private var speakerControlRunning = false
 
@@ -63,12 +73,148 @@ class MainActivity : Activity() {
         MobileUi.applyWindow(this)
         requestNotificationPermission()
 
+        currentDestination = mainDestination(
+            intent?.action,
+            intent?.getStringExtra(MainNavigation.EXTRA_DESTINATION),
+        )
+
+        val root = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(getColor(R.color.wam_background))
+        }
+        val contentHost = FrameLayout(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                0,
+                1f,
+            )
+        }
+
+        homePane = buildHomePane()
+        radioPane = buildRadioPane()
+        settingsPane = buildSettingsPane()
+        contentHost.addView(homePane)
+        contentHost.addView(radioPane)
+        contentHost.addView(settingsPane)
+
+        val navigation = MobileUi.bottomNavigation(this).apply {
+            homeNavButton = MobileUi.navigationButton(this@MainActivity, "Home") {
+                showDestination(MainDestination.HOME)
+            }
+            radioNavButton = MobileUi.navigationButton(this@MainActivity, "Radio") {
+                showDestination(MainDestination.RADIO)
+            }
+            settingsNavButton = MobileUi.navigationButton(this@MainActivity, "Settings") {
+                showDestination(MainDestination.SETTINGS)
+            }
+            MobileUi.addWeighted(this, homeNavButton)
+            MobileUi.addWeighted(this, radioNavButton)
+            MobileUi.addWeighted(this, settingsNavButton, marginDp = 0)
+        }
+
+        root.addView(contentHost)
+        root.addView(navigation)
+        setContentView(root)
+        showDestination(currentDestination)
+
+        refreshLauncherButton()
+        refreshStatus()
+        window.decorView.post(autoDiscoveryRetry)
+    }
+
+    private fun buildHomePane(): View {
         val content = MobileUi.page(this)
         content.addView(
             MobileUi.header(
                 this,
                 getString(R.string.app_name),
-                "Samsung Wireless Audio Multiroom, without the fossilized Samsung app.",
+                "Your M5 at a glance.",
+            ),
+        )
+
+        homeStatusView = MobileUi.status(this, "Connecting…")
+        content.addView(homeStatusView)
+
+        content.addView(MobileUi.sectionTitle(this, "Quick access"))
+        val actions = MobileUi.card(this)
+        actions.addView(
+            MobileUi.body(
+                this,
+                "Now Playing and the three physical M5 presets land here next. For now, use the existing radio and setup tools.",
+            ),
+        )
+        actions.addView(MobileUi.row(this).apply {
+            setPadding(0, MobileUi.dp(this@MainActivity, 12), 0, 0)
+            MobileUi.addWeighted(
+                this,
+                MobileUi.button(this@MainActivity, "Radio", MobileUi.ButtonKind.PRIMARY) {
+                    showDestination(MainDestination.RADIO)
+                },
+            )
+            MobileUi.addWeighted(
+                this,
+                MobileUi.button(this@MainActivity, "Settings") {
+                    showDestination(MainDestination.SETTINGS)
+                },
+                marginDp = 0,
+            )
+        })
+        content.addView(actions)
+
+        return ScrollView(this).apply { addView(content) }
+    }
+
+    private fun buildRadioPane(): View {
+        val content = MobileUi.page(this)
+        content.addView(
+            MobileUi.header(
+                this,
+                "Radio",
+                "Physical presets, saved stations and the M5 TuneIn catalogue.",
+            ),
+        )
+
+        val card = MobileUi.card(this)
+        card.addView(
+            MobileUi.body(
+                this,
+                "Use the existing radio tools while the vNext library grows around them.",
+            ),
+        )
+        card.addView(MobileUi.row(this).apply {
+            setPadding(0, MobileUi.dp(this@MainActivity, 12), 0, 0)
+            MobileUi.addWeighted(
+                this,
+                MobileUi.button(this@MainActivity, "Presets") {
+                    startActivity(Intent(this@MainActivity, TuneInActivity::class.java))
+                },
+            )
+            MobileUi.addWeighted(
+                this,
+                MobileUi.button(this@MainActivity, "Browse") {
+                    startActivity(Intent(this@MainActivity, CatalogueActivity::class.java))
+                },
+            )
+            MobileUi.addWeighted(
+                this,
+                MobileUi.button(this@MainActivity, "Stations") {
+                    startActivity(Intent(this@MainActivity, RadioStationsActivity::class.java))
+                },
+                marginDp = 0,
+            )
+        })
+        content.addView(card)
+
+        return ScrollView(this).apply { addView(content) }
+    }
+
+    private fun buildSettingsPane(): View {
+        val content = MobileUi.page(this)
+        content.addView(
+            MobileUi.header(
+                this,
+                "Settings",
+                "Speaker setup, renderer controls and system integration.",
             ),
         )
 
@@ -92,32 +238,68 @@ class MainActivity : Activity() {
             }
         })
         speakerCard.addView(speakerIp)
-        speakerCard.addView(MobileUi.body(this, "Discovery runs automatically on launch and follows the saved speaker across DHCP changes.").apply {
-            setPadding(0, MobileUi.dp(this@MainActivity, 10), 0, MobileUi.dp(this@MainActivity, 10))
-        })
+        speakerCard.addView(
+            MobileUi.body(
+                this,
+                "Discovery runs automatically on launch and follows the saved speaker across DHCP changes.",
+            ).apply {
+                setPadding(
+                    0,
+                    MobileUi.dp(this@MainActivity, 10),
+                    0,
+                    MobileUi.dp(this@MainActivity, 10),
+                )
+            },
+        )
         speakerCard.addView(MobileUi.row(this).also { row ->
             discoverButton = MobileUi.button(this, "Discover") { runDiscovery(manual = true) }
             MobileUi.addWeighted(row, discoverButton)
-            MobileUi.addWeighted(row, MobileUi.button(this, "Save + test") { testSpeaker() }, marginDp = 0)
+            MobileUi.addWeighted(
+                row,
+                MobileUi.button(this, "Save + test") { testSpeaker() },
+                marginDp = 0,
+            )
         })
         content.addView(speakerCard)
 
         content.addView(MobileUi.sectionTitle(this, "Renderer"))
         val rendererCard = MobileUi.card(this)
-        rendererCard.addView(MobileUi.body(this, "Expose this phone as ‘WAM Bridge · M5’ to local UPnP/DLNA players."))
+        rendererCard.addView(
+            MobileUi.body(
+                this,
+                "Expose this phone as ‘WAM Bridge · M5’ to local UPnP/DLNA players.",
+            ),
+        )
         rendererCard.addView(MobileUi.row(this).apply {
             setPadding(0, MobileUi.dp(this@MainActivity, 12), 0, 0)
-            startRendererButton = MobileUi.button(this@MainActivity, "Start renderer", MobileUi.ButtonKind.PRIMARY) { startRenderer() }
-            stopRendererButton = MobileUi.button(this@MainActivity, "Stop", MobileUi.ButtonKind.DANGER) {
-                startService(Intent(this@MainActivity, RendererService::class.java).apply { action = RendererService.ACTION_STOP })
+            startRendererButton = MobileUi.button(
+                this@MainActivity,
+                "Start renderer",
+                MobileUi.ButtonKind.PRIMARY,
+            ) { startRenderer() }
+            stopRendererButton = MobileUi.button(
+                this@MainActivity,
+                "Stop",
+                MobileUi.ButtonKind.DANGER,
+            ) {
+                startService(
+                    Intent(this@MainActivity, RendererService::class.java).apply {
+                        action = RendererService.ACTION_STOP
+                    },
+                )
                 refreshUntilSettled()
             }
             MobileUi.addWeighted(this, startRendererButton)
             MobileUi.addWeighted(this, stopRendererButton, marginDp = 0)
         })
-        rendererCard.addView(MobileUi.body(this, "Neutron: Settings → Output To → WAM Bridge · M5. WAV/L16, MP3 and FLAC are advertised.").apply {
-            setPadding(0, MobileUi.dp(this@MainActivity, 10), 0, 0)
-        })
+        rendererCard.addView(
+            MobileUi.body(
+                this,
+                "Neutron: Settings → Output To → WAM Bridge · M5. WAV/L16, MP3 and FLAC are advertised.",
+            ).apply {
+                setPadding(0, MobileUi.dp(this@MainActivity, 10), 0, 0)
+            },
+        )
         content.addView(rendererCard)
 
         content.addView(MobileUi.sectionTitle(this, "Speaker controls"))
@@ -158,23 +340,22 @@ class MainActivity : Activity() {
         })
         content.addView(controlsCard)
 
-        content.addView(MobileUi.sectionTitle(this, "Radio"))
-        val radioCard = MobileUi.card(this)
-        radioCard.addView(MobileUi.body(this, "Native TuneIn presets, the speaker catalogue, and your saved direct streams."))
-        radioCard.addView(MobileUi.row(this).apply {
-            setPadding(0, MobileUi.dp(this@MainActivity, 12), 0, 0)
-            MobileUi.addWeighted(this, MobileUi.button(this@MainActivity, "Presets") { startActivity(Intent(this@MainActivity, TuneInActivity::class.java)) })
-            MobileUi.addWeighted(this, MobileUi.button(this@MainActivity, "Browse") { startActivity(Intent(this@MainActivity, CatalogueActivity::class.java)) })
-            MobileUi.addWeighted(this, MobileUi.button(this@MainActivity, "Stations") { startActivity(Intent(this@MainActivity, RadioStationsActivity::class.java)) }, marginDp = 0)
-        })
-        content.addView(radioCard)
-
         content.addView(MobileUi.sectionTitle(this, "Quick access"))
         val shortcutsCard = MobileUi.card(this)
-        shortcutsCard.addView(MobileUi.body(this, "Add the Quick Settings tile before hiding the launcher. Long-pressing the tile reopens this screen."))
+        shortcutsCard.addView(
+            MobileUi.body(
+                this,
+                "Add the Quick Settings tile before hiding the launcher. Long-pressing the tile reopens Settings.",
+            ),
+        )
         shortcutsCard.addView(MobileUi.row(this).apply {
             setPadding(0, MobileUi.dp(this@MainActivity, 12), 0, 0)
-            MobileUi.addWeighted(this, MobileUi.button(this@MainActivity, "Quick Settings") { requestQuickSettingsTile() })
+            MobileUi.addWeighted(
+                this,
+                MobileUi.button(this@MainActivity, "Quick Settings") {
+                    requestQuickSettingsTile()
+                },
+            )
             launcherButton = MobileUi.button(this@MainActivity, "Launcher") {
                 if (isLauncherHidden()) setLauncherVisible(true) else confirmHideLauncher()
             }
@@ -182,10 +363,18 @@ class MainActivity : Activity() {
         })
         content.addView(shortcutsCard)
 
-        setContentView(ScrollView(this).apply { addView(content) })
-        refreshLauncherButton()
-        refreshStatus()
-        window.decorView.post(autoDiscoveryRetry)
+        return ScrollView(this).apply { addView(content) }
+    }
+
+    private fun showDestination(destination: MainDestination) {
+        currentDestination = destination
+        homePane.visibility = if (destination == MainDestination.HOME) View.VISIBLE else View.GONE
+        radioPane.visibility = if (destination == MainDestination.RADIO) View.VISIBLE else View.GONE
+        settingsPane.visibility =
+            if (destination == MainDestination.SETTINGS) View.VISIBLE else View.GONE
+        MobileUi.setNavigationSelected(homeNavButton, destination == MainDestination.HOME)
+        MobileUi.setNavigationSelected(radioNavButton, destination == MainDestination.RADIO)
+        MobileUi.setNavigationSelected(settingsNavButton, destination == MainDestination.SETTINGS)
     }
 
     private fun requestNotificationPermission() {
