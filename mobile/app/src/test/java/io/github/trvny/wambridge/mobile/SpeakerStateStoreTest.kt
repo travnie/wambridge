@@ -92,4 +92,20 @@ class SpeakerStateStoreTest {
         assertEquals("M5 not found", discoveryStatus(SpeakerDiscoveryStage.FAILED))
         assertEquals("Starting…", discoveryStatus(SpeakerDiscoveryStage.IDLE))
     }
+    @Test
+    fun sleepTimerLivesInTheSharedSnapshot() {
+        SpeakerStateStore.update {
+            it.copy(
+                sleepTimer = SleepTimerState(
+                    phase = SleepTimerPhase.ARMED,
+                    seconds = 900,
+                ),
+            )
+        }
+
+        assertEquals(
+            SleepTimerState(SleepTimerPhase.ARMED, 900),
+            SpeakerStateStore.current().sleepTimer,
+        )
+    }
 }
