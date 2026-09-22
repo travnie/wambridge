@@ -41,4 +41,20 @@ class MainNavigationTest {
     fun unknownDestinationFallsBackToHome() {
         assertEquals(MainDestination.HOME, mainDestination(null, "NOPE"))
     }
+
+    @Test
+    fun paneVisibilityMatchesEachDestination() {
+        assertEquals(
+            MainPaneVisibility(home = true, radio = false, settings = false),
+            mainPaneVisibility(MainDestination.HOME),
+        )
+        assertEquals(
+            MainPaneVisibility(home = false, radio = true, settings = false),
+            mainPaneVisibility(MainDestination.RADIO),
+        )
+        assertEquals(
+            MainPaneVisibility(home = false, radio = false, settings = true),
+            mainPaneVisibility(MainDestination.SETTINGS),
+        )
+    }
 }
