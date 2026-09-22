@@ -2,6 +2,7 @@ package io.github.trvny.wambridge.mobile
 
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 
 internal object SleepTimerControls {
     data class Outcome(
@@ -27,6 +28,50 @@ internal object SleepTimerControls {
             val confirmed = SpeakerRemote.setSleepTimer(appContext, target, command.seconds)
             SpeakerStateStore.update { it.copy(sleepTimer = confirmed) }
             Outcome(timerMessage(confirmed), confirmed)
+        }
+    }
+
+    fun standbyNow(context: Context): Outcome {
+        val appContext = context.applicationContext
+        SpeakerStateStore.update {
+            it.copy(
+                sleepTimer = SleepTimerState(
+                    phase = SleepTimerPhase.REQUESTED,
+                    seconds = STANDBY_TIMER_SECONDS,
+                ),
+            )
+        }
+
+        if (RadioService.active) {
+            appContext.startService(
+                Intent(appContext, RadioService::class.java).apply {
+                    action = RadioService.ACTION_STOP
+                },
+            )
+        }
+        if (RendererService.busy) {
+            appContext.startService(
+                Intent(appContext, RendererService::class.java).apply {
+                    action = RendererService.ACTION_STOP
+                },
+            )
+        }
+
+        waitForOwnerRelease()
+
+        return SpeakerControlGate.serial {
+            check(!RadioService.active && !RendererService.busy) {
+                "M5 control owner did not release"
+            }
+            val target = SpeakerTarget.resolve(appContext)
+                ?: error("No WAM speaker found")
+            val confirmed = SpeakerRemote.setSleepTimer(
+                appContext,
+                target,
+                STANDBY_TIMER_SECONDS,
+            )
+            SpeakerStateStore.update { it.copy(sleepTimer = confirmed) }
+            Outcome("Standby requested from M5.", confirmed)
         }
     }
 
@@ -96,10 +141,26 @@ internal object SleepTimerControls {
         }
     }
 
+    private fun waitForOwnerRelease() {
+        val deadline = SystemClock.elapsedRealtime() + OWNER_RELEASE_TIMEOUT_MS
+        while (
+            (RadioService.active || RendererService.busy) &&
+            SystemClock.elapsedRealtime() < deadline
+        ) {
+            SystemClock.sleep(50)
+        }
+        check(!RadioService.active && !RendererService.busy) {
+            "M5 control owner did not release"
+        }
+    }
+
     private fun timerMessage(state: SleepTimerState): String = when (state.phase) {
         SleepTimerPhase.OFF -> "Sleep timer off."
         SleepTimerPhase.ARMED -> "M5 sleep timer · ${state.seconds ?: "?"}s."
         SleepTimerPhase.REQUESTED -> "Sleep timer request sent."
         SleepTimerPhase.UNKNOWN -> "Sleep timer state unknown."
     }
+
+    private const val STANDBY_TIMER_SECONDS = 1
+    private const val OWNER_RELEASE_TIMEOUT_MS = 4_000L
 }
