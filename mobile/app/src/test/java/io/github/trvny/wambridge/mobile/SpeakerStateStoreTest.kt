@@ -61,6 +61,28 @@ class SpeakerStateStoreTest {
     }
 
     @Test
+    fun newSpeakerWithoutIdentityDoesNotKeepOldRuntimeIdentity() {
+        SpeakerStateStore.publishSpeaker("10.0.0.20", "A1B2C3D4E5F6")
+        SpeakerStateStore.publishSpeaker("10.0.0.44", null)
+
+        val snapshot = SpeakerStateStore.current()
+        assertEquals("10.0.0.44", snapshot.speakerIp)
+        assertNull(snapshot.deviceId)
+    }
+
+    @Test
+    fun noWifiOutcomeStaysWaitingInsteadOfBecomingTerminalFailure() {
+        assertEquals(
+            SpeakerDiscoveryStage.WAITING_FOR_WIFI,
+            finalDiscoveryStage(WamDiscovery.Scan.NotRun),
+        )
+        assertEquals(
+            SpeakerDiscoveryStage.FAILED,
+            finalDiscoveryStage(WamDiscovery.Scan.Full(254)),
+        )
+    }
+
+    @Test
     fun discoveryStagesHaveShortHumanLabels() {
         assertEquals("Waiting for Wi-Fi…", discoveryStatus(SpeakerDiscoveryStage.WAITING_FOR_WIFI))
         assertEquals("Checking M5…", discoveryStatus(SpeakerDiscoveryStage.CHECKING_SAVED))
