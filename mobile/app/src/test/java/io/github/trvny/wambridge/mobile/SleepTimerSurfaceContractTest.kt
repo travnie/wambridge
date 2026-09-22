@@ -35,13 +35,14 @@ class SleepTimerSurfaceContractTest {
     @Test
     fun requestedTimerIsNotRenderedAsConfirmedSuccess() {
         assertTrue(main.contains("outcome.state.phase"))
+        val compact = main.replace(Regex("\\s+"), " ")
         assertTrue(
-            main.contains(
+            compact.contains(
                 "SleepTimerPhase.REQUESTED, SleepTimerPhase.UNKNOWN -> MobileUi.StatusKind.INFO",
             ),
         )
         assertTrue(
-            main.contains(
+            compact.contains(
                 "SleepTimerPhase.ARMED, SleepTimerPhase.OFF -> MobileUi.StatusKind.SUCCESS",
             ),
         )
