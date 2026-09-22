@@ -1,26 +1,42 @@
 name: Release
 
-# Versioned releases only.
+# Two shapes, one pipeline.
 #
-# Bumping the single project version in pyproject.toml on main cuts one fixed
-# release. Pre-release suffixes such as -beta.1 become GitHub prereleases;
-# a plain major.minor.patch version becomes a stable release.
+# While the project is beta the useful thing is still a single rolling prerelease:
+# one tag, one permanent download link, assets replaced whenever main moves.
+# Nobody has to invent a version number to ship a fix.
 #
-# workflow_dispatch is retained for retrying a version whose release was not
-# created yet. Existing tags/releases are never moved or replaced.
+# Pushing a v* tag still cuts a fixed, versioned release for when a build is
+# worth pinning.
 on:
   push:
     branches:
       - main
     paths:
+      - ".github/workflows/release.yml"
+      - ".github/workflows/build.yml"
+      - ".github/workflows/mobile.yml"
+      - "foobar/**"
+      - "mobile/**"
+      - "src/**"
+      - "tools/**"
       - "pyproject.toml"
+      - "uv.lock"
   workflow_dispatch:
+    inputs:
+      version:
+        description: >-
+          Cut a fixed, versioned release instead of refreshing the rolling one,
+          e.g. 0.2.0. Leave empty for the rolling beta.
+        type: string
+        required: false
+        default: ""
 
 permissions:
   contents: read
 
 concurrency:
-  group: release
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -31,38 +47,50 @@ jobs:
       name: ${{ steps.parse.outputs.name }}
       code: ${{ steps.parse.outputs.code }}
       title: ${{ steps.parse.outputs.title }}
-      prerelease: ${{ steps.parse.outputs.prerelease }}
+      rolling: ${{ steps.parse.outputs.rolling }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
 
-      - name: Read release version
+      - name: Decide what is being published
         id: parse
         shell: bash
+        env:
+          REQUESTED: ${{ inputs.version }}
+          SHA: ${{ github.sha }}
         run: |
           set -euo pipefail
+          # The displayed version and the versionCode answer different
+          # questions and are kept apart on purpose. The version says how mature
+          # this is and lives in exactly one place, pyproject.toml, so nothing
+          # can disagree with it again. The code only has to keep rising, which
+          # whole hours since the epoch does on its own: monotonic, unique per
+          # hour, comfortably inside Android's limit and already far above every
+          # code shipped by hand before this.
+          code=$(( $(date -u +%s) / 3600 ))
 
-          name="$(grep -m1 '^version' pyproject.toml | cut -d'"' -f2)"
-          test -n "$name"
-
-          if [[ ! "$name" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
-            echo "Version $name is not a supported semantic version" >&2
-            exit 1
-          fi
-
-          code=$(( $(date -u +%s) / 60 ))
-
-          echo "tag=v${name}" >> "$GITHUB_OUTPUT"
-          echo "name=$name" >> "$GITHUB_OUTPUT"
-          echo "code=$code" >> "$GITHUB_OUTPUT"
-          echo "title=WAM Bridge ${name}" >> "$GITHUB_OUTPUT"
-
-          if [[ "$name" == *-* ]]; then
-            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          if [[ -n "${REQUESTED:-}" ]]; then
+            name="${REQUESTED#v}"
+            core="${name%%-*}"
+            if [[ ! "$core" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Version $REQUESTED is not major.minor.patch" >&2
+              exit 1
+            fi
+            echo "tag=v${name}" >> "$GITHUB_OUTPUT"
+            echo "name=$name" >> "$GITHUB_OUTPUT"
+            echo "title=WAMbridge ${name}" >> "$GITHUB_OUTPUT"
+            echo "rolling=false" >> "$GITHUB_OUTPUT"
           else
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            base="$(grep -m1 '^version' pyproject.toml | cut -d'"' -f2)"
+            test -n "$base"
+            name="${base}-beta.$(date -u +%Y%m%d).${SHA:0:7}"
+            echo "tag=beta" >> "$GITHUB_OUTPUT"
+            echo "name=$name" >> "$GITHUB_OUTPUT"
+            echo "title=WAM Bridge beta" >> "$GITHUB_OUTPUT"
+            echo "rolling=true" >> "$GITHUB_OUTPUT"
           fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
 
   component:
     uses: ./.github/workflows/build.yml
@@ -92,7 +120,7 @@ jobs:
           name: wambridge-apk
           path: apk
 
-      - name: Publish fixed versioned release
+      - name: Publish the component and the APK together
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -100,10 +128,9 @@ jobs:
           TAG: ${{ needs.version.outputs.tag }}
           VERSION: ${{ needs.version.outputs.name }}
           TITLE: ${{ needs.version.outputs.title }}
-          PRERELEASE: ${{ needs.version.outputs.prerelease }}
+          ROLLING: ${{ needs.version.outputs.rolling }}
         run: |
           set -euo pipefail
-
           assets=(
             "component/foo_out_wam.fb2k-component"
             "component/wambridge-source.zip"
@@ -113,18 +140,27 @@ jobs:
             test -f "$asset"
           done
 
+          if [[ "$ROLLING" == "true" ]]; then
+            {
+              echo "Rolling beta, rebuilt from main. Currently ${VERSION}."
+              echo
+              echo "The foobar2000 component and the Android APK always come from the same commit. The tag is replaced in place, so these download links keep working."
+            } > release-notes.md
+            # Move the rolling tag onto this commit, creating it the first time.
+            if ! gh api --method PATCH "repos/${GH_REPO}/git/refs/tags/${TAG}" -f sha="$GITHUB_SHA" -F force=true >/dev/null 2>&1; then
+              gh api --method POST "repos/${GH_REPO}/git/refs" -f ref="refs/tags/${TAG}" -f sha="$GITHUB_SHA" >/dev/null
+            fi
+          else
+            echo "foobar2000 component and signed Android APK for ${VERSION}." > release-notes.md
+          fi
+
           if gh release view "$TAG" >/dev/null 2>&1; then
-            echo "Release $TAG already exists; fixed releases are never replaced." >&2
-            exit 1
+            gh release edit "$TAG" --title "$TITLE" --notes-file release-notes.md --prerelease --target "$GITHUB_SHA"
+            gh release upload "$TAG" "${assets[@]}" --clobber
+            # A rolling release keeps one APK, not a growing pile of them.
+            gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^wambridge-.*[.]apk$' | grep -vxF "wambridge-${VERSION}.apk" | while read -r stale; do
+              gh release delete-asset "$TAG" "$stale" --yes
+            done
+          else
+            gh release create "$TAG" "${assets[@]}" --target "$GITHUB_SHA" --title "$TITLE" --prerelease --notes-file release-notes.md
           fi
-
-          flags=(
-            --target "$GITHUB_SHA"
-            --title "$TITLE"
-            --generate-notes
-          )
-          if [[ "$PRERELEASE" == "true" ]]; then
-            flags+=(--prerelease)
-          fi
-
-          gh release create "$TAG" "${assets[@]}" "${flags[@]}"
