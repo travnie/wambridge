@@ -44,6 +44,10 @@ branch or implementing another timing layer.
   Physical Neutron playback to the M5 is confirmed. As of PR #97, renderer starts from the
   app, Quick Settings tile and widget all auto-resolve/discover the WAM target; the native
   TuneIn screen exposes station artwork/metadata plus play/pause, mute, raw-volume and Stop.
+  **Root UI 2026-09-22:** the launcher is now a persistent Home · Radio · Settings shell.
+  Home consumes the shared runtime speaker snapshot, Radio routes to the existing deep tools,
+  and the former technical launcher controls live under Settings. Full Now Playing and the
+  three physical M5 preset tiles are the next Home slice.
 
 The stable universal transport is local HTTP started through `SetUrlPlayback`. The speaker
 paces the HTTP side through TCP backpressure. Finite share/DLNA playback is proven as a
