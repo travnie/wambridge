@@ -150,3 +150,13 @@ internal fun speakerSnapshotForRadio(
             status = status,
         )
     }
+
+internal fun discoveryStatus(stage: SpeakerDiscoveryStage): String = when (stage) {
+    SpeakerDiscoveryStage.WAITING_FOR_WIFI -> "Waiting for Wi-Fi…"
+    SpeakerDiscoveryStage.CHECKING_SAVED -> "Checking M5…"
+    SpeakerDiscoveryStage.SSDP -> "Finding M5…"
+    SpeakerDiscoveryStage.LAN_SCAN -> "Scanning Wi-Fi…"
+    SpeakerDiscoveryStage.READY -> "M5 ready"
+    SpeakerDiscoveryStage.FAILED -> "M5 not found"
+    SpeakerDiscoveryStage.IDLE -> "Starting…"
+}
