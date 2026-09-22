@@ -30,4 +30,18 @@ class MainNavigationContractTest {
         assertTrue(source.contains("\"Radio\""))
         assertTrue(source.contains("\"Settings\""))
     }
+
+    @Test
+    fun homeSpeakerStateSubscriptionIsLifecycleBoundAndMainThreadRendered() {
+        val source = File(
+            "src/main/java/io/github/trvny/wambridge/mobile/MainActivity.kt",
+        ).readText()
+
+        assertTrue(source.contains("override fun onStart()"))
+        assertTrue(source.contains("SpeakerStateStore.subscribe"))
+        assertTrue(source.contains("runOnUiThread"))
+        assertTrue(source.contains("override fun onStop()"))
+        assertTrue(source.contains("speakerStateSubscription?.close()"))
+        assertTrue(source.contains("renderHomeState("))
+    }
 }
