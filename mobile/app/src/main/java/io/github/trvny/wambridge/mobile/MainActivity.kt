@@ -985,7 +985,7 @@ class MainActivity : Activity() {
                     },
                     onFailure = { error ->
                         MobileUi.setStatus(
-                            feedbackView,
+                            statusView,
                             error.message ?: error.javaClass.simpleName,
                             MobileUi.StatusKind.ERROR,
                         )
@@ -1142,7 +1142,7 @@ class MainActivity : Activity() {
                     },
                     onFailure = { error ->
                         MobileUi.setStatus(
-                            statusView,
+                            feedbackView,
                             error.message ?: error.javaClass.simpleName,
                             MobileUi.StatusKind.ERROR,
                         )
