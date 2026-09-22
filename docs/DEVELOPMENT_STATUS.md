@@ -635,6 +635,14 @@ operating system records.
     widget and Quick Settings after clearing or staling the saved target, and repeat across a
     real Wi-Fi/DHCP move on the physical M5.
 
+    **Home 3.5 added 2026-09-22:** Home now consumes the shared speaker snapshot for
+    Now Playing and direct controls, and Home + Radio consume one runtime list of exactly three
+    `kind=speaker` TuneIn presets read from the M5. Those are the same slots cycled by the
+    physical Radio button; there is no second local copy. Playback reuses the measured
+    `SetPlayPreset` path. Editing remains deliberately absent until the write-side preset
+    commands are hardware-validated. Physical follow-up: confirm all three displayed slots
+    match the button order and start correctly from both Home and Radio.
+
     ~~The renderer serves its stream to any host on the Wi-Fi that guesses the per-session
     path.~~ **False, and it had been false for six days when this file repeated it on
     2026-08-25.** `ef2d273` ("Harden Android mobile adapter", 2026-08-19) put two rules on the
