@@ -17,7 +17,7 @@ but not integrated.
 Everything here was measured against one physical Shape M5 (`SPK-WAM550`,
 firmware `WAM550WWB-3117.1`). Other models in the family are untested.
 
-## Status: working **beta**
+## Status: working [`beta`](https://github.com/travnie/wambridge/releases/tag/beta)
 
 Both paths play audio on real hardware. The foobar component passed its full
 physical checklist on 2026-08-02: a complete 213-second track start to finish at
