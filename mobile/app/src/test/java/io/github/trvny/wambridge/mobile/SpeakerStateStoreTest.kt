@@ -59,4 +59,15 @@ class SpeakerStateStoreTest {
         assertEquals("A1B2C3D4E5F6", snapshot.deviceId)
         assertNull(snapshot.lastError)
     }
+
+    @Test
+    fun discoveryStagesHaveShortHumanLabels() {
+        assertEquals("Waiting for Wi-Fi…", discoveryStatus(SpeakerDiscoveryStage.WAITING_FOR_WIFI))
+        assertEquals("Checking M5…", discoveryStatus(SpeakerDiscoveryStage.CHECKING_SAVED))
+        assertEquals("Finding M5…", discoveryStatus(SpeakerDiscoveryStage.SSDP))
+        assertEquals("Scanning Wi-Fi…", discoveryStatus(SpeakerDiscoveryStage.LAN_SCAN))
+        assertEquals("M5 ready", discoveryStatus(SpeakerDiscoveryStage.READY))
+        assertEquals("M5 not found", discoveryStatus(SpeakerDiscoveryStage.FAILED))
+        assertEquals("Starting…", discoveryStatus(SpeakerDiscoveryStage.IDLE))
+    }
 }
