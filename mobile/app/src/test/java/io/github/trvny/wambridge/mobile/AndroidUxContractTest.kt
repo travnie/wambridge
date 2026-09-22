@@ -21,4 +21,21 @@ class AndroidUxContractTest {
 
         assertTrue(info.contains("@layout/widget_wam_bridge_controls"))
     }
+
+    @Test
+    fun widgetAndTileStartOnlyTheRendererAndDoNotOwnDiscovery() {
+        val widget = File(
+            "src/main/java/io/github/trvny/wambridge/mobile/WamBridgeWidget.kt",
+        ).readText()
+        val tile = File(
+            "src/main/java/io/github/trvny/wambridge/mobile/WamBridgeTileService.kt",
+        ).readText()
+
+        for (source in listOf(widget, tile)) {
+            assertTrue(source.contains("RendererService.ACTION_START"))
+            assertTrue(source.contains("SpeakerStateStore.current()"))
+            assertTrue(!source.contains("WamDiscovery.discover("))
+            assertTrue(!source.contains("SpeakerTarget.resolve"))
+        }
+    }
 }
