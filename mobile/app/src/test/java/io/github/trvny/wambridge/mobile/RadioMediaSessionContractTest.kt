@@ -18,7 +18,8 @@ class RadioMediaSessionContractTest {
         val text = source.readText()
         assertTrue(text.contains("MediaSession("))
         assertTrue(text.contains("setCallback"))
-        assertTrue(text.contains("RadioService.ACTION_TOGGLE_PAUSE"))
+        assertTrue(text.contains("RadioService.ACTION_PAUSE"))
+        assertTrue(text.contains("RadioService.ACTION_RESUME"))
         assertTrue(text.contains("RadioService.ACTION_STOP"))
         assertTrue(text.contains("PlaybackState.Builder"))
         assertTrue(text.contains("MediaMetadata.Builder"))
@@ -47,6 +48,10 @@ class RadioMediaSessionContractTest {
         assertTrue(radio.contains("running = running && safeVolumeApplied"))
         assertTrue(radio.contains("setMediaSession(mediaSession.sessionToken)"))
         assertTrue(radio.contains("mediaSession.close()"))
+        assertTrue(radio.contains("ACTION_PAUSE"))
+        assertTrue(radio.contains("ACTION_RESUME"))
+        assertTrue(radio.contains("setPaused(true)"))
+        assertTrue(radio.contains("setPaused(false)"))
     }
     @Test
     fun lateRadioWorkerCannotPublishIntoReleasedSession() {
