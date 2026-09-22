@@ -66,6 +66,7 @@ internal object WamDiscovery {
         allowScan: Boolean,
         ssdpTimeoutMs: Long = 2_500,
         shouldContinue: () -> Boolean = { true },
+        onStage: (SpeakerDiscoveryStage) -> Unit = {},
     ): Result {
         val targets = WifiLan.targets(context)
         if (targets.isEmpty() || !shouldContinue()) return Result(emptyList(), Scan.NotRun)
@@ -77,10 +78,12 @@ internal object WamDiscovery {
         runCatching { multicastLock?.acquire() }
 
         return try {
+            onStage(SpeakerDiscoveryStage.SSDP)
             val ssdp = discoverSsdp(targets, ssdpTimeoutMs, shouldContinue)
             if (ssdp.isNotEmpty() || !allowScan || !shouldContinue()) {
                 Result(ssdp, Scan.NotRun)
             } else {
+                onStage(SpeakerDiscoveryStage.LAN_SCAN)
                 scanLocalLan(targets, shouldContinue)
             }
         } finally {

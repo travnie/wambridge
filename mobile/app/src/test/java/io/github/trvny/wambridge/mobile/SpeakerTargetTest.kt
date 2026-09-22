@@ -35,6 +35,39 @@ class SpeakerTargetTest {
     }
 
     @Test
+    fun savedIpSurvivesTemporaryIdentityTimeoutWhenItIsTheOnlySpeaker() {
+        val selected = SpeakerTarget.selectCandidate(
+            savedIp = old.ip,
+            savedId = "A1B2C3D4E5F6",
+            speakers = listOf(old),
+            identify = { null },
+        )
+        assertEquals(old, selected)
+    }
+
+    @Test
+    fun changedIpWithoutIdentityClearsPreviouslySavedIdentity() {
+        val remembered = SpeakerTarget.deviceIdToPersist(
+            previousIp = old.ip,
+            previousDeviceId = "A1B2C3D4E5F6",
+            result = SpeakerTarget.Resolution(moved.ip, null),
+        )
+
+        assertNull(remembered)
+    }
+
+    @Test
+    fun sameIpWithoutIdentityKeepsPreviouslySavedIdentity() {
+        val remembered = SpeakerTarget.deviceIdToPersist(
+            previousIp = old.ip,
+            previousDeviceId = "A1B2C3D4E5F6",
+            result = SpeakerTarget.Resolution(old.ip, null),
+        )
+
+        assertEquals("A1B2C3D4E5F6", remembered)
+    }
+
+    @Test
     fun legacySavedIpStillDisambiguatesMultipleSpeakers() {
         val selected = SpeakerTarget.selectCandidate(
             savedIp = moved.ip,
@@ -54,5 +87,35 @@ class SpeakerTargetTest {
             identify = { null },
         )
         assertNull(selected)
+    }
+
+    @Test
+    fun oneDiscoveredSpeakerIsUsableWhenIdentityReadTemporarilyFails() {
+        val selected = SpeakerTarget.selectCandidate(
+            savedIp = "",
+            savedId = "",
+            speakers = listOf(moved),
+            identify = { null },
+        )
+        assertEquals(moved, selected)
+    }
+
+    @Test
+    fun savedDeviceIdMismatchStillAllowsMatchingMovedSpeaker() {
+        val third = WamDiscovery.Speaker("10.0.0.55", "LAN scan")
+        val identities = mapOf(
+            old.ip to "WRONG",
+            moved.ip to "A1B2C3D4E5F6",
+            third.ip to null,
+        )
+
+        val selected = SpeakerTarget.selectCandidate(
+            savedIp = old.ip,
+            savedId = "A1B2C3D4E5F6",
+            speakers = listOf(old, third, moved),
+            identify = identities::get,
+        )
+
+        assertEquals(moved, selected)
     }
 }

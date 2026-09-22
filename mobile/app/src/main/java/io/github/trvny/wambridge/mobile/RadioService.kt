@@ -107,6 +107,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                     desiredStation = StationRequest(alias, tuneInId)
                     wifiRecoveryControls = null
                     starting = true
+                    publishRuntimeState(lastStatus)
                     WamBridgeWidget.updateAll(applicationContext)
                     execute {
                         try {
@@ -114,6 +115,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                         } finally {
                             startPending.set(false)
                             starting = false
+                            publishRuntimeState(lastStatus)
                             WamBridgeWidget.updateAll(applicationContext)
                         }
                     }
@@ -486,6 +488,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         if (clearDesired) desiredStation = null
         speakerIp = ""
         running = false
+        publishRuntimeState(if (active) lastStatus else "Stopped")
         WamBridgeWidget.updateAll(applicationContext)
         if (removeForeground) stopForeground(STOP_FOREGROUND_REMOVE)
     }
@@ -532,7 +535,24 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         startForeground(NOTIFICATION_ID, buildNotification(message))
     }
 
+    private fun publishRuntimeState(message: String) {
+        SpeakerStateStore.update {
+            speakerSnapshotForRadio(
+                starting = starting,
+                running = running,
+                recovering = wifiRecovery,
+                paused = paused,
+                muted = muted,
+                volume = targetVolume,
+                stationAlias = station?.alias,
+                status = message,
+                current = it,
+            )
+        }
+    }
+
     private fun publish(message: String) {
+        publishRuntimeState(message)
         startForeground(NOTIFICATION_ID, buildNotification(message))
         WamBridgeWidget.updateAll(applicationContext)
     }

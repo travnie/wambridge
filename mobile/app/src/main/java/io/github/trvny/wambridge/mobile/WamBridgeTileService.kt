@@ -75,8 +75,11 @@ class WamBridgeTileService : TileService() {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) tile.subtitle = "Renderer on"
             }
             RendererService.Phase.STARTING -> {
+                val snapshot = SpeakerStateStore.current()
                 tile.state = Tile.STATE_UNAVAILABLE
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) tile.subtitle = "Starting…"
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    tile.subtitle = discoveryStatus(snapshot.discovery)
+                }
             }
             RendererService.Phase.STOPPING -> {
                 tile.state = Tile.STATE_UNAVAILABLE

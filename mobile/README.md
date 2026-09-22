@@ -41,6 +41,21 @@ The Android adapter provides:
 
 Physical phone + M5 playback through Neutron is confirmed. The direct mobile radio relay intentionally rejects HLS and Ogg until a phone-side transcoding layer exists; the desktop bridge remains the fully transcoding radio path.
 
+### Speaker discovery
+
+All Android start surfaces use the same target resolution path:
+
+1. verify the saved M5 address;
+2. fall back to SSDP;
+3. fall back to the bounded LAN scan;
+4. persist the resolved address/device identity;
+5. continue the requested action.
+
+Automatic startup, manual Discover and renderer start share this resolver. The home-screen
+widget and Quick Settings tile continue to start the renderer through `RendererService`, so
+they inherit the same recovery path instead of owning network discovery themselves. Multiple
+unmatched speakers require an explicit choice; manual IP remains available as an escape hatch.
+
 ## Architecture
 
 ```text
