@@ -621,6 +621,16 @@ operating system records.
     DHCP moves them, and the UPnP facade sends SSDP `alive`/`byebye` announcements instead of
     relying only on a control point to issue a fresh `M-SEARCH`.
 
+    **Unified 2026-09-22:** automatic discovery, manual Discover and renderer startup now share
+    one saved-IP -> SSDP -> bounded-LAN-scan resolver. Widget and Quick Settings continue to
+    delegate renderer start to `RendererService`, so they inherit the same recovery path
+    without owning network discovery themselves. A shared in-process speaker snapshot now
+    carries owner/discovery/status for later Home and MediaSession work.
+
+    JVM/CI coverage is complete. Real-device validation is still required: start DLNA from the
+    widget and Quick Settings after clearing or staling the saved target, and repeat across a
+    real Wi-Fi/DHCP move on the physical M5.
+
     ~~The renderer serves its stream to any host on the Wi-Fi that guesses the per-session
     path.~~ **False, and it had been false for six days when this file repeated it on
     2026-08-25.** `ef2d273` ("Harden Android mobile adapter", 2026-08-19) put two rules on the
