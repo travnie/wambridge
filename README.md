@@ -65,16 +65,15 @@ facts from a physical `SPK-WAM550` are in
 
 ## Foobar2000 output
 
-Versioned beta releases are published from tested `main` when the version in
-`pyproject.toml` is bumped. Releases are fixed in place: tags and assets are not rewritten.
-The project version is still the single source of truth for the component/APK pair.
+Rolling beta prerelease:
+[`beta`](https://github.com/travnie/wambridge/releases/tag/beta), rebuilt whenever tested
+`main` moves. The tag and download link stay put while the component/APK assets are replaced
+from the same commit. The base version still comes from `version` in `pyproject.toml`.
 
-Current release line: **0.2 beta**. See [GitHub Releases](https://github.com/travnie/wambridge/releases).
-
-Each release contains:
+Each rolling beta contains:
 
 - `foo_out_wam.fb2k-component` - the foobar2000 output
-- `wambridge-<version>.apk` - the signed Android adapter
+- `wambridge-<version>-beta.<date>.<commit>.apk` - the signed Android adapter
 - a source archive
 
 Open the `.fb2k-component` file with foobar2000 2.x x64, then select:
