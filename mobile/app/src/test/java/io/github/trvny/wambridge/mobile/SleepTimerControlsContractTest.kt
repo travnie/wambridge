@@ -19,9 +19,9 @@ class SleepTimerControlsContractTest {
     @Test
     fun activeOwnersReceiveTimerCommandsInsideTheirServices() {
         val text = controls.readText()
-        assertTrue(text.contains("RadioService.active"))
+        assertTrue(text.contains("RadioService.running"))
         assertTrue(text.contains("RadioService.ACTION_SET_SLEEP_TIMER"))
-        assertTrue(text.contains("RendererService.busy"))
+        assertTrue(text.contains("RendererService.phase == RendererService.Phase.RUNNING"))
         assertTrue(text.contains("RendererService.ACTION_SET_SLEEP_TIMER"))
         assertTrue(radio.contains("ACTION_SET_SLEEP_TIMER"))
         assertTrue(renderer.contains("ACTION_SET_SLEEP_TIMER"))
@@ -31,8 +31,8 @@ class SleepTimerControlsContractTest {
     fun idlePathRechecksOwnershipInsideSpeakerGate() {
         val text = controls.readText()
         assertTrue(text.contains("SpeakerControlGate.serial"))
-        assertTrue(text.contains("RadioService.active"))
-        assertTrue(text.contains("RendererService.busy"))
+        assertTrue(text.contains("RadioService.running"))
+        assertTrue(text.contains("RendererService.phase == RendererService.Phase.RUNNING"))
         assertTrue(text.contains("SpeakerTarget.resolve("))
         assertTrue(text.contains("SpeakerRemote.setSleepTimer"))
     }
@@ -74,5 +74,34 @@ class SleepTimerControlsContractTest {
         val closeEnd = renderer.indexOf("private fun", closeStart + 12)
         val closeBlock = renderer.substring(closeStart, closeEnd)
         assertTrue(closeBlock.contains("releaseTimerChannelAfterReply = false"))
+    }
+    @Test
+    fun transitionalOwnersAreNotTreatedAsAcceptedTimerCommands() {
+        val text = controls.readText()
+        val setStart = text.indexOf("private fun dispatchSetToOwner")
+        val setEnd = text.indexOf("private fun dispatchRefreshToOwner", setStart)
+        val setBlock = text.substring(setStart, setEnd)
+        assertTrue(setBlock.contains("RadioService.running"))
+        assertTrue(setBlock.contains("RendererService.phase == RendererService.Phase.RUNNING"))
+        assertFalse(setBlock.contains("RadioService.active ->"))
+        assertFalse(setBlock.contains("RendererService.busy ->"))
+    }
+
+    @Test
+    fun synchronousFailuresRestoreThePreviousTimerSnapshot() {
+        val text = controls.readText()
+        assertTrue(text.contains("restoreRequestedState"))
+        assertTrue(text.contains("val previous = SpeakerStateStore.current().sleepTimer"))
+        assertTrue(text.contains("catch (error: Exception)"))
+    }
+
+    @Test
+    fun rendererBoundsTemporaryTimerChannelLifetime() {
+        assertTrue(renderer.contains("timerReplyRelease"))
+        assertTrue(renderer.contains("scheduleTimerChannelRelease"))
+        assertTrue(renderer.contains("cancelTimerChannelRelease"))
+        assertTrue(renderer.contains("TIMER_REPLY_TIMEOUT_MS"))
+        assertTrue(renderer.contains("wamChannel === activeChannel"))
+        assertTrue(renderer.contains("!ownsPlayback"))
     }
 }
