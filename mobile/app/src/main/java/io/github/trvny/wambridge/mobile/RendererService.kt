@@ -18,6 +18,7 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.roundToInt
 
 class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener {
@@ -37,6 +38,8 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     private var wifiFallback: ScheduledFuture<*>? = null
     private val startPending = AtomicBoolean(false)
     private val desiredRunning = AtomicBoolean(false)
+    private val pendingSleepTimerSeconds = AtomicReference<Int?>(null)
+    private var releaseTimerChannelAfterReply = false
     private val commandGeneration = AtomicInteger(0)
     @Volatile private var latestStartId = 0
     private val worker = Executors.newSingleThreadExecutor { runnable ->
@@ -77,6 +80,31 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
                         if (!desiredRunning.get()) stopSelfResult(startId)
                     }
                 }
+                return START_NOT_STICKY
+            }
+
+            ACTION_SET_SLEEP_TIMER -> {
+                val seconds = intent.getIntExtra(EXTRA_SLEEP_TIMER_SECONDS, -1)
+                val command = runCatching { sleepTimerCommand(seconds) }.getOrElse {
+                    lastStatus = "Invalid sleep timer."
+                    publish(lastStatus)
+                    return START_NOT_STICKY
+                }
+                pendingSleepTimerSeconds.set(command.seconds)
+                SpeakerStateStore.update {
+                    it.copy(
+                        sleepTimer = SleepTimerState(
+                            phase = SleepTimerPhase.REQUESTED,
+                            seconds = command.seconds,
+                        ),
+                    )
+                }
+                worker.execute { applyPendingSleepTimer() }
+                return START_NOT_STICKY
+            }
+
+            ACTION_GET_SLEEP_TIMER -> {
+                worker.execute { requestSleepTimerFromOwner() }
                 return START_NOT_STICKY
             }
 
@@ -190,6 +218,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         ) {
             lastStatus = "Ready · ${currentRenderer.localAddress.hostAddress}:${currentRenderer.port} → $speakerIp · speaker released"
             setPhase(Phase.RUNNING)
+            applyPendingSleepTimer()
             publish(lastStatus)
             return
         }
@@ -221,6 +250,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
             safeVolumeApplied = false
             lastStatus = "Ready · ${startedRenderer.localAddress.hostAddress}:${startedRenderer.port} → $speakerIp · speaker released"
             setPhase(Phase.RUNNING)
+            applyPendingSleepTimer()
             publish(lastStatus)
         } catch (error: Exception) {
             if (shouldKeepStarting(generation)) {
@@ -338,6 +368,36 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
             }
             wamChannel = null
         }
+    }
+
+    private fun applyPendingSleepTimer() {
+        if (phase != Phase.RUNNING) return
+        val pending = pendingSleepTimerSeconds.get() ?: return
+        val activeChannel = wamChannel ?: run {
+            releaseTimerChannelAfterReply = !ownsPlayback
+            ensureChannel()
+        }
+        val seconds = pendingSleepTimerSeconds.getAndSet(null) ?: pending
+        try {
+            activeChannel.setSleepTimer(seconds)
+            activeChannel.requestSleepTimer()
+        } catch (error: Exception) {
+            pendingSleepTimerSeconds.compareAndSet(null, seconds)
+            if (releaseTimerChannelAfterReply && !ownsPlayback) {
+                releaseTimerChannelAfterReply = false
+                closeWamChannel()
+            }
+            throw error
+        }
+    }
+
+    private fun requestSleepTimerFromOwner() {
+        if (phase != Phase.RUNNING) return
+        val activeChannel = wamChannel ?: run {
+            releaseTimerChannelAfterReply = !ownsPlayback
+            ensureChannel()
+        }
+        activeChannel.requestSleepTimer()
     }
 
     private fun cancelIdleRelease() {
@@ -541,6 +601,15 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         publish("M5 reported error $code$source")
     }
 
+    override fun onSleepTimerChanged(source: Any, state: SleepTimerState) = dispatchWamEvent {
+        if (source !== wamChannel) return@dispatchWamEvent
+        SpeakerStateStore.update { it.copy(sleepTimer = state) }
+        if (releaseTimerChannelAfterReply && !ownsPlayback) {
+            releaseTimerChannelAfterReply = false
+            closeWamChannel()
+        }
+    }
+
     private fun promoteToForeground(message: String) {
         lastStatus = message
         startForeground(NOTIFICATION_ID, buildNotification(message))
@@ -648,6 +717,9 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     companion object {
         const val ACTION_START = "trvny.wambridge.mobile.START"
         const val ACTION_STOP = "trvny.wambridge.mobile.STOP"
+        const val ACTION_SET_SLEEP_TIMER = "trvny.wambridge.mobile.SET_SLEEP_TIMER"
+        const val ACTION_GET_SLEEP_TIMER = "trvny.wambridge.mobile.GET_SLEEP_TIMER"
+        const val EXTRA_SLEEP_TIMER_SECONDS = "sleep_timer_seconds"
         const val PREFS = "mobile-adapter"
         const val KEY_SPEAKER_IP = "speaker_ip"
         private const val KEY_CLIENT_UUID = "wam_client_uuid"
