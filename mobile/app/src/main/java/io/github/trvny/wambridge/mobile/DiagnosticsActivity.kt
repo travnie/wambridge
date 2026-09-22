@@ -11,6 +11,7 @@ import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicBoolean
 
 class DiagnosticsActivity : Activity() {
     private lateinit var reportCard: LinearLayout
@@ -18,6 +19,7 @@ class DiagnosticsActivity : Activity() {
     private val worker = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "wam-mobile-diagnostics").apply { isDaemon = true }
     }
+    private val fixRunning = AtomicBoolean(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -117,7 +119,7 @@ class DiagnosticsActivity : Activity() {
     }
 
     private fun fixConnection() {
-        if (worker.isShutdown) return
+        if (worker.isShutdown || !fixRunning.compareAndSet(false, true)) return
         MobileUi.setStatus(statusView, "Stopping active playback and reconnecting…")
         worker.execute {
             val result = runCatching {
@@ -143,7 +145,7 @@ class DiagnosticsActivity : Activity() {
                         "M5 ready at " + outcome.resolution.ip + "."
 
                     is SpeakerTarget.ResolveOutcome.Ambiguous ->
-                        "Multiple WAM speakers found. Use Settings → Advanced to choose one."
+                        "Multiple WAM speakers found. Use Settings → Discover to choose one."
 
                     is SpeakerTarget.ResolveOutcome.NotFound ->
                         when (outcome.scan) {
@@ -155,6 +157,7 @@ class DiagnosticsActivity : Activity() {
                 }
             }
 
+            fixRunning.set(false)
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 result.fold(
