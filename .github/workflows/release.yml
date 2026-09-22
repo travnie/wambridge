@@ -20,7 +20,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.sha }}
+  group: release
   cancel-in-progress: false
 
 jobs:
@@ -51,7 +51,7 @@ jobs:
             exit 1
           fi
 
-          code=$(( $(date -u +%s) / 3600 ))
+          code=$(( $(date -u +%s) / 60 ))
 
           echo "tag=v${name}" >> "$GITHUB_OUTPUT"
           echo "name=$name" >> "$GITHUB_OUTPUT"
