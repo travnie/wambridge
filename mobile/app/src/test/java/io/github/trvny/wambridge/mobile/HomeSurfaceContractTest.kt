@@ -96,4 +96,31 @@ class HomeSurfaceContractTest {
         assertFalse(source.contains("SetMovePreset"))
         assertFalse(source.contains("SetRemovePreset"))
     }
+    @Test
+    fun homeExposesTheExistingConfirmedStopPath() {
+        val homeStart = main.indexOf("private fun buildHomePane")
+        val radioStart = main.indexOf("private fun buildRadioPane")
+        val home = main.substring(homeStart, radioStart)
+
+        assertTrue(home.contains("\"Stop\""))
+        assertTrue(main.contains("TuneInActivity.ACTION_STOP_PLAYBACK"))
+        assertTrue(main.contains("stopHomePlayback"))
+    }
+
+    @Test
+    fun homeControlFailuresReportToTheCallingSurface() {
+        val start = main.indexOf("private fun runSpeakerControl")
+        val end = main.indexOf("private fun refreshSpeakerControlButtons", start)
+        val control = main.substring(start, end)
+
+        assertTrue(control.contains("onFailure = { error ->"))
+        assertTrue(control.contains("feedbackView"))
+        assertFalse(
+            control.contains(
+                "onFailure = { error ->\n" +
+                    "                        MobileUi.setStatus(\n" +
+                    "                            statusView,",
+            ),
+        )
+    }
 }
