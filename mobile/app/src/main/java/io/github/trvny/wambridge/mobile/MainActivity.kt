@@ -49,6 +49,7 @@ class MainActivity : Activity() {
     private lateinit var radioNavButton: Button
     private lateinit var settingsNavButton: Button
     private var currentDestination = MainDestination.HOME
+    private var speakerStateSubscription: AutoCloseable? = null
     private val speakerControlButtons = mutableListOf<Button>()
     private var speakerControlRunning = false
 
@@ -375,6 +376,53 @@ class MainActivity : Activity() {
         MobileUi.setNavigationSelected(homeNavButton, destination == MainDestination.HOME)
         MobileUi.setNavigationSelected(radioNavButton, destination == MainDestination.RADIO)
         MobileUi.setNavigationSelected(settingsNavButton, destination == MainDestination.SETTINGS)
+    }
+
+    private fun renderHomeState(snapshot: SpeakerSnapshot) {
+        if (!::homeStatusView.isInitialized) return
+
+        val owner = when (snapshot.owner) {
+            SpeakerOwner.IDLE -> "M5"
+            SpeakerOwner.RADIO -> "Radio"
+            SpeakerOwner.RENDERER -> "DLNA"
+        }
+        val playback = when (snapshot.playback) {
+            SpeakerPlaybackState.STOPPED -> "idle"
+            SpeakerPlaybackState.STARTING -> "starting"
+            SpeakerPlaybackState.PLAYING -> "playing"
+            SpeakerPlaybackState.PAUSED -> "paused"
+            SpeakerPlaybackState.STOPPING -> "stopping"
+            SpeakerPlaybackState.UNKNOWN -> "status unknown"
+        }
+        val station = snapshot.stationAlias?.let { " · $it" }.orEmpty()
+        val address = snapshot.speakerIp?.let { " · $it" }.orEmpty()
+        val kind = when (snapshot.discovery) {
+            SpeakerDiscoveryStage.FAILED -> MobileUi.StatusKind.ERROR
+            SpeakerDiscoveryStage.READY -> MobileUi.StatusKind.SUCCESS
+            else -> MobileUi.StatusKind.INFO
+        }
+
+        MobileUi.setStatus(
+            homeStatusView,
+            "$owner · $playback$station$address",
+            kind,
+        )
+    }
+
+    override fun onStart() {
+        super.onStart()
+        speakerStateSubscription?.close()
+        speakerStateSubscription = SpeakerStateStore.subscribe { snapshot ->
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) renderHomeState(snapshot)
+            }
+        }
+    }
+
+    override fun onStop() {
+        speakerStateSubscription?.close()
+        speakerStateSubscription = null
+        super.onStop()
     }
 
     private fun requestNotificationPermission() {
