@@ -41,7 +41,6 @@ class MainActivity : Activity() {
     private lateinit var statusView: TextView
     private val speakerControlButtons = mutableListOf<Button>()
     private var speakerControlRunning = false
-    private var manualDiscoveryRunning = false
 
     private val autoDiscoveryGeneration = AtomicInteger()
     private val speakerInputRevision = AtomicInteger()
@@ -97,7 +96,7 @@ class MainActivity : Activity() {
             setPadding(0, MobileUi.dp(this@MainActivity, 10), 0, MobileUi.dp(this@MainActivity, 10))
         })
         speakerCard.addView(MobileUi.row(this).also { row ->
-            discoverButton = MobileUi.button(this, "Discover") { discoverSpeaker(allowScan = true) }
+            discoverButton = MobileUi.button(this, "Discover") { runDiscovery(manual = true) }
             MobileUi.addWeighted(row, discoverButton)
             MobileUi.addWeighted(row, MobileUi.button(this, "Save + test") { testSpeaker() }, marginDp = 0)
         })
@@ -225,37 +224,102 @@ class MainActivity : Activity() {
     private fun cancelAutoDiscovery() {
         autoDiscoveryGeneration.incrementAndGet()
         window.decorView.removeCallbacks(autoDiscoveryRetry)
-        if (::discoverButton.isInitialized && !manualDiscoveryRunning) MobileUi.setEnabled(discoverButton, true)
+        if (::discoverButton.isInitialized) MobileUi.setEnabled(discoverButton, true)
     }
 
-    private fun autoDiscoverSpeaker() {
+    private fun autoDiscoverSpeaker() = runDiscovery(manual = false)
+
+    private fun runDiscovery(manual: Boolean) {
         if (isFinishing || isDestroyed || discoveryExecutor.isShutdown) return
         window.decorView.removeCallbacks(autoDiscoveryRetry)
-        if (deferAutoDiscoveryWhileBusy()) return
+
+        if (RendererService.busy || RadioService.active) {
+            if (manual) {
+                Toast.makeText(
+                    this,
+                    "Stop renderer/radio playback before discovery.",
+                    Toast.LENGTH_SHORT,
+                ).show()
+            } else {
+                window.decorView.postDelayed(autoDiscoveryRetry, 1_000L)
+            }
+            return
+        }
 
         val previous = speakerIp.text.toString().trim()
         val savedBefore = preferences.getString(RendererService.KEY_SPEAKER_IP, "").orEmpty().trim()
         val inputRevision = speakerInputRevision.get()
         val generation = autoDiscoveryGeneration.incrementAndGet()
+
         MobileUi.setEnabled(discoverButton, false)
-        MobileUi.setStatus(statusView, "Finding M5 on Wi-Fi…")
+        MobileUi.setStatus(
+            statusView,
+            if (manual) "Discovering WAM speakers on Wi-Fi…" else "Finding M5 on Wi-Fi…",
+        )
 
         discoveryExecutor.execute {
             val result = runCatching {
-                SpeakerTarget.resolveUnpersisted(applicationContext) {
-                    autoDiscoveryStillCurrent(generation, inputRevision, savedBefore)
-                }
+                SpeakerTarget.resolveDetailed(
+                    context = applicationContext,
+                    persist = false,
+                    shouldContinue = {
+                        autoDiscoveryStillCurrent(generation, inputRevision, savedBefore)
+                    },
+                    onStage = { stage ->
+                        SpeakerStateStore.update {
+                            it.copy(
+                                discovery = stage,
+                                status = when (stage) {
+                                    SpeakerDiscoveryStage.WAITING_FOR_WIFI -> "Waiting for Wi-Fi…"
+                                    SpeakerDiscoveryStage.CHECKING_SAVED -> "Checking saved M5…"
+                                    SpeakerDiscoveryStage.SSDP -> "Finding M5…"
+                                    SpeakerDiscoveryStage.LAN_SCAN -> "Scanning Wi-Fi…"
+                                    SpeakerDiscoveryStage.READY -> "M5 ready"
+                                    SpeakerDiscoveryStage.FAILED -> "M5 not found"
+                                    SpeakerDiscoveryStage.IDLE -> "Starting…"
+                                },
+                                lastError = null,
+                            )
+                        }
+                    },
+                )
             }
+
             runOnUiThread {
-                applyAutoDiscoveryResult(generation, inputRevision, savedBefore, previous, result)
+                if (isFinishing || isDestroyed || autoDiscoveryGeneration.get() != generation) {
+                    return@runOnUiThread
+                }
+                MobileUi.setEnabled(discoverButton, true)
+
+                result.fold(
+                    onSuccess = { outcome ->
+                        applyDiscoveryOutcome(
+                            manual = manual,
+                            generation = generation,
+                            inputRevision = inputRevision,
+                            savedBefore = savedBefore,
+                            previous = previous,
+                            outcome = outcome,
+                        )
+                    },
+                    onFailure = { error ->
+                        val message = error.message ?: error.javaClass.simpleName
+                        SpeakerStateStore.update {
+                            it.copy(
+                                discovery = SpeakerDiscoveryStage.FAILED,
+                                status = "M5 not found",
+                                lastError = message,
+                            )
+                        }
+                        MobileUi.setStatus(
+                            statusView,
+                            "Discovery failed: $message",
+                            MobileUi.StatusKind.ERROR,
+                        )
+                    },
+                )
             }
         }
-    }
-
-    private fun deferAutoDiscoveryWhileBusy(): Boolean {
-        if (!RendererService.busy && !RadioService.active) return false
-        window.decorView.postDelayed(autoDiscoveryRetry, 1_000L)
-        return true
     }
 
     private fun autoDiscoveryStillCurrent(
@@ -267,111 +331,72 @@ class MainActivity : Activity() {
         preferences.getString(RendererService.KEY_SPEAKER_IP, "").orEmpty().trim() == savedBefore &&
         !Thread.currentThread().isInterrupted
 
-    private fun applyAutoDiscoveryResult(
+    private fun applyDiscoveryOutcome(
+        manual: Boolean,
         generation: Int,
         inputRevision: Int,
         savedBefore: String,
         previous: String,
-        result: Result<SpeakerTarget.Resolution?>,
+        outcome: SpeakerTarget.ResolveOutcome,
     ) {
         if (isFinishing || isDestroyed || autoDiscoveryGeneration.get() != generation) return
-        MobileUi.setEnabled(discoverButton, true)
         if (speakerInputRevision.get() != inputRevision) return
-        val resolution = result.getOrNull()
-        val target = resolution?.ip
-        val savedNow = preferences.getString(RendererService.KEY_SPEAKER_IP, "").orEmpty().trim()
-        if (savedNow != savedBefore && savedNow != target) return
 
-        result.fold(
-            onSuccess = { showAutoDiscoveryTarget(previous, it) },
-            onFailure = { error ->
+        when (outcome) {
+            is SpeakerTarget.ResolveOutcome.Found -> {
+                val savedNow = preferences.getString(
+                    RendererService.KEY_SPEAKER_IP,
+                    "",
+                ).orEmpty().trim()
+                if (savedNow != savedBefore && savedNow != outcome.resolution.ip) return
+
+                SpeakerTarget.rememberResolved(applicationContext, outcome.resolution)
+                SpeakerStateStore.publishSpeaker(
+                    outcome.resolution.ip,
+                    outcome.resolution.deviceId,
+                )
+                speakerIp.setText(outcome.resolution.ip)
                 MobileUi.setStatus(
                     statusView,
-                    "Automatic discovery failed: ${error.message ?: error.javaClass.simpleName}",
+                    if (outcome.resolution.ip == previous) {
+                        "M5 ready at " + outcome.resolution.ip + "."
+                    } else {
+                        "Found M5 at " + outcome.resolution.ip + " and updated the saved address."
+                    },
+                    MobileUi.StatusKind.SUCCESS,
+                )
+            }
+
+            is SpeakerTarget.ResolveOutcome.Ambiguous -> {
+                if (manual) {
+                    chooseDiscoveredSpeaker(outcome.speakers)
+                } else {
+                    MobileUi.setStatus(
+                        statusView,
+                        "Multiple WAM speakers found. Tap Discover to choose one.",
+                        MobileUi.StatusKind.INFO,
+                    )
+                }
+            }
+
+            is SpeakerTarget.ResolveOutcome.NotFound -> {
+                val message = emptyScanMessage(outcome.scan)
+                SpeakerStateStore.update {
+                    it.copy(
+                        discovery = SpeakerDiscoveryStage.FAILED,
+                        status = "M5 not found",
+                        lastError = message,
+                    )
+                }
+                MobileUi.setStatus(
+                    statusView,
+                    message,
                     MobileUi.StatusKind.ERROR,
                 )
-            },
-        )
-    }
-
-    private fun showAutoDiscoveryTarget(previous: String, result: SpeakerTarget.Resolution?) {
-        if (result == null) {
-            MobileUi.setStatus(
-                statusView,
-                "No WAM speaker found automatically. Tap Discover to retry.",
-                MobileUi.StatusKind.ERROR,
-            )
-            return
-        }
-        SpeakerTarget.rememberResolved(applicationContext, result)
-        val target = result.ip
-        speakerIp.setText(target)
-        MobileUi.setStatus(
-            statusView,
-            if (target == previous) {
-                "M5 ready at $target."
-            } else {
-                "Found M5 at $target and updated the saved address."
-            },
-            MobileUi.StatusKind.SUCCESS,
-        )
-    }
-
-    private fun discoverSpeaker(allowScan: Boolean) {
-        cancelAutoDiscovery()
-        if (manualDiscoveryRunning) return
-        if (RendererService.busy || RadioService.active) {
-            Toast.makeText(this, "Stop renderer/radio playback before discovery.", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val inputRevision = speakerInputRevision.get()
-        manualDiscoveryRunning = true
-        MobileUi.setEnabled(discoverButton, false)
-        MobileUi.setStatus(
-            statusView,
-            if (allowScan) {
-                "Discovering WAM speakers on Wi-Fi…"
-            } else {
-                "Looking for WAM speakers on Wi-Fi…"
-            },
-        )
-
-        Thread({
-            val result = SpeakerTarget.withDiscoveryLock {
-                WamDiscovery.discover(applicationContext, allowScan = allowScan)
             }
-            val speakers = result.speakers
-            runOnUiThread {
-                manualDiscoveryRunning = false
-                if (isFinishing || isDestroyed) return@runOnUiThread
-                MobileUi.setEnabled(discoverButton, true)
-                if (speakerInputRevision.get() != inputRevision) {
-                    MobileUi.setStatus(statusView, "Discovery finished; keeping the address you edited.")
-                    return@runOnUiThread
-                }
-                when {
-                    speakers.isEmpty() && allowScan -> {
-                        MobileUi.setStatus(
-                            statusView,
-                            emptyScanMessage(result.scan),
-                            MobileUi.StatusKind.ERROR,
-                        )
-                    }
 
-                    speakers.isEmpty() -> {
-                        MobileUi.setStatus(
-                            statusView,
-                            "No WAM speaker announced via SSDP. Tap Discover for LAN fallback or enter the IP manually.",
-                            MobileUi.StatusKind.ERROR,
-                        )
-                    }
-
-                    speakers.size == 1 -> useDiscoveredSpeaker(speakers.single())
-                    else -> chooseDiscoveredSpeaker(speakers)
-                }
-            }
-        }, "wam-mobile-discovery").start()
+            SpeakerTarget.ResolveOutcome.Cancelled -> Unit
+        }
     }
 
     /**
@@ -401,6 +426,10 @@ class MainActivity : Activity() {
     }
 
     private fun chooseDiscoveredSpeaker(speakers: List<WamDiscovery.Speaker>) {
+        if (speakers.size == 1) {
+            useDiscoveredSpeaker(speakers.single())
+            return
+        }
         val labels = speakers.map { "${it.ip} · ${it.source}" }.toTypedArray()
         AlertDialog.Builder(this)
             .setTitle("Choose WAM speaker")
@@ -415,11 +444,11 @@ class MainActivity : Activity() {
     }
 
     private fun useDiscoveredSpeaker(speaker: WamDiscovery.Speaker) {
-        speakerIp.setText(speaker.ip)
-        SpeakerTarget.rememberManualIp(applicationContext, speaker.ip)
+        val resolution = SpeakerTarget.acceptDiscovered(applicationContext, speaker)
+        speakerIp.setText(resolution.ip)
         MobileUi.setStatus(
             statusView,
-            "Found WAM speaker at ${speaker.ip} via ${speaker.source}.",
+            "Found WAM speaker at ${resolution.ip} via ${speaker.source}.",
             MobileUi.StatusKind.SUCCESS,
         )
     }
