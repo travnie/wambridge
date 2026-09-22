@@ -10,12 +10,8 @@ import android.content.pm.PackageManager
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
-import android.text.Editable
-import android.text.InputType
-import android.text.TextWatcher
 import android.view.View
 import android.widget.Button
-import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -40,7 +36,6 @@ class MainActivity : Activity() {
     private lateinit var discoverButton: Button
     private lateinit var startRendererButton: Button
     private lateinit var stopRendererButton: Button
-    private lateinit var speakerIp: EditText
     private lateinit var statusView: TextView
     private lateinit var homeStatusView: TextView
     private lateinit var homeNowPlayingTitle: TextView
@@ -367,7 +362,7 @@ class MainActivity : Activity() {
             MobileUi.header(
                 this,
                 "Settings",
-                "Speaker setup, renderer controls and system integration.",
+                "Speaker, playback, radio and troubleshooting.",
             ),
         )
 
@@ -377,53 +372,37 @@ class MainActivity : Activity() {
         content.addView(MobileUi.sectionTitle(this, "Speaker"))
         val speakerCard = MobileUi.card(this)
         speakerCard.addView(MobileUi.label(this, "Samsung M5"))
-        speakerIp = MobileUi.field(this, "IPv4 address, or leave empty for discovery").apply {
-            inputType = InputType.TYPE_CLASS_PHONE
-            setText(preferences.getString(RendererService.KEY_SPEAKER_IP, ""))
-            setSingleLine(true)
-        }
-        speakerIp.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
-            override fun afterTextChanged(s: Editable?) {
-                speakerInputRevision.incrementAndGet()
-                cancelAutoDiscovery()
-            }
-        })
-        speakerCard.addView(speakerIp)
         speakerCard.addView(
             MobileUi.body(
                 this,
-                "Discovery runs automatically on launch and follows the saved speaker across DHCP changes.",
-            ).apply {
-                setPadding(
-                    0,
-                    MobileUi.dp(this@MainActivity, 10),
-                    0,
-                    MobileUi.dp(this@MainActivity, 10),
-                )
-            },
+                "Discovery follows the saved M5 across DHCP changes. Manual IP lives under Advanced.",
+            ),
         )
-        speakerCard.addView(MobileUi.row(this).also { row ->
-            discoverButton = MobileUi.button(this, "Discover") { runDiscovery(manual = true) }
-            MobileUi.addWeighted(row, discoverButton)
+        speakerCard.addView(MobileUi.row(this).apply {
+            setPadding(0, MobileUi.dp(this@MainActivity, 12), 0, 0)
+            discoverButton = MobileUi.button(
+                this@MainActivity,
+                "Discover",
+                MobileUi.ButtonKind.PRIMARY,
+            ) { runDiscovery(manual = true) }
+            MobileUi.addWeighted(this, discoverButton)
             MobileUi.addWeighted(
-                row,
-                MobileUi.button(this, "Save + test") { testSpeaker() },
+                this,
+                MobileUi.button(this@MainActivity, "Test connection") { testConnection() },
                 marginDp = 0,
             )
         })
         content.addView(speakerCard)
 
-        content.addView(MobileUi.sectionTitle(this, "Renderer"))
-        val rendererCard = MobileUi.card(this)
-        rendererCard.addView(
+        content.addView(MobileUi.sectionTitle(this, "Playback & system"))
+        val playbackCard = MobileUi.card(this)
+        playbackCard.addView(
             MobileUi.body(
                 this,
-                "Expose this phone as ‘WAM Bridge · M5’ to local UPnP/DLNA players.",
+                "DLNA renderer status plus Android shortcuts. Playback controls live on Home.",
             ),
         )
-        rendererCard.addView(MobileUi.row(this).apply {
+        playbackCard.addView(MobileUi.row(this).apply {
             setPadding(0, MobileUi.dp(this@MainActivity, 12), 0, 0)
             startRendererButton = MobileUi.button(
                 this@MainActivity,
@@ -432,7 +411,7 @@ class MainActivity : Activity() {
             ) { startRenderer() }
             stopRendererButton = MobileUi.button(
                 this@MainActivity,
-                "Stop",
+                "Stop renderer",
                 MobileUi.ButtonKind.DANGER,
             ) {
                 startService(
@@ -445,64 +424,8 @@ class MainActivity : Activity() {
             MobileUi.addWeighted(this, startRendererButton)
             MobileUi.addWeighted(this, stopRendererButton, marginDp = 0)
         })
-        rendererCard.addView(
-            MobileUi.body(
-                this,
-                "Neutron: Settings → Output To → WAM Bridge · M5. WAV/L16, MP3 and FLAC are advertised.",
-            ).apply {
-                setPadding(0, MobileUi.dp(this@MainActivity, 10), 0, 0)
-            },
-        )
-        content.addView(rendererCard)
-
-        content.addView(MobileUi.sectionTitle(this, "Speaker controls"))
-        val controlsCard = MobileUi.card(this)
-        controlsCard.addView(
-            MobileUi.body(
-                this,
-                "Control native TuneIn or the M5 directly. While DLNA owns the speaker, use the player that started playback.",
-            ),
-        )
-        fun controlButton(label: String, action: SpeakerControls.Action): Button =
-            MobileUi.button(this, label) { runSpeakerControl(action) }.also {
-                speakerControlButtons += it
-            }
-        controlsCard.addView(MobileUi.row(this).apply {
-            setPadding(0, MobileUi.dp(this@MainActivity, 12), 0, 0)
-            MobileUi.addWeighted(
-                this,
-                controlButton("Play / pause", SpeakerControls.Action.PLAY_PAUSE),
-            )
-            MobileUi.addWeighted(
-                this,
-                controlButton("Mute", SpeakerControls.Action.MUTE),
-                marginDp = 0,
-            )
-        })
-        controlsCard.addView(MobileUi.row(this).apply {
+        playbackCard.addView(MobileUi.row(this).apply {
             setPadding(0, MobileUi.dp(this@MainActivity, 8), 0, 0)
-            MobileUi.addWeighted(
-                this,
-                controlButton("Volume −", SpeakerControls.Action.VOLUME_DOWN),
-            )
-            MobileUi.addWeighted(
-                this,
-                controlButton("Volume +", SpeakerControls.Action.VOLUME_UP),
-                marginDp = 0,
-            )
-        })
-        content.addView(controlsCard)
-
-        content.addView(MobileUi.sectionTitle(this, "Quick access"))
-        val shortcutsCard = MobileUi.card(this)
-        shortcutsCard.addView(
-            MobileUi.body(
-                this,
-                "Add the Quick Settings tile before hiding the launcher. Long-pressing the tile reopens Settings.",
-            ),
-        )
-        shortcutsCard.addView(MobileUi.row(this).apply {
-            setPadding(0, MobileUi.dp(this@MainActivity, 12), 0, 0)
             MobileUi.addWeighted(
                 this,
                 MobileUi.button(this@MainActivity, "Quick Settings") {
@@ -514,7 +437,63 @@ class MainActivity : Activity() {
             }
             MobileUi.addWeighted(this, launcherButton, marginDp = 0)
         })
-        content.addView(shortcutsCard)
+        content.addView(playbackCard)
+
+        content.addView(MobileUi.sectionTitle(this, "Radio"))
+        val radioCard = MobileUi.card(this)
+        radioCard.addView(
+            MobileUi.body(
+                this,
+                "The physical M5 presets and your saved app-side stations stay separate.",
+            ),
+        )
+        radioCard.addView(MobileUi.row(this).apply {
+            setPadding(0, MobileUi.dp(this@MainActivity, 10), 0, 0)
+            MobileUi.addWeighted(
+                this,
+                MobileUi.button(this@MainActivity, "Physical presets") {
+                    showDestination(MainDestination.RADIO)
+                },
+            )
+            MobileUi.addWeighted(
+                this,
+                MobileUi.button(this@MainActivity, "Saved stations") {
+                    startActivity(Intent(this@MainActivity, RadioStationsActivity::class.java))
+                },
+                marginDp = 0,
+            )
+        })
+        content.addView(radioCard)
+
+        content.addView(MobileUi.sectionTitle(this, "Diagnostics"))
+        val diagnosticsCard = MobileUi.card(this)
+        diagnosticsCard.addView(
+            MobileUi.body(
+                this,
+                "Readable runtime/network state first; manual IP and low-level setup stay tucked away.",
+            ),
+        )
+        diagnosticsCard.addView(MobileUi.row(this).apply {
+            setPadding(0, MobileUi.dp(this@MainActivity, 10), 0, 0)
+            MobileUi.addWeighted(
+                this,
+                MobileUi.button(
+                    this@MainActivity,
+                    "Diagnostics",
+                    MobileUi.ButtonKind.PRIMARY,
+                ) {
+                    startActivity(Intent(this@MainActivity, DiagnosticsActivity::class.java))
+                },
+            )
+            MobileUi.addWeighted(
+                this,
+                MobileUi.button(this@MainActivity, "Advanced") {
+                    startActivity(Intent(this@MainActivity, AdvancedSettingsActivity::class.java))
+                },
+                marginDp = 0,
+            )
+        })
+        content.addView(diagnosticsCard)
 
         return ScrollView(this).apply { addView(content) }
     }
@@ -738,17 +717,6 @@ class MainActivity : Activity() {
         super.onDestroy()
     }
 
-    private fun saveSpeakerIp(): String? {
-        cancelAutoDiscovery()
-        val value = speakerIp.text.toString().trim()
-        if (!RendererService.isReasonableIpv4(value)) {
-            speakerIp.error = "Enter an IPv4 address"
-            return null
-        }
-        SpeakerTarget.rememberManualIp(applicationContext, value)
-        return value
-    }
-
     private fun cancelAutoDiscovery() {
         autoDiscoveryGeneration.incrementAndGet()
         window.decorView.removeCallbacks(autoDiscoveryRetry)
@@ -774,8 +742,8 @@ class MainActivity : Activity() {
             return
         }
 
-        val previous = speakerIp.text.toString().trim()
         val savedBefore = preferences.getString(RendererService.KEY_SPEAKER_IP, "").orEmpty().trim()
+        val previous = savedBefore
         val inputRevision = speakerInputRevision.get()
         val generation = autoDiscoveryGeneration.incrementAndGet()
 
@@ -876,7 +844,6 @@ class MainActivity : Activity() {
                     outcome.resolution.ip,
                     outcome.resolution.deviceId,
                 )
-                speakerIp.setText(outcome.resolution.ip)
                 MobileUi.setStatus(
                     statusView,
                     if (outcome.resolution.ip == previous) {
@@ -984,7 +951,6 @@ class MainActivity : Activity() {
                 MobileUi.setEnabled(discoverButton, true)
                 result.fold(
                     onSuccess = { resolution ->
-                        speakerIp.setText(resolution.ip)
                         MobileUi.setStatus(
                             statusView,
                             "Found WAM speaker at ${resolution.ip} via ${speaker.source}.",
@@ -1003,42 +969,48 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun testSpeaker() {
-        val value = saveSpeakerIp() ?: return
+    private fun testConnection() {
         if (RendererService.busy || RadioService.active) {
             Toast.makeText(
                 this,
-                "Stop renderer/radio playback before probing. The M5 keeps one WAM control connection only.",
+                "Stop renderer/radio playback before testing the M5 connection.",
                 Toast.LENGTH_LONG,
             ).show()
             return
         }
+        if (discoveryExecutor.isShutdown) return
 
-        MobileUi.setStatus(statusView, "Testing $value…")
-        Thread({
-            val reachable = SpeakerTarget.withDiscoveryLock {
-                SamsungWamChannel.probe(applicationContext, value)
-            }
+        val saved = preferences.getString(RendererService.KEY_SPEAKER_IP, "").orEmpty().trim()
+        if (!RendererService.isReasonableIpv4(saved)) {
+            MobileUi.setStatus(
+                statusView,
+                "No saved M5 yet. Run Discover first.",
+                MobileUi.StatusKind.INFO,
+            )
+            return
+        }
+
+        MobileUi.setStatus(statusView, "Testing " + saved + "…")
+        discoveryExecutor.execute {
+            val reachable = runCatching {
+                SpeakerTarget.withDiscoveryLock {
+                    SamsungWamChannel.probe(applicationContext, saved)
+                }
+            }.getOrDefault(false)
             runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
                 MobileUi.setStatus(
                     statusView,
-                    if (reachable) "M5 answered at $value." else "No WAM response from $value.",
+                    if (reachable) "M5 answered at " + saved + "."
+                    else "No WAM response from " + saved + ". Try Discover.",
                     if (reachable) MobileUi.StatusKind.SUCCESS else MobileUi.StatusKind.ERROR,
                 )
             }
-        }, "wam-mobile-probe").start()
+        }
     }
 
     private fun startRenderer() {
         cancelAutoDiscovery()
-        val manualTarget = speakerIp.text.toString().trim()
-        if (manualTarget.isNotEmpty()) {
-            if (!RendererService.isReasonableIpv4(manualTarget)) {
-                speakerIp.error = "Enter an IPv4 address or leave it empty for auto-discovery"
-                return
-            }
-            SpeakerTarget.rememberManualIp(applicationContext, manualTarget)
-        }
         val intent = Intent(this, RendererService::class.java).apply {
             action = RendererService.ACTION_START
         }
@@ -1128,10 +1100,8 @@ class MainActivity : Activity() {
                         when (outcome.destination) {
                             SpeakerControls.Destination.TUNEIN ->
                                 startActivity(Intent(this, TuneInActivity::class.java))
-                            SpeakerControls.Destination.SETTINGS -> {
-                                showDestination(MainDestination.SETTINGS)
-                                speakerIp.requestFocus()
-                            }
+                            SpeakerControls.Destination.SETTINGS ->
+                                startActivity(Intent(this, AdvancedSettingsActivity::class.java))
                             null -> Unit
                         }
                         val message = outcome.message
