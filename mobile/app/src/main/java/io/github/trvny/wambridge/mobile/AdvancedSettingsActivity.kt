@@ -87,6 +87,7 @@ class AdvancedSettingsActivity : Activity() {
                         },
                     )
                     renderStatus("Starting renderer…")
+                    refreshUntilSettled()
                 },
             )
             MobileUi.addWeighted(
@@ -102,6 +103,7 @@ class AdvancedSettingsActivity : Activity() {
                         },
                     )
                     renderStatus("Stopping renderer…")
+                    refreshUntilSettled()
                 },
                 marginDp = 0,
             )
@@ -155,6 +157,19 @@ class AdvancedSettingsActivity : Activity() {
                     if (reachable) MobileUi.StatusKind.SUCCESS else MobileUi.StatusKind.ERROR,
                 )
             }
+        }
+    }
+
+    private fun refreshUntilSettled(minimumPolls: Int = 2) {
+        if (isFinishing || isDestroyed) return
+        renderStatus()
+        if (minimumPolls > 0 || RendererService.transitioning) {
+            window.decorView.postDelayed(
+                {
+                    refreshUntilSettled((minimumPolls - 1).coerceAtLeast(0))
+                },
+                250,
+            )
         }
     }
 
