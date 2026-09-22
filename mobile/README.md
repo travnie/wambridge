@@ -37,6 +37,9 @@ The Android adapter provides:
 - saved direct radio stations with optional TuneIn station IDs, resolved at play time ahead of
   ordered fallback URLs and relayed locally by the phone; a fresh install starts with the
   BBC Radio 1, Trójka and Czwórka bundle;
+- radio playback owns an Android MediaSession, so its play/pause/stop state can appear in the
+  notification shade, lock screen and compatible headset/Bluetooth controls; DLNA still belongs
+  to the external player that started it;
 - Android 13+ notification permission is requested on launch so renderer/radio foreground
   controls can actually appear in the notification shade;
 - an M5-style app/renderer icon exposed through UPnP for players such as Neutron;
@@ -65,6 +68,14 @@ Radio renders the same runtime preset snapshot above Saved stations and TuneIn E
 The slots are read-only in this release. Android can play them through the already measured
 `SetPlayPreset` path, but preset editing stays disabled until the write-side
 `SetSavePreset`/`SetMovePreset` behavior is hardware-validated on the physical M5.
+
+### Radio system controls
+
+RadioService owns a single Android MediaSession while radio is starting, recovering or playing.
+The session mirrors the same radio runtime state used by Home and the foreground notification,
+and routes system play/pause/stop actions back through the existing RadioService commands.
+It becomes inactive when radio stops. Renderer/DLNA playback deliberately creates no WAM Bridge
+MediaSession, so the external player remains the only system-media owner for DLNA.
 
 ### Settings and diagnostics
 
