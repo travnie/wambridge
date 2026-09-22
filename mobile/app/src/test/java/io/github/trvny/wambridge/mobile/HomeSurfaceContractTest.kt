@@ -91,4 +91,32 @@ class HomeSurfaceContractTest {
         assertFalse(source.contains("SetMovePreset"))
         assertFalse(source.contains("SetRemovePreset"))
     }
+
+    @Test
+    fun radioUsesTheSameSpeakerOwnedPhysicalPresetStore() {
+        val radioStart = main.indexOf("private fun buildRadioPane")
+        val settingsStart = main.indexOf("private fun buildSettingsPane")
+        assertTrue(radioStart >= 0)
+        assertTrue(settingsStart > radioStart)
+
+        val radio = main.substring(radioStart, settingsStart)
+        assertTrue(radio.contains("Physical presets"))
+        assertTrue(radio.contains("radioPresetButtons"))
+        assertTrue(radio.contains("playPhysicalPreset"))
+        assertTrue(main.contains("PhysicalPresetStore.current()"))
+        assertTrue(radio.contains("Saved stations"))
+        assertTrue(radio.contains("Browse TuneIn"))
+    }
+
+    @Test
+    fun mobileDoesNotShipUnvalidatedPresetWrites() {
+        val root = File("src/main/java/io/github/trvny/wambridge/mobile")
+        val production = root.walkTopDown()
+            .filter { it.isFile && it.extension == "kt" }
+            .joinToString("\n") { it.readText() }
+
+        assertFalse(production.contains("SetSavePreset"))
+        assertFalse(production.contains("SetMovePreset"))
+        assertFalse(production.contains("SetRemovePreset"))
+    }
 }
