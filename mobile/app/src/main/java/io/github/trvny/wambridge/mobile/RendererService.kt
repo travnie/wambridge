@@ -150,7 +150,27 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         val preferences = getSharedPreferences(PREFS, MODE_PRIVATE)
         lastStatus = "Finding WAM speaker on Wi-Fi…"
         publish(lastStatus)
-        val boundTarget = SpeakerTarget.resolveBound(applicationContext) { shouldKeepStarting(generation) }
+        val boundTarget = SpeakerTarget.resolveBound(
+            context = applicationContext,
+            shouldContinue = { shouldKeepStarting(generation) },
+            onStage = { stage ->
+                SpeakerStateStore.update {
+                    it.copy(
+                        discovery = stage,
+                        status = when (stage) {
+                            SpeakerDiscoveryStage.WAITING_FOR_WIFI -> "Waiting for Wi-Fi…"
+                            SpeakerDiscoveryStage.CHECKING_SAVED -> "Checking saved M5…"
+                            SpeakerDiscoveryStage.SSDP -> "Finding M5…"
+                            SpeakerDiscoveryStage.LAN_SCAN -> "Scanning Wi-Fi…"
+                            SpeakerDiscoveryStage.READY -> "M5 ready"
+                            SpeakerDiscoveryStage.FAILED -> "M5 not found"
+                            SpeakerDiscoveryStage.IDLE -> "Starting…"
+                        },
+                        lastError = null,
+                    )
+                }
+            },
+        )
         if (!shouldKeepStarting(generation)) return
         if (boundTarget == null) {
             if (WifiLan.addresses(this).isEmpty()) {
@@ -160,6 +180,13 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
             }
             lastStatus = "No WAM speaker found on Wi-Fi."
             publish(lastStatus)
+            SpeakerStateStore.update {
+                it.copy(
+                    discovery = SpeakerDiscoveryStage.FAILED,
+                    status = "M5 not found",
+                    lastError = lastStatus,
+                )
+            }
             failCurrentStart(generation, startId)
             return
         }
@@ -529,6 +556,14 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
 
     private fun publish(message: String) {
         lastStatus = message
+        SpeakerStateStore.update {
+            speakerSnapshotForRenderer(
+                phase = phase,
+                status = message,
+                speakerIp = speakerIp.takeIf(String::isNotBlank),
+                current = it,
+            )
+        }
         startForeground(NOTIFICATION_ID, buildNotification(message))
     }
 
@@ -540,6 +575,14 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     private fun setPhase(value: Phase) {
         if (phase == value) return
         phase = value
+        SpeakerStateStore.update {
+            speakerSnapshotForRenderer(
+                phase = value,
+                status = lastStatus,
+                speakerIp = speakerIp.takeIf(String::isNotBlank),
+                current = it,
+            )
+        }
         notifyRendererStateChanged()
     }
 
