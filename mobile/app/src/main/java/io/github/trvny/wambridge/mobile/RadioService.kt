@@ -14,6 +14,7 @@ import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 internal fun radioOwnerActive(starting: Boolean, running: Boolean, recovering: Boolean): Boolean =
     starting || running || recovering
@@ -27,6 +28,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         Thread(runnable, WORKER_THREAD_NAME).apply { isDaemon = true }
     }
     private val startPending = AtomicBoolean(false)
+    private val pendingSleepTimerSeconds = AtomicReference<Int?>(null)
     private lateinit var mediaSession: RadioMediaSession
 
     private var proxy: RadioProxyServer? = null
@@ -102,6 +104,31 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
 
             ACTION_VOLUME_UP -> {
                 execute { changeVolume(1) }
+                return START_NOT_STICKY
+            }
+
+            ACTION_SET_SLEEP_TIMER -> {
+                val seconds = intent.getIntExtra(EXTRA_SLEEP_TIMER_SECONDS, -1)
+                val command = runCatching { sleepTimerCommand(seconds) }.getOrElse {
+                    lastStatus = "Invalid sleep timer."
+                    publishRuntimeState(lastStatus)
+                    return START_NOT_STICKY
+                }
+                pendingSleepTimerSeconds.set(command.seconds)
+                SpeakerStateStore.update {
+                    it.copy(
+                        sleepTimer = SleepTimerState(
+                            phase = SleepTimerPhase.REQUESTED,
+                            seconds = command.seconds,
+                        ),
+                    )
+                }
+                execute { applyPendingSleepTimer() }
+                return START_NOT_STICKY
+            }
+
+            ACTION_GET_SLEEP_TIMER -> {
+                execute { channel?.requestSleepTimer() }
                 return START_NOT_STICKY
             }
 
@@ -198,6 +225,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             desiredStation = requestForStation(selected)
             proxy = activeProxy
             channel = activeChannel
+            applyPendingSleepTimer()
             activeProxy = null
             activeChannel = null
             // Start state belongs to the command, not to delayed speaker/proxy callbacks.
@@ -450,6 +478,26 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         }
     }
 
+    override fun onSleepTimerChanged(source: Any, state: SleepTimerState) {
+        if (destroyed || source !== channel) return
+        execute {
+            if (destroyed || source !== channel) return@execute
+            SpeakerStateStore.update { it.copy(sleepTimer = state) }
+        }
+    }
+
+    private fun applyPendingSleepTimer() {
+        val activeChannel = channel ?: return
+        val seconds = pendingSleepTimerSeconds.getAndSet(null) ?: return
+        try {
+            activeChannel.setSleepTimer(seconds)
+            activeChannel.requestSleepTimer()
+        } catch (error: Exception) {
+            pendingSleepTimerSeconds.compareAndSet(null, seconds)
+            throw error
+        }
+    }
+
     private fun togglePause() {
         setPaused(!paused)
     }
@@ -650,6 +698,9 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         const val ACTION_MUTE = "trvny.wambridge.mobile.RADIO_MUTE"
         const val ACTION_VOLUME_DOWN = "trvny.wambridge.mobile.RADIO_VOLUME_DOWN"
         const val ACTION_VOLUME_UP = "trvny.wambridge.mobile.RADIO_VOLUME_UP"
+        const val ACTION_SET_SLEEP_TIMER = "trvny.wambridge.mobile.RADIO_SET_SLEEP_TIMER"
+        const val ACTION_GET_SLEEP_TIMER = "trvny.wambridge.mobile.RADIO_GET_SLEEP_TIMER"
+        const val EXTRA_SLEEP_TIMER_SECONDS = "sleep_timer_seconds"
         const val EXTRA_ALIAS = "station_alias"
 
         /**
