@@ -39,6 +39,7 @@ class SleepTimerProtocolContractTest {
         assertTrue(remote.contains("fun readSleepTimer("))
         assertTrue(remote.contains("\"SetSleepTimer\""))
         assertTrue(remote.contains("\"GetSleepTimer\""))
+        assertTrue(remote.contains("return readSleepTimer(context, speakerIp)"))
         assertTrue(remote.contains("sleepTimerState("))
     }
 }
