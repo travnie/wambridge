@@ -8,14 +8,14 @@ internal data class SleepTimerCommand(
     val seconds: Int,
 )
 
-internal enum class SleepTimerPhase {
+enum class SleepTimerPhase {
     UNKNOWN,
     REQUESTED,
     OFF,
     ARMED,
 }
 
-internal data class SleepTimerState(
+data class SleepTimerState(
     val phase: SleepTimerPhase = SleepTimerPhase.UNKNOWN,
     val seconds: Int? = null,
 )
