@@ -442,13 +442,36 @@ class MainActivity : Activity() {
     }
 
     private fun useDiscoveredSpeaker(speaker: WamDiscovery.Speaker) {
-        val resolution = SpeakerTarget.acceptDiscovered(applicationContext, speaker)
-        speakerIp.setText(resolution.ip)
-        MobileUi.setStatus(
-            statusView,
-            "Found WAM speaker at ${resolution.ip} via ${speaker.source}.",
-            MobileUi.StatusKind.SUCCESS,
-        )
+        if (discoveryExecutor.isShutdown) return
+        MobileUi.setEnabled(discoverButton, false)
+        MobileUi.setStatus(statusView, "Reading M5 identity at ${speaker.ip}…")
+
+        discoveryExecutor.execute {
+            val result = runCatching {
+                SpeakerTarget.acceptDiscovered(applicationContext, speaker)
+            }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                MobileUi.setEnabled(discoverButton, true)
+                result.fold(
+                    onSuccess = { resolution ->
+                        speakerIp.setText(resolution.ip)
+                        MobileUi.setStatus(
+                            statusView,
+                            "Found WAM speaker at ${resolution.ip} via ${speaker.source}.",
+                            MobileUi.StatusKind.SUCCESS,
+                        )
+                    },
+                    onFailure = { error ->
+                        MobileUi.setStatus(
+                            statusView,
+                            error.message ?: error.javaClass.simpleName,
+                            MobileUi.StatusKind.ERROR,
+                        )
+                    },
+                )
+            }
+        }
     }
 
     private fun testSpeaker() {
