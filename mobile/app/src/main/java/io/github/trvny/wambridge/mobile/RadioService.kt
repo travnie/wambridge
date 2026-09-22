@@ -486,6 +486,17 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         if (clearDesired) desiredStation = null
         speakerIp = ""
         running = false
+        SpeakerStateStore.update {
+            speakerSnapshotForRadio(
+                active = active,
+                paused = paused,
+                muted = muted,
+                volume = targetVolume,
+                stationAlias = station?.alias,
+                status = if (active) lastStatus else "Stopped",
+                current = it,
+            )
+        }
         WamBridgeWidget.updateAll(applicationContext)
         if (removeForeground) stopForeground(STOP_FOREGROUND_REMOVE)
     }
@@ -533,6 +544,17 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
     }
 
     private fun publish(message: String) {
+        SpeakerStateStore.update {
+            speakerSnapshotForRadio(
+                active = active,
+                paused = paused,
+                muted = muted,
+                volume = targetVolume,
+                stationAlias = station?.alias,
+                status = message,
+                current = it,
+            )
+        }
         startForeground(NOTIFICATION_ID, buildNotification(message))
         WamBridgeWidget.updateAll(applicationContext)
     }
