@@ -980,31 +980,41 @@ class MainActivity : Activity() {
         }
         if (discoveryExecutor.isShutdown) return
 
-        val saved = preferences.getString(RendererService.KEY_SPEAKER_IP, "").orEmpty().trim()
-        if (!RendererService.isReasonableIpv4(saved)) {
-            MobileUi.setStatus(
-                statusView,
-                "No saved M5 yet. Run Discover first.",
-                MobileUi.StatusKind.INFO,
-            )
-            return
-        }
-
-        MobileUi.setStatus(statusView, "Testing " + saved + "…")
+        cancelAutoDiscovery()
+        MobileUi.setStatus(statusView, "Testing saved M5…")
         discoveryExecutor.execute {
-            val reachable = runCatching {
-                SpeakerTarget.withDiscoveryLock {
-                    SamsungWamChannel.probe(applicationContext, saved)
-                }
-            }.getOrDefault(false)
+            val saved = preferences.getString(
+                RendererService.KEY_SPEAKER_IP,
+                "",
+            ).orEmpty().trim()
+            val reachable = if (RendererService.isReasonableIpv4(saved)) {
+                runCatching {
+                    SpeakerTarget.withDiscoveryLock {
+                        SamsungWamChannel.probe(applicationContext, saved)
+                    }
+                }.getOrDefault(false)
+            } else {
+                null
+            }
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
-                MobileUi.setStatus(
-                    statusView,
-                    if (reachable) "M5 answered at " + saved + "."
-                    else "No WAM response from " + saved + ". Try Discover.",
-                    if (reachable) MobileUi.StatusKind.SUCCESS else MobileUi.StatusKind.ERROR,
-                )
+                when (reachable) {
+                    null -> MobileUi.setStatus(
+                        statusView,
+                        "No saved M5 yet. Run Discover first.",
+                        MobileUi.StatusKind.INFO,
+                    )
+                    true -> MobileUi.setStatus(
+                        statusView,
+                        "M5 answered at " + saved + ".",
+                        MobileUi.StatusKind.SUCCESS,
+                    )
+                    false -> MobileUi.setStatus(
+                        statusView,
+                        "No WAM response from " + saved + ". Try Discover.",
+                        MobileUi.StatusKind.ERROR,
+                    )
+                }
             }
         }
     }
