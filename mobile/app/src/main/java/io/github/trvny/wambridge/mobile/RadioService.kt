@@ -578,26 +578,30 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         removeForeground: Boolean = true,
         clearDesired: Boolean = true,
     ) = SpeakerControlGate.serial {
-        if (channel != null) {
-            runCatching { channel?.pause() }
+        stopping = true
+        try {
+            if (channel != null) {
+                runCatching { channel?.pause() }
+            }
+            safeVolumeApplied = false
+            targetVolume = SAFE_START_VOLUME
+            muted = false
+            paused = false
+            volumeChannel = null
+            runCatching { channel?.close() }
+            channel = null
+            runCatching { proxy?.close() }
+            proxy = null
+            station = null
+            if (clearDesired) desiredStation = null
+            speakerIp = ""
+            running = false
+            publishRuntimeState(if (active) lastStatus else "Stopped")
+            WamBridgeWidget.updateAll(applicationContext)
+            if (removeForeground) stopForeground(STOP_FOREGROUND_REMOVE)
+        } finally {
+            stopping = false
         }
-        safeVolumeApplied = false
-        targetVolume = SAFE_START_VOLUME
-        muted = false
-        paused = false
-        volumeChannel = null
-        runCatching { channel?.close() }
-        channel = null
-        runCatching { proxy?.close() }
-        proxy = null
-        station = null
-        if (clearDesired) desiredStation = null
-        speakerIp = ""
-        running = false
-        stopping = false
-        publishRuntimeState(if (active) lastStatus else "Stopped")
-        WamBridgeWidget.updateAll(applicationContext)
-        if (removeForeground) stopForeground(STOP_FOREGROUND_REMOVE)
     }
 
     private fun fail(message: String, retryable: Boolean = false) {
