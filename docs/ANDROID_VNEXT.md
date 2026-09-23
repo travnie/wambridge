@@ -58,6 +58,10 @@ Manage the presets cycled by the M5's physical Radio button.
 
 ## 5. Radio favourites 2.0
 
+**Shipped 2026-09-23.** Android now uses the shared `station_packs.json` favourites pack as
+its default library and layers user pin/order/default/recent state on top. The station manager
+also supports duplicate/edit plus JSON/M3U/PLS import/export.
+
 Make saved stations pleasant to live with.
 
 - pinning and manual ordering
