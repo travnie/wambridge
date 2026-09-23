@@ -174,6 +174,7 @@ class WamBridgeWidget : AppWidgetProvider() {
                 ComponentName(context, WamBridgeControlsWidget::class.java),
             )
             controlIds.forEach { updateControls(context, manager, it) }
+            WamBridgeStationWidget.updateAll(context)
         }
 
         internal fun updateControlsWidget(

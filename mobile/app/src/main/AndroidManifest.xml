@@ -49,6 +49,14 @@
             android:name=".CatalogueActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".StationWidgetConfigActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <activity-alias
             android:name="trvny.wambridge.mobile.LauncherAlias"
             android:enabled="true"
@@ -84,6 +92,18 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/wam_bridge_controls_widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".WamBridgeStationWidget"
+            android:exported="false"
+            android:label="@string/widget_station_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/wam_bridge_station_widget_info" />
         </receiver>
 
         <service

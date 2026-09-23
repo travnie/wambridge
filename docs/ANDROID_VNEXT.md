@@ -109,16 +109,16 @@ not a small codec toggle.
 
 ## 9. Quick actions everywhere
 
-**Launcher + Radio tile implemented 2026-09-23.** Runtime launcher shortcuts use the shared
-`station_packs.json` `top3` pack plus Stop/Standby up to the device launcher limit. A second
-Quick Settings tile starts last/default radio when idle and cycles the same top3 pack while
-radio is active. Small one-tap station widgets remain follow-up work.
+**Shipped 2026-09-23.** Runtime launcher shortcuts use the shared `station_packs.json`
+`top3` pack plus Stop/Standby up to the device launcher limit. A second Quick Settings tile
+starts last/default radio when idle and cycles the same top3 pack while radio is active.
+A configurable 1×1 Station widget selects one top3 station per widget instance and starts it
+with one tap.
 
 Make common actions reachable without opening the app.
 
 - launcher shortcuts for favourite stations, Stop and Standby
 - optional Radio Quick Settings tile
-- small one-tap station widgets
 - reuse the same command/state routing as the app instead of duplicating control logic
 
 ## 10. Human-friendly Diagnostics
