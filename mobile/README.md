@@ -89,8 +89,9 @@ client; idle commands use the normal shared target/gate path. Settings shows spe
 timer state when it can be read safely.
 
 **Standby now** releases WAM Bridge radio/renderer ownership and then arms a one-second speaker
-timer without waking the M5. The software path is implemented, but that one-second standby
-sequence remains hardware-unverified until the physical M5 checklist is completed.
+timer without waking the M5. The rolling release was hardware-checked on 2026-09-23: the physical
+M5 front lamp went dark after Standby now. The longer 15/30/45/60-minute presets still need a
+duration/readback pass.
 
 ### Settings and diagnostics
 
