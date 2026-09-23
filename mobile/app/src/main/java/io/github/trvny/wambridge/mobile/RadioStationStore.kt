@@ -18,6 +18,12 @@ internal fun validateTuneInId(value: String): String {
     return value
 }
 
+/** Use TuneIn's station CDN only when we already have a validated station id. */
+internal fun tuneInArtworkUrl(value: String?): String? {
+    val id = value?.trim()?.takeIf(::isTuneInStationId) ?: return null
+    return "https://cdn-profiles.tunein.com/$id/images/logod.png"
+}
+
 internal data class MobileRadioStation(
     val alias: String,
     val urls: List<String>,
