@@ -233,7 +233,8 @@ class WamBridgeWidget : AppWidgetProvider() {
             views.setTextViewText(
                 R.id.widget_status,
                 when {
-                    RadioService.active -> RadioService.lastStatus
+                    RadioService.active ->
+                        snapshot.metadata?.takeIf(String::isNotBlank) ?: RadioService.lastStatus
                     RendererService.transitioning -> discoveryStatus(snapshot.discovery)
                     RendererService.busy -> RendererService.lastStatus
                     else -> "Speaker controls"
