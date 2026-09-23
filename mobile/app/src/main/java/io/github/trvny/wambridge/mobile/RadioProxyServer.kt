@@ -28,7 +28,7 @@ internal class RadioProxyServer(
     interface Listener {
         fun onStreamOpened(source: Any, sourceUrl: String)
         fun onSourceFailed(source: Any, sourceUrl: String, message: String)
-        fun onMetadata(source: Any, title: String?)
+        fun onMetadata(source: Any, metadata: RadioNowPlaying)
         fun onStreamClosed(source: Any)
         fun onProxyError(source: Any, message: String)
     }
@@ -139,8 +139,8 @@ internal class RadioProxyServer(
                             input = buffered,
                             output = output,
                             metadataInterval = metadataInterval,
-                        ) { title ->
-                            listener.onMetadata(this, title)
+                        ) { metadata ->
+                            listener.onMetadata(this, metadata)
                         }
                     }
                     output.flush()
