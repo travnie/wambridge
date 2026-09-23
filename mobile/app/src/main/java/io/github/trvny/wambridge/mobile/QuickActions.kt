@@ -43,6 +43,14 @@ internal fun nextRadioTileStation(
 }
 
 internal object LauncherQuickActions {
+    private data class ShortcutSpec(
+        val id: String,
+        val label: String,
+        val longLabel: String,
+        val action: String,
+        val alias: String? = null,
+    )
+
     const val ACTION_PLAY_STATION = "trvny.wambridge.mobile.QUICK_PLAY_STATION"
     const val ACTION_STOP = "trvny.wambridge.mobile.QUICK_STOP"
     const val ACTION_STANDBY = "trvny.wambridge.mobile.QUICK_STANDBY"
@@ -56,8 +64,7 @@ internal object LauncherQuickActions {
         val candidates = buildList {
             RadioStationStore(context).quickStations().forEach { station ->
                 add(
-                    shortcut(
-                        context = context,
+                    ShortcutSpec(
                         id = "radio:${station.alias.lowercase()}",
                         label = shortcutLabel(station.alias),
                         longLabel = "Play ${shortcutLabel(station.alias)}",
@@ -66,32 +73,22 @@ internal object LauncherQuickActions {
                     ),
                 )
             }
-            add(
-                shortcut(
-                    context = context,
-                    id = "stop",
-                    label = "Stop",
-                    longLabel = "Stop playback",
-                    action = ACTION_STOP,
-                ),
-            )
-            add(
-                shortcut(
-                    context = context,
-                    id = "standby",
-                    label = "Standby",
-                    longLabel = "Put M5 in standby",
-                    action = ACTION_STANDBY,
-                ),
-            )
+            add(ShortcutSpec("stop", "Stop", "Stop playback", ACTION_STOP))
+            add(ShortcutSpec("standby", "Standby", "Put M5 in standby", ACTION_STANDBY))
         }
 
-        val desired = candidates.take(max).mapIndexed { index, item ->
-            ShortcutInfo.Builder(context, item.id)
-                .setShortLabel(item.shortLabel)
-                .setLongLabel(item.longLabel)
-                .setIcon(item.icon)
-                .setIntent(item.intent)
+        val desired = candidates.take(max).mapIndexed { index, spec ->
+            ShortcutInfo.Builder(context, spec.id)
+                .setShortLabel(spec.label)
+                .setLongLabel(spec.longLabel)
+                .setIcon(Icon.createWithResource(context, R.drawable.ic_qs_tile))
+                .setIntent(
+                    Intent(context, MainActivity::class.java).apply {
+                        action = spec.action
+                        addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        spec.alias?.let { putExtra(EXTRA_ALIAS, it) }
+                    },
+                )
                 .setRank(index)
                 .build()
         }
@@ -99,29 +96,8 @@ internal object LauncherQuickActions {
         val desiredIds = desired.map { it.id }
         if (currentIds == desiredIds) return
 
-        runCatching { manager.dynamicShortcuts = desired }
+        runCatching { manager.setDynamicShortcuts(desired) }
     }
-
-    private fun shortcut(
-        context: Context,
-        id: String,
-        label: String,
-        longLabel: String,
-        action: String,
-        alias: String? = null,
-    ): ShortcutInfo =
-        ShortcutInfo.Builder(context, id)
-            .setShortLabel(label)
-            .setLongLabel(longLabel)
-            .setIcon(Icon.createWithResource(context, R.drawable.ic_qs_tile))
-            .setIntent(
-                Intent(context, MainActivity::class.java).apply {
-                    this.action = action
-                    addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    alias?.let { putExtra(EXTRA_ALIAS, it) }
-                },
-            )
-            .build()
 
     private fun shortcutLabel(alias: String): String {
         val trimmed = alias.trim()
