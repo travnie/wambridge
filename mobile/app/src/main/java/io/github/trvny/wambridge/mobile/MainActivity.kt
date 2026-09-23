@@ -1196,9 +1196,13 @@ class MainActivity : Activity() {
             sourceIntent?.getStringExtra(LauncherQuickActions.EXTRA_ALIAS),
         ) ?: return
 
-        sourceIntent?.action = Intent.ACTION_MAIN
-        sourceIntent?.removeExtra(LauncherQuickActions.EXTRA_ALIAS)
-        sourceIntent?.removeExtra(LauncherQuickActions.EXTRA_TOKEN)
+        setIntent(
+            Intent(sourceIntent).apply {
+                action = Intent.ACTION_MAIN
+                removeExtra(LauncherQuickActions.EXTRA_ALIAS)
+                removeExtra(LauncherQuickActions.EXTRA_TOKEN)
+            },
+        )
         cancelAutoDiscovery()
 
         when (action) {
@@ -1340,7 +1344,9 @@ class MainActivity : Activity() {
         ) { result ->
             val ready = result == StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED ||
                 result == StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED
-            if (ready) preferences.edit().putBoolean("recovery_tile_ready", true).apply()
+            if (serviceClass == WamBridgeTileService::class.java) {
+                preferences.edit().putBoolean("recovery_tile_ready", ready).apply()
+            }
             Toast.makeText(
                 this,
                 if (ready) "$label ready." else "$label was not added.",
