@@ -73,6 +73,11 @@ Make saved stations pleasant to live with.
 
 ## 6. Smarter fallback routing
 
+**Shipped 2026-09-23.** The mobile relay passively remembers successful/failed endpoints,
+prefers the last working endpoint on later starts, cools failed URLs for 15 minutes, and
+publishes the active fallback position through shared runtime state. It never opens a second
+probe beside playback.
+
 Improve radio recovery without adding a second probing client to the active stream.
 
 - remember the last working endpoint
