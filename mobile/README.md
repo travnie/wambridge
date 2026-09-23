@@ -24,7 +24,11 @@ The Android adapter provides:
 - a local WAV/LPCM, MP3 and FLAC proxy handed to the M5 through `SetUrlPlayback`;
 - safe first-start volume capped at M5 raw step `3`;
 - idle/session release so stopped playback does not keep the M5 awake;
-- a Quick Settings tile: tap toggles the renderer, long-press opens settings;
+- two Quick Settings tiles: the existing DLNA tile toggles the renderer, while the Radio tile
+  starts the last/default station when idle and cycles the shared `station_packs.json` `top3`
+  pack while radio is active;
+- launcher long-press actions publish the same shared `top3` stations plus Stop and Standby,
+  capped by the launcher's per-app shortcut limit;
 - a daily-driver Home screen with shared Now Playing state, play/pause, mute and raw-volume
   controls, plus the M5's three speaker-owned physical Radio presets;
 - an in-app speaker remote plus two explicit home-screen widget choices: a compact
@@ -114,6 +118,17 @@ controls, the foreground notification and Diagnostics without opening a second H
 Streams without ICY metadata stay on the normal byte-for-byte relay path. Repeated identical
 titles are suppressed, an empty `StreamTitle` clears stale track text, and metadata decoding
 accepts UTF-8 with ISO-8859-1 fallback for older stations.
+
+### Quick actions
+
+Launcher shortcuts are generated at runtime from the shared `top3` station pack, so BBC1,
+Trójka and Czwórka are not duplicated in Kotlin. Stop and Standby use the same app command
+paths as Home. Android launchers impose a device-specific shortcut cap, so WAM Bridge publishes
+as many of the ordered station/control actions as the launcher reports it can hold.
+
+A second Quick Settings tile is radio-specific: when idle it starts last-played, then the
+configured default, then the first `top3` station. While WAM Bridge radio is already active,
+successive taps cycle through that same `top3` list. The original DLNA tile remains unchanged.
 
 ### Radio system controls
 
