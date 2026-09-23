@@ -23,6 +23,7 @@ class RadioMediaSessionContractTest {
         assertTrue(text.contains("RadioService.ACTION_STOP"))
         assertTrue(text.contains("PlaybackState.Builder"))
         assertTrue(text.contains("MediaMetadata.Builder"))
+        assertTrue(text.contains("METADATA_KEY_ART_URI"))
     }
 
     @Test
