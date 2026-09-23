@@ -180,7 +180,15 @@ jobs:
 
           if [[ "$ROLLING" == "true" ]]; then
             # A rolling release keeps one APK, not a growing pile of them.
-            gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^wambridge-.*[.]apk | grep -vxF "wambridge-${VERSION}.apk" | while read -r stale; do
+            gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^wambridge-.*[.]apk
+              gh release delete-asset "$TAG" "$stale" --yes
+            done
+
+            # One-time cleanup of the superseded rolling prerelease channel.
+            gh release delete beta --yes >/dev/null 2>&1 || true
+            gh api --method DELETE "repos/${GH_REPO}/git/refs/tags/beta" >/dev/null 2>&1 || true
+          fi
+ | grep -vxF "wambridge-${VERSION}.apk" | while read -r stale; do
               gh release delete-asset "$TAG" "$stale" --yes
             done
 
