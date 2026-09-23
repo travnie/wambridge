@@ -52,7 +52,8 @@ The Android adapter provides:
 - direct radio requests ICY metadata on the same upstream connection, strips metadata blocks
   before forwarding audio to the M5, and publishes `StreamTitle` plus image-like `StreamUrl`
   artwork through the shared Now Playing state used by Home, the controls widget,
-  MediaSession/notification and Diagnostics;
+  MediaSession/notification and Diagnostics; transcoded HLS/Ogg paths also forward Media3
+  title/artist and web artwork metadata when the source exposes it;
 - Radio Paradise additionally uses its small now-playing JSON endpoint for track metadata and
   per-track cover art, refreshing from the API's remaining-track hint rather than polling the
   audio stream a second time;
@@ -66,7 +67,7 @@ The Android adapter provides:
   controls can actually appear in the notification shade;
 - an M5-style app/renderer icon exposed through UPnP for players such as Neutron;
 
-Physical phone + M5 playback through Neutron is confirmed. The direct mobile radio relay intentionally rejects HLS and Ogg until a phone-side transcoding layer exists; the desktop bridge remains the fully transcoding radio path.
+Physical phone + M5 playback through Neutron is confirmed. HLS and Ogg/Opus radio can use the isolated phone-side Media3 transcoder, which normalizes decoded audio to PCM16 stereo 44.1 kHz and serves endless WAV to the M5. MP3/AAC/FLAC remain on the lightweight direct relay. Physical M5 validation of the transcoding path is still required before release.
 
 ### Android navigation
 

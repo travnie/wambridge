@@ -107,11 +107,13 @@ state that can feed:
 
 ## 8. Phone-side HLS / Ogg support
 
-Add a dedicated mobile transcoding path so streams currently rejected by the phone relay
-can play through the M5.
+**Software implemented 2026-09-23; physical M5 validation pending.** Media3 decodes HLS and
+Ogg/Opus on the phone, normalizes audio to PCM16 stereo 44.1 kHz and serves endless WAV to the
+M5. The normal MP3/AAC/FLAC relay remains lightweight. The transcoder stays bound to the selected
+Wi-Fi network and forwards Media3 title/artist/web-artwork metadata into shared Now Playing state.
 
-Keep this isolated from the normal direct relay because it is a larger transport subsystem,
-not a small codec toggle.
+BBC 6 Music and Fallout FM 5 are now exposed to Android because their HLS/Ogg formats have a
+software path. Merge/release of this transport work remains gated on the physical M5 pass.
 
 ## 9. Quick actions everywhere
 
