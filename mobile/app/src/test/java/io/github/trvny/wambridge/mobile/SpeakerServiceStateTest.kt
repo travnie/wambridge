@@ -126,13 +126,37 @@ class SpeakerServiceStateTest {
             muted = false,
             volume = 3,
             stationAlias = "bbc1",
+            metadata = "Artist - Track",
             source = "https://radio.example/fallback",
             fallback = "2/3",
             status = "Playing bbc1 · fallback 2/3",
         )
 
+        assertEquals("Artist - Track", snapshot.metadata)
         assertEquals("https://radio.example/fallback", snapshot.source)
         assertEquals("2/3", snapshot.fallback)
+    }
+
+    @Test
+    fun stoppedRadioClearsNowPlayingMetadata() {
+        val snapshot = speakerSnapshotForRadio(
+            starting = false,
+            running = false,
+            recovering = false,
+            paused = false,
+            muted = false,
+            volume = 3,
+            stationAlias = null,
+            status = "Stopped",
+            current = SpeakerSnapshot(
+                owner = SpeakerOwner.RADIO,
+                playback = SpeakerPlaybackState.PLAYING,
+                stationAlias = "bbc1",
+                metadata = "Old track",
+            ),
+        )
+
+        assertEquals(null, snapshot.metadata)
     }
 
     @Test

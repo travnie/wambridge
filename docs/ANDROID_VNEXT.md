@@ -87,6 +87,11 @@ Improve radio recovery without adding a second probing client to the active stre
 
 ## 7. ICY metadata pipeline
 
+**Software implemented 2026-09-23; physical metadata pass pending.** Direct radio requests
+ICY metadata on the existing upstream connection, strips metadata blocks before they reach the
+M5, and publishes `StreamTitle` through the shared speaker snapshot. No parallel probe/client
+is introduced.
+
 Extract metadata such as `StreamTitle` from direct radio and keep one shared playback
 state that can feed:
 

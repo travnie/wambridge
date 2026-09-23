@@ -40,6 +40,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
     private var canonicalSources: List<String> = emptyList()
     private var activeSourceUrl: String? = null
     private var activeFallback: String? = null
+    private var activeMetadata: String? = null
     private var safeVolumeApplied = false
     private var targetVolume = SAFE_START_VOLUME
     private var muted = false
@@ -244,6 +245,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         canonicalSources = prepared.canonicalSources
         activeSourceUrl = null
         activeFallback = null
+        activeMetadata = null
 
         val clientUuid = radioClientUuid()
 
@@ -472,6 +474,14 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         publish(lastStatus)
     }
 
+    override fun onMetadata(source: Any, title: String?) = execute {
+        if (destroyed || !running || source !== proxy) return@execute
+        activeMetadata = title?.takeIf(String::isNotBlank)
+        publishRuntimeState(lastStatus)
+        startForeground(NOTIFICATION_ID, buildNotification(lastStatus))
+        WamBridgeWidget.updateAll(applicationContext)
+    }
+
     override fun onSourceFailed(source: Any, sourceUrl: String, message: String) = execute {
         if (destroyed || source !== proxy) return@execute
         // A Wi-Fi handoff is a transport failure, not evidence that this station URL is bad.
@@ -620,6 +630,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             volumeChannel = null
             activeSourceUrl = null
             activeFallback = null
+            activeMetadata = null
             canonicalSources = emptyList()
             runCatching { channel?.close() }
             channel = null
@@ -689,6 +700,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                 muted = muted,
                 volume = targetVolume,
                 stationAlias = station?.alias,
+                metadata = activeMetadata,
                 source = activeSourceUrl,
                 fallback = activeFallback,
                 status = message,
@@ -702,8 +714,12 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                 recovering = wifiRecovery,
                 paused = paused,
             ),
-            title = station?.alias ?: desiredStation?.alias,
-            source = "Samsung M5",
+            title = activeMetadata ?: station?.alias ?: desiredStation?.alias,
+            source = if (activeMetadata.isNullOrBlank()) {
+                "Samsung M5"
+            } else {
+                station?.alias ?: desiredStation?.alias ?: "Samsung M5"
+            },
         )
     }
 
@@ -743,10 +759,12 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             @Suppress("DEPRECATION")
             Notification.Builder(this)
         }
+        val nowPlaying = activeMetadata?.takeIf(String::isNotBlank)
+        val stationName = station?.alias ?: desiredStation?.alias
         return builder
             .setSmallIcon(R.drawable.ic_qs_tile)
-            .setContentTitle("WAM Bridge · Radio")
-            .setContentText(message)
+            .setContentTitle(nowPlaying ?: stationName?.let { "WAM Bridge · $it" } ?: "WAM Bridge · Radio")
+            .setContentText(if (nowPlaying != null) stationName ?: message else message)
             .setContentIntent(openIntent)
             .setCategory(Notification.CATEGORY_TRANSPORT)
             .setOnlyAlertOnce(true)
