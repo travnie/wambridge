@@ -2,14 +2,11 @@ package io.github.trvny.wambridge.mobile
 
 import android.app.Activity
 import android.content.Intent
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.os.SystemClock
-import android.util.LruCache
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
@@ -18,11 +15,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import java.io.ByteArrayOutputStream
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
-import java.util.concurrent.Executors
 
 class TuneInActivity : Activity() {
     private var widgetStopInProgress = false
@@ -35,11 +28,6 @@ class TuneInActivity : Activity() {
     private lateinit var volumeUpButton: Button
     private lateinit var volumeView: TextView
     private lateinit var presetsView: LinearLayout
-
-    private val artworkExecutor = Executors.newFixedThreadPool(3)
-    private val artworkCache = object : LruCache<String, Bitmap>(4 * 1024) {
-        override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
-    }
 
     private val preferences by lazy {
         getSharedPreferences(RendererService.PREFS, MODE_PRIVATE)
@@ -183,7 +171,7 @@ class TuneInActivity : Activity() {
             clipToOutline = true
         }
         row.addView(logo, LinearLayout.LayoutParams(dp(58), dp(58)).apply { marginEnd = dp(12) })
-        loadArtwork(logo, preset.thumbnail)
+        ArtworkLoader.load(this, logo, preset.thumbnail)
 
         val copy = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         copy.addView(TextView(this).apply {
@@ -218,11 +206,19 @@ class TuneInActivity : Activity() {
                 releasePlaybackOwners()
                 val target = resolveSpeaker()
                 SamsungTuneIn.playSafely(applicationContext, target, preset)
+                target
             }
             runOnUiThread {
                 setButtonsEnabled(true)
                 result.fold(
-                    onSuccess = {
+                    onSuccess = { target ->
+                        SpeakerStateStore.update {
+                            nativePresetPlayingSnapshot(
+                                speakerIp = target,
+                                preset = preset,
+                                current = it,
+                            )
+                        }
                         MobileUi.setStatus(
                             statusView,
                             "Playing · ${preset.title}",
@@ -336,6 +332,7 @@ class TuneInActivity : Activity() {
                                     playback = SpeakerPlaybackState.STOPPED,
                                     stationAlias = null,
                                     metadata = null,
+                                    artworkUrl = null,
                                     source = null,
                                     fallback = null,
                                     status = report,
@@ -357,58 +354,6 @@ class TuneInActivity : Activity() {
                 if (finishAfter) finish()
             }
         }, "wam-mobile-tunein-stop").start()
-    }
-
-    private fun loadArtwork(view: ImageView, url: String?) {
-        val key = url?.trim()?.takeIf { it.startsWith("http://") || it.startsWith("https://") } ?: return
-        view.tag = key
-        synchronized(artworkCache) { artworkCache.get(key) }?.let {
-            view.setImageBitmap(it)
-            return
-        }
-        artworkExecutor.execute {
-            val bitmap = runCatching { downloadArtwork(key) }.getOrNull() ?: return@execute
-            synchronized(artworkCache) { artworkCache.put(key, bitmap) }
-            runOnUiThread {
-                if (!isFinishing && view.tag == key) view.setImageBitmap(bitmap)
-            }
-        }
-    }
-
-    private fun downloadArtwork(address: String): Bitmap {
-        var lastError: Exception? = null
-        for (connection in WifiLan.openHttpConnections(applicationContext, URL(address))) {
-            connection.apply {
-                connectTimeout = ARTWORK_TIMEOUT_MS
-                readTimeout = ARTWORK_TIMEOUT_MS
-                useCaches = true
-                instanceFollowRedirects = true
-                requestMethod = "GET"
-            }
-            try {
-                if (connection.responseCode != HttpURLConnection.HTTP_OK) {
-                    throw IOException("Artwork HTTP ${connection.responseCode}")
-                }
-                val out = ByteArrayOutputStream()
-                val buffer = ByteArray(8 * 1024)
-                connection.inputStream.use { input ->
-                    while (true) {
-                        val count = input.read(buffer)
-                        if (count < 0) break
-                        if (out.size() + count > MAX_ARTWORK_BYTES) throw IOException("Artwork too large")
-                        out.write(buffer, 0, count)
-                    }
-                }
-                val bytes = out.toByteArray()
-                return BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                    ?: throw IOException("Unsupported artwork image")
-            } catch (error: Exception) {
-                lastError = error
-            } finally {
-                connection.disconnect()
-            }
-        }
-        throw lastError ?: IOException("No active Wi-Fi network")
     }
 
     private fun roundedBackground(): GradientDrawable = MobileUi.rounded(
@@ -521,11 +466,6 @@ class TuneInActivity : Activity() {
         if (widgetStopInProgress) outState.putBoolean(STATE_WIDGET_STOP, true)
     }
 
-    override fun onDestroy() {
-        artworkExecutor.shutdownNow()
-        super.onDestroy()
-    }
-
     private fun releasePlaybackOwners() {
         releaseRenderer()
         releaseRadio()
@@ -563,9 +503,6 @@ class TuneInActivity : Activity() {
         const val ACTION_STOP_PLAYBACK = "trvny.wambridge.mobile.TUNEIN_STOP_PLAYBACK"
         private const val STATE_WIDGET_STOP = "widget_stop_in_progress"
         private const val OWNER_STOP_TIMEOUT_MS = 2_500L
-        private const val ARTWORK_TIMEOUT_MS = 5_000
-        private const val MAX_ARTWORK_BYTES = 1024 * 1024
-
         /** Gap between `SetFunc aux` and `SetFunc wifi`, and the flush after the last send. */
         private const val FUNCTION_SWITCH_PAUSE_MS = 2_000L
 
