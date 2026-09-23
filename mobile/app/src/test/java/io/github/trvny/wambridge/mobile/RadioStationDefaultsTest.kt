@@ -116,6 +116,26 @@ class RadioStationDefaultsTest {
     }
 
     @Test
+    fun stationSourceSummaryDistinguishesTuneInAndFallbacks() {
+        assertEquals(
+            "TuneIn s24939 · direct backup · 1 fallback",
+            radioStationSourceSummary(
+                MobileRadioStation(
+                    "bbc1",
+                    listOf("https://one.example/live", "https://two.example/live"),
+                    "s24939",
+                ),
+            ),
+        )
+        assertEquals(
+            "Direct",
+            radioStationSourceSummary(
+                MobileRadioStation("plain", listOf("https://one.example/live")),
+            ),
+        )
+    }
+
+    @Test
     fun m3uImportUsesExtinfTitles() {
         val imported = importRadioStations(
             "stations.m3u",
