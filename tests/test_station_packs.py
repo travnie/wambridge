@@ -25,6 +25,43 @@ class StationPackTests(TestCase):
         self.assertIn("radiozet", aliases)
         self.assertIn("streamingsoundtracks", aliases)
 
+    def test_verified_tunein_ids_keep_static_url_fallbacks(self) -> None:
+        stations = {
+            station.alias: station for station in get_station_pack("favorites")
+        }
+
+        self.assertEqual(
+            {
+                "radioparadise": "s13606",
+                "bbc6": "s44491",
+                "minimalmix": "s151855",
+                "kaszebe": "s77862",
+                "cinemix": "s96408",
+                "streamingsoundtracks": "s1562",
+            },
+            {
+                alias: stations[alias].tunein_id
+                for alias in (
+                    "radioparadise",
+                    "bbc6",
+                    "minimalmix",
+                    "kaszebe",
+                    "cinemix",
+                    "streamingsoundtracks",
+                )
+            },
+        )
+        self.assertTrue(
+            all(stations[alias].all_urls for alias in (
+                "radioparadise",
+                "bbc6",
+                "minimalmix",
+                "kaszebe",
+                "cinemix",
+                "streamingsoundtracks",
+            ))
+        )
+
     def test_favorite_fallbacks_preserve_order(self) -> None:
         stations = {
             station.alias: station for station in get_station_pack("favorites")
