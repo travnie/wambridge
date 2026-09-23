@@ -506,7 +506,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         lastStatus = when {
             paused -> "Paused $alias"
             muted -> "Muted $alias"
-            else -> "Playing $alias · confirmed"
+            else -> "Playing $alias · confirmed" +
+                activeFallback?.let { " · fallback $it" }.orEmpty()
         }
         publish(lastStatus)
     }
@@ -615,6 +616,9 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             muted = false
             paused = false
             volumeChannel = null
+            activeSourceUrl = null
+            activeFallback = null
+            canonicalSources = emptyList()
             runCatching { channel?.close() }
             channel = null
             runCatching { proxy?.close() }
@@ -683,6 +687,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                 muted = muted,
                 volume = targetVolume,
                 stationAlias = station?.alias,
+                source = activeSourceUrl,
+                fallback = activeFallback,
                 status = message,
                 current = it,
             )
