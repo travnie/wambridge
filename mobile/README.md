@@ -71,11 +71,12 @@ Physical phone + M5 playback through Neutron is confirmed. The direct mobile rad
 ### Android navigation
 
 The launcher now opens a persistent **Home · Radio · Settings** shell. Home is the default
-daily-driver screen: Now Playing, shared play/pause/mute/raw-volume controls, connection state,
-and three always-visible physical preset slots. Radio shows the same three slots above Saved
-stations and TuneIn Explore; the slots are read directly from the M5 and match the speaker's
-physical Radio button. This release intentionally keeps those physical slots read-only until
-the write-side preset commands are hardware-validated. Settings keeps normal speaker/system
+daily-driver screen: Now Playing, shared play/pause/mute/raw-volume controls, connection state
+and a stateful one-tap DLNA renderer switch. Radio is the station picker: it opens with the full
+TuneIn preset list read from the M5 plus Browse TuneIn, then shows the app-side stations with
+their TuneIn/direct/fallback source summary and a route to the full station manager. The three
+physical Radio-button slots remain part of that M5-owned TuneIn list instead of being repeated
+on Home and Settings. Settings keeps normal speaker/system
 controls up front, while Diagnostics exposes copyable runtime/network state and a controlled
 Fix connection action. Manual IP and dedicated troubleshooting controls live under Advanced. Switching
 root destinations reuses the same panes instead of recreating Activities.

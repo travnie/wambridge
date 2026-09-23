@@ -31,6 +31,19 @@ internal data class MobileRadioStation(
     val tuneInId: String? = null,
 )
 
+internal fun radioStationSourceSummary(station: MobileRadioStation): String {
+    val fallbacks = (station.urls.size - 1).coerceAtLeast(0)
+    return when {
+        station.tuneInId != null && station.urls.isNotEmpty() ->
+            "TuneIn ${station.tuneInId} · direct backup · $fallbacks fallback${if (fallbacks == 1) "" else "s"}"
+        station.tuneInId != null ->
+            "TuneIn ${station.tuneInId}"
+        fallbacks > 0 ->
+            "Direct · $fallbacks fallback${if (fallbacks == 1) "" else "s"}"
+        else -> "Direct"
+    }
+}
+
 internal fun mergeRadioStations(
     saved: List<MobileRadioStation>,
     bundled: List<MobileRadioStation>,

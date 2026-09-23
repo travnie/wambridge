@@ -45,7 +45,7 @@ class SettingsSurfaceContractTest {
         assertTrue(settings.contains("AdvancedSettingsActivity::class.java"))
         assertTrue(settings.contains("\"Add DLNA tile\""))
         assertTrue(settings.contains("\"Add Radio tile\""))
-        assertTrue(settings.contains("\"Physical presets\""))
-        assertTrue(settings.contains("\"Saved stations\""))
+        assertFalse(settings.contains("\"Physical presets\""))
+        assertFalse(settings.contains("\"Saved stations\""))
     }
 }

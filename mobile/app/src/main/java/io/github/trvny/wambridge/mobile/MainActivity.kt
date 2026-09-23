@@ -37,6 +37,7 @@ class MainActivity : Activity() {
     private lateinit var discoverButton: Button
     private lateinit var startRendererButton: Button
     private lateinit var stopRendererButton: Button
+    private lateinit var homeDlnaButton: Button
     private lateinit var statusView: TextView
     private lateinit var homeStatusView: TextView
     private lateinit var homeArtworkView: ImageView
@@ -44,11 +45,10 @@ class MainActivity : Activity() {
     private lateinit var homeNowPlayingMeta: TextView
     private lateinit var homePlayPauseButton: Button
     private lateinit var homeMuteButton: Button
-    private lateinit var homePresetStatusView: TextView
     private lateinit var sleepTimerStatusView: TextView
-    private val homePresetButtons = mutableListOf<Button>()
     private lateinit var radioPresetStatusView: TextView
-    private val radioPresetButtons = mutableListOf<Button>()
+    private lateinit var radioTuneInView: LinearLayout
+    private lateinit var radioStationsView: LinearLayout
     private lateinit var homePane: View
     private lateinit var radioPane: View
     private lateinit var settingsPane: View
@@ -231,43 +231,26 @@ class MainActivity : Activity() {
         homeStatusView = MobileUi.status(this, "Connecting…")
         content.addView(homeStatusView)
 
-        content.addView(MobileUi.sectionTitle(this, "Physical presets"))
-        val presets = MobileUi.card(this)
-        presets.addView(
+        content.addView(MobileUi.sectionTitle(this, "DLNA renderer"))
+        val dlna = MobileUi.card(this)
+        dlna.addView(
             MobileUi.body(
                 this,
-                "The same three slots cycled by the Radio button on the M5.",
+                "Expose the M5 as a DLNA renderer. The button shows the current renderer state.",
             ),
         )
-        homePresetStatusView = MobileUi.status(this, "Waiting for M5…")
-        homePresetStatusView.setPadding(
-            MobileUi.dp(this, 10),
-            MobileUi.dp(this, 8),
-            MobileUi.dp(this, 10),
-            MobileUi.dp(this, 8),
-        )
-        presets.addView(homePresetStatusView)
-        presets.addView(MobileUi.row(this).apply {
-            setPadding(0, MobileUi.dp(this@MainActivity, 10), 0, 0)
-            repeat(PHYSICAL_PRESET_SLOTS) { index ->
-                val button = MobileUi.button(
-                    this@MainActivity,
-                    "Preset ${index + 1}",
-                    if (index == 0) MobileUi.ButtonKind.PRIMARY else MobileUi.ButtonKind.SECONDARY,
-                ) {
-                    playPhysicalPreset(index)
-                }.apply {
-                    maxLines = 2
-                }
-                homePresetButtons += button
-                MobileUi.addWeighted(
-                    this,
-                    button,
-                    marginDp = if (index == PHYSICAL_PRESET_SLOTS - 1) 0 else 6,
-                )
-            }
-        })
-        content.addView(presets)
+        homeDlnaButton = MobileUi.button(
+            this,
+            "DLNA ○ Off",
+            MobileUi.ButtonKind.SECONDARY,
+        ) { toggleRenderer() }.apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = MobileUi.dp(this@MainActivity, 10) }
+        }
+        dlna.addView(homeDlnaButton)
+        content.addView(dlna)
 
         content.addView(MobileUi.sectionTitle(this, "Quick actions"))
         val quickActions = MobileUi.card(this)
@@ -303,16 +286,16 @@ class MainActivity : Activity() {
             MobileUi.header(
                 this,
                 "Radio",
-                "The M5's physical presets, your saved stations and TuneIn.",
+                "TuneIn from the M5 first, then your direct and fallback stations.",
             ),
         )
 
-        content.addView(MobileUi.sectionTitle(this, "Physical presets"))
-        val physical = MobileUi.card(this)
-        physical.addView(
+        content.addView(MobileUi.sectionTitle(this, "TuneIn"))
+        val tuneIn = MobileUi.card(this)
+        tuneIn.addView(
             MobileUi.body(
                 this,
-                "Slots 1–3 are read directly from the speaker and match its physical Radio button.",
+                "Presets are read directly from the M5. Tap one to play it, or browse the TuneIn catalogue.",
             ),
         )
         radioPresetStatusView = MobileUi.status(this, "Waiting for M5…")
@@ -322,51 +305,13 @@ class MainActivity : Activity() {
             MobileUi.dp(this, 10),
             MobileUi.dp(this, 8),
         )
-        physical.addView(radioPresetStatusView)
-        physical.addView(MobileUi.row(this).apply {
+        tuneIn.addView(radioPresetStatusView)
+        radioTuneInView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             setPadding(0, MobileUi.dp(this@MainActivity, 10), 0, 0)
-            repeat(PHYSICAL_PRESET_SLOTS) { index ->
-                val button = MobileUi.button(
-                    this@MainActivity,
-                    "Preset ${index + 1}",
-                    if (index == 0) MobileUi.ButtonKind.PRIMARY else MobileUi.ButtonKind.SECONDARY,
-                ) {
-                    playPhysicalPreset(index)
-                }.apply { maxLines = 2 }
-                radioPresetButtons += button
-                MobileUi.addWeighted(
-                    this,
-                    button,
-                    marginDp = if (index == PHYSICAL_PRESET_SLOTS - 1) 0 else 6,
-                )
-            }
-        })
-        content.addView(physical)
-
-        content.addView(MobileUi.sectionTitle(this, "Saved stations"))
-        val saved = MobileUi.card(this)
-        saved.addView(
-            MobileUi.body(
-                this,
-                "Your app-side station list, independent from the three physical M5 slots.",
-            ),
-        )
-        saved.addView(
-            MobileUi.button(this, "Saved stations", MobileUi.ButtonKind.PRIMARY) {
-                startActivity(Intent(this, RadioStationsActivity::class.java))
-            },
-        )
-        content.addView(saved)
-
-        content.addView(MobileUi.sectionTitle(this, "Explore"))
-        val explore = MobileUi.card(this)
-        explore.addView(
-            MobileUi.body(
-                this,
-                "Browse the M5 TuneIn catalogue or open the full preset list.",
-            ),
-        )
-        explore.addView(MobileUi.row(this).apply {
+        }
+        tuneIn.addView(radioTuneInView)
+        tuneIn.addView(MobileUi.row(this).apply {
             setPadding(0, MobileUi.dp(this@MainActivity, 10), 0, 0)
             MobileUi.addWeighted(
                 this,
@@ -376,13 +321,38 @@ class MainActivity : Activity() {
             )
             MobileUi.addWeighted(
                 this,
-                MobileUi.button(this@MainActivity, "All presets") {
-                    startActivity(Intent(this@MainActivity, TuneInActivity::class.java))
+                MobileUi.button(this@MainActivity, "Refresh presets") {
+                    refreshPhysicalPresets()
                 },
                 marginDp = 0,
             )
         })
-        content.addView(explore)
+        content.addView(tuneIn)
+
+        content.addView(MobileUi.sectionTitle(this, "Other stations"))
+        val stations = MobileUi.card(this)
+        stations.addView(
+            MobileUi.body(
+                this,
+                "Saved stations with TuneIn IDs, direct URLs and ordered fallbacks.",
+            ),
+        )
+        radioStationsView = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, MobileUi.dp(this@MainActivity, 10), 0, 0)
+        }
+        stations.addView(radioStationsView)
+        stations.addView(
+            MobileUi.button(this, "Manage stations") {
+                startActivity(Intent(this, RadioStationsActivity::class.java))
+            }.apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = MobileUi.dp(this@MainActivity, 10) }
+            },
+        )
+        content.addView(stations)
 
         return ScrollView(this).apply { addView(content) }
     }
@@ -393,7 +363,7 @@ class MainActivity : Activity() {
             MobileUi.header(
                 this,
                 "Settings",
-                "Speaker, playback, radio and troubleshooting.",
+                "Speaker, playback and troubleshooting.",
             ),
         )
 
@@ -490,32 +460,6 @@ class MainActivity : Activity() {
         playbackCard.addView(launcherButton)
         content.addView(playbackCard)
 
-        content.addView(MobileUi.sectionTitle(this, "Radio"))
-        val radioCard = MobileUi.card(this)
-        radioCard.addView(
-            MobileUi.body(
-                this,
-                "The physical M5 presets and your saved app-side stations stay separate.",
-            ),
-        )
-        radioCard.addView(MobileUi.row(this).apply {
-            setPadding(0, MobileUi.dp(this@MainActivity, 10), 0, 0)
-            MobileUi.addWeighted(
-                this,
-                MobileUi.button(this@MainActivity, "Physical presets") {
-                    showDestination(MainDestination.RADIO)
-                },
-            )
-            MobileUi.addWeighted(
-                this,
-                MobileUi.button(this@MainActivity, "Saved stations") {
-                    startActivity(Intent(this@MainActivity, RadioStationsActivity::class.java))
-                },
-                marginDp = 0,
-            )
-        })
-        content.addView(radioCard)
-
         content.addView(MobileUi.sectionTitle(this, "Diagnostics"))
         val diagnosticsCard = MobileUi.card(this)
         diagnosticsCard.addView(
@@ -558,11 +502,14 @@ class MainActivity : Activity() {
         MobileUi.setNavigationSelected(homeNavButton, visibility.home)
         MobileUi.setNavigationSelected(radioNavButton, visibility.radio)
         MobileUi.setNavigationSelected(settingsNavButton, visibility.settings)
-        if (visibility.home || visibility.radio) {
+        if (visibility.radio) {
             val presets = PhysicalPresetStore.current()
-            if (!presets.loading && presets.slots.all { it == null }) {
+            if (!presets.loading && presets.allPresets.isEmpty()) {
                 refreshPhysicalPresets()
+            } else {
+                renderPhysicalPresets(presets)
             }
+            renderRadioStations()
         }
         if (visibility.settings) refreshSleepTimerState()
     }
@@ -726,35 +673,48 @@ class MainActivity : Activity() {
     }
 
     private fun renderPhysicalPresets(snapshot: PhysicalPresetSnapshot) {
-        if (!::homePresetStatusView.isInitialized) return
+        if (!::radioPresetStatusView.isInitialized || !::radioTuneInView.isInitialized) return
         val busy = presetWorkRunning.get()
         val status = when {
-            busy -> "Working with M5 presets…"
-            snapshot.loading -> "Reading physical presets…"
+            busy -> "Working with M5 TuneIn…"
+            snapshot.loading -> "Reading TuneIn presets…"
             snapshot.error != null -> snapshot.error
-            snapshot.slots.any { it != null } -> "Synced with the M5 Radio button."
-            else -> "No physical presets loaded yet."
+            snapshot.allPresets.isNotEmpty() ->
+                "${snapshot.allPresets.size} TuneIn preset${if (snapshot.allPresets.size == 1) "" else "s"} ready."
+            else -> "No TuneIn presets loaded yet."
         }
-        val statusKind =
-            if (snapshot.error != null) MobileUi.StatusKind.ERROR else MobileUi.StatusKind.INFO
-        MobileUi.setStatus(homePresetStatusView, status, statusKind)
-        if (::radioPresetStatusView.isInitialized) {
-            MobileUi.setStatus(radioPresetStatusView, status, statusKind)
+        val statusKind = when {
+            snapshot.error != null -> MobileUi.StatusKind.ERROR
+            snapshot.allPresets.isNotEmpty() && !snapshot.loading -> MobileUi.StatusKind.SUCCESS
+            else -> MobileUi.StatusKind.INFO
         }
+        MobileUi.setStatus(radioPresetStatusView, status, statusKind)
 
-        fun renderButtons(buttons: List<Button>) {
-            buttons.forEachIndexed { index, button ->
-                val preset = snapshot.slots.getOrNull(index)
-                button.text = if (preset == null) {
-                    "${index + 1} · Empty"
+        radioTuneInView.removeAllViews()
+        snapshot.allPresets.forEach { preset ->
+            val detail = listOfNotNull(
+                preset.description?.takeIf(String::isNotBlank),
+                preset.kind.takeIf(String::isNotBlank),
+            ).joinToString(" · ")
+            val label = if (detail.isBlank()) preset.title else "${preset.title}\n$detail"
+            val button = MobileUi.button(
+                this,
+                label,
+                if (preset.kind.equals("speaker", ignoreCase = true)) {
+                    MobileUi.ButtonKind.PRIMARY
                 } else {
-                    "${index + 1} · ${preset.title}"
-                }
-                MobileUi.setEnabled(button, preset != null && !snapshot.loading && !busy)
+                    MobileUi.ButtonKind.SECONDARY
+                },
+            ) { playTuneInPreset(preset) }.apply {
+                maxLines = 3
+                MobileUi.setEnabled(this, !snapshot.loading && !busy)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { bottomMargin = MobileUi.dp(this@MainActivity, 6) }
             }
+            radioTuneInView.addView(button)
         }
-        renderButtons(homePresetButtons)
-        renderButtons(radioPresetButtons)
     }
 
     private fun refreshPhysicalPresets() {
@@ -770,14 +730,10 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun playPhysicalPreset(index: Int) {
-        val preset = PhysicalPresetStore.current().slots.getOrNull(index) ?: return
+    private fun playTuneInPreset(preset: SamsungTuneIn.Preset) {
         if (presetExecutor.isShutdown || !presetWorkRunning.compareAndSet(false, true)) return
         renderPhysicalPresets(PhysicalPresetStore.current())
-        MobileUi.setStatus(homeStatusView, "Starting ${preset.title}…")
-        if (::radioPresetStatusView.isInitialized) {
-            MobileUi.setStatus(radioPresetStatusView, "Starting ${preset.title}…")
-        }
+        MobileUi.setStatus(radioPresetStatusView, "Starting ${preset.title}…")
         presetExecutor.execute {
             val result = runCatching {
                 PhysicalPresetController.play(applicationContext, preset)
@@ -789,32 +745,17 @@ class MainActivity : Activity() {
                 result.fold(
                     onSuccess = {
                         MobileUi.setStatus(
-                            homeStatusView,
+                            radioPresetStatusView,
                             "Playing · ${preset.title}",
                             MobileUi.StatusKind.SUCCESS,
                         )
-                        if (::radioPresetStatusView.isInitialized) {
-                            MobileUi.setStatus(
-                                radioPresetStatusView,
-                                "Playing · ${preset.title}",
-                                MobileUi.StatusKind.SUCCESS,
-                            )
-                        }
                     },
                     onFailure = { error ->
-                        val message = error.message ?: error.javaClass.simpleName
                         MobileUi.setStatus(
-                            homeStatusView,
-                            message,
+                            radioPresetStatusView,
+                            error.message ?: error.javaClass.simpleName,
                             MobileUi.StatusKind.ERROR,
                         )
-                        if (::radioPresetStatusView.isInitialized) {
-                            MobileUi.setStatus(
-                                radioPresetStatusView,
-                                message,
-                                MobileUi.StatusKind.ERROR,
-                            )
-                        }
                     },
                 )
             }
@@ -858,6 +799,7 @@ class MainActivity : Activity() {
         super.onResume()
         LauncherQuickActions.sync(applicationContext)
         if (::statusView.isInitialized) refreshStatus()
+        if (currentDestination == MainDestination.RADIO) renderRadioStations()
         if (currentDestination == MainDestination.SETTINGS) refreshSleepTimerState()
     }
 
@@ -1173,6 +1115,54 @@ class MainActivity : Activity() {
         }
     }
 
+    private fun renderRadioStations() {
+        if (!::radioStationsView.isInitialized) return
+        val stations = RadioStationStore(this).all()
+        radioStationsView.removeAllViews()
+        stations.forEach { station ->
+            val button = MobileUi.button(
+                this,
+                "${station.alias}\n${radioStationSourceSummary(station)}",
+                MobileUi.ButtonKind.SECONDARY,
+            ) { playSavedStation(station) }.apply {
+                maxLines = 3
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ).apply { bottomMargin = MobileUi.dp(this@MainActivity, 6) }
+            }
+            radioStationsView.addView(button)
+        }
+        if (stations.isEmpty()) {
+            radioStationsView.addView(MobileUi.body(this, "No saved stations yet."))
+        }
+    }
+
+    private fun playSavedStation(station: MobileRadioStation) {
+        startForegroundService(
+            Intent(this, RadioService::class.java).apply {
+                action = RadioService.ACTION_PLAY
+                putExtra(RadioService.EXTRA_ALIAS, station.alias)
+            },
+        )
+        MobileUi.setStatus(radioPresetStatusView, "Starting ${station.alias}…")
+    }
+
+    private fun toggleRenderer() {
+        if (RendererService.busy) {
+            startService(
+                Intent(this, RendererService::class.java).apply {
+                    action = RendererService.ACTION_STOP
+                },
+            )
+            MobileUi.setStatus(homeStatusView, "Stopping DLNA renderer…")
+            refreshUntilSettled()
+        } else {
+            startRenderer()
+            MobileUi.setStatus(homeStatusView, "Starting DLNA renderer…")
+        }
+    }
+
     private fun startRenderer() {
         cancelAutoDiscovery()
         val intent = Intent(this, RendererService::class.java).apply {
@@ -1211,6 +1201,20 @@ class MainActivity : Activity() {
         if (::startRendererButton.isInitialized) {
             MobileUi.setEnabled(startRendererButton, !RendererService.active)
             MobileUi.setEnabled(stopRendererButton, RendererService.busy)
+        }
+        if (::homeDlnaButton.isInitialized) {
+            homeDlnaButton.text = when (RendererService.phase) {
+                RendererService.Phase.RUNNING -> "DLNA ● On"
+                RendererService.Phase.STARTING -> "DLNA ◐ Starting…"
+                RendererService.Phase.STOPPING -> "DLNA ◐ Stopping…"
+                RendererService.Phase.STOPPED -> "DLNA ○ Off"
+            }
+            MobileUi.setToggleSelected(
+                homeDlnaButton,
+                selected = RendererService.phase == RendererService.Phase.RUNNING,
+                transitioning = RendererService.transitioning,
+            )
+            MobileUi.setEnabled(homeDlnaButton, !RendererService.transitioning)
         }
         refreshSpeakerControlButtons()
     }

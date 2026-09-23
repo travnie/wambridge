@@ -366,7 +366,7 @@ class RadioStationsActivity : Activity() {
                 setTextColor(getColor(R.color.wam_text))
             })
             val detail = buildList {
-                add(sourceSummary(station))
+                add(radioStationSourceSummary(station))
                 station.urls.take(2).forEach(::add)
             }.joinToString("\n")
             card.addView(MobileUi.body(this, detail).apply {
@@ -445,19 +445,6 @@ class RadioStationsActivity : Activity() {
                 )
             })
             stationsView.addView(card)
-        }
-    }
-
-    private fun sourceSummary(station: MobileRadioStation): String {
-        val fallbacks = (station.urls.size - 1).coerceAtLeast(0)
-        return when {
-            station.tuneInId != null && station.urls.isNotEmpty() ->
-                "TuneIn ${station.tuneInId} · direct backup · $fallbacks fallback${if (fallbacks == 1) "" else "s"}"
-            station.tuneInId != null ->
-                "TuneIn ${station.tuneInId}"
-            fallbacks > 0 ->
-                "Direct · $fallbacks fallback${if (fallbacks == 1) "" else "s"}"
-            else -> "Direct"
         }
     }
 
