@@ -141,6 +141,8 @@ internal fun speakerSnapshotForRadio(
     muted: Boolean,
     volume: Int,
     stationAlias: String?,
+    source: String? = null,
+    fallback: String? = null,
     status: String,
     current: SpeakerSnapshot = SpeakerStateStore.current(),
 ): SpeakerSnapshot =
@@ -151,6 +153,8 @@ internal fun speakerSnapshotForRadio(
             muted = muted,
             volume = volume,
             stationAlias = stationAlias,
+            source = source,
+            fallback = fallback,
             status = status,
             lastError = null,
         )
@@ -161,6 +165,8 @@ internal fun speakerSnapshotForRadio(
             muted = muted,
             volume = volume,
             stationAlias = stationAlias,
+            source = source,
+            fallback = fallback,
             status = status,
             lastError = null,
         )
@@ -171,6 +177,8 @@ internal fun speakerSnapshotForRadio(
             owner = SpeakerOwner.IDLE,
             playback = SpeakerPlaybackState.STOPPED,
             stationAlias = null,
+            source = null,
+            fallback = null,
             status = status,
         )
     }

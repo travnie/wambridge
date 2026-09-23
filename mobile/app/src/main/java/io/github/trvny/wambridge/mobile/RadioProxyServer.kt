@@ -27,6 +27,7 @@ internal class RadioProxyServer(
 ) : AutoCloseable {
     interface Listener {
         fun onStreamOpened(source: Any, sourceUrl: String)
+        fun onSourceFailed(source: Any, sourceUrl: String, message: String)
         fun onStreamClosed(source: Any)
         fun onProxyError(source: Any, message: String)
     }
@@ -115,6 +116,11 @@ internal class RadioProxyServer(
                 openSource(source)
             } catch (error: Exception) {
                 lastError = error
+                listener.onSourceFailed(
+                    this,
+                    source,
+                    error.message ?: error.javaClass.simpleName,
+                )
                 continue
             }
 
@@ -126,6 +132,11 @@ internal class RadioProxyServer(
                     output.flush()
                 }
             } catch (error: Exception) {
+                listener.onSourceFailed(
+                    this,
+                    source,
+                    error.message ?: error.javaClass.simpleName,
+                )
                 listener.onProxyError(this, error.message ?: error.javaClass.simpleName)
             } finally {
                 opened.connection.disconnect()

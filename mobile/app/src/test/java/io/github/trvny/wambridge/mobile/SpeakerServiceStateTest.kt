@@ -117,6 +117,25 @@ class SpeakerServiceStateTest {
     }
 
     @Test
+    fun playingRadioPublishesActiveSourceAndFallback() {
+        val snapshot = speakerSnapshotForRadio(
+            starting = false,
+            running = true,
+            recovering = false,
+            paused = false,
+            muted = false,
+            volume = 3,
+            stationAlias = "bbc1",
+            source = "https://radio.example/fallback",
+            fallback = "2/3",
+            status = "Playing bbc1 · fallback 2/3",
+        )
+
+        assertEquals("https://radio.example/fallback", snapshot.source)
+        assertEquals("2/3", snapshot.fallback)
+    }
+
+    @Test
     fun stoppedRadioLeavesSpeakerIdle() {
         val snapshot = speakerSnapshotForRadio(
             starting = false,

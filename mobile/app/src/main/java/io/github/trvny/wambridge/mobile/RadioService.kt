@@ -21,7 +21,11 @@ internal fun radioOwnerActive(starting: Boolean, running: Boolean, recovering: B
 class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Listener {
     private data class StationRequest(val alias: String, val tuneInId: String?)
     private data class RecoveryControls(val volume: Int, val muted: Boolean, val paused: Boolean)
-    private data class PreparedStation(val station: MobileRadioStation, val sources: List<String>)
+    private data class PreparedStation(
+        val station: MobileRadioStation,
+        val sources: List<String>,
+        val canonicalSources: List<String>,
+    )
 
     private val worker = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, WORKER_THREAD_NAME).apply { isDaemon = true }
@@ -33,6 +37,9 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
     private var channel: SamsungWamChannel? = null
     @Volatile private var volumeChannel: SamsungWamChannel? = null
     private var station: MobileRadioStation? = null
+    private var canonicalSources: List<String> = emptyList()
+    private var activeSourceUrl: String? = null
+    private var activeFallback: String? = null
     private var safeVolumeApplied = false
     private var targetVolume = SAFE_START_VOLUME
     private var muted = false
@@ -234,6 +241,9 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         val prepared = prepareStation(alias, tuneInId) ?: return
         val selected = prepared.station
         val sources = prepared.sources
+        canonicalSources = prepared.canonicalSources
+        activeSourceUrl = null
+        activeFallback = null
 
         val clientUuid = radioClientUuid()
 
@@ -310,8 +320,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             fail("Radio station '$alias' is no longer saved.")
             return null
         }
-        val sources = TuneInResolver.candidateUrls(this, selected)
-        if (sources.isEmpty()) {
+        val canonicalSources = TuneInResolver.candidateUrls(this, selected)
+        if (canonicalSources.isEmpty()) {
             val catalogueOnly = selected.urls.isEmpty() && selected.tuneInId != null
             fail(
                 "TuneIn has no directly playable stream for ${selected.alias}.",
@@ -319,7 +329,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             )
             return null
         }
-        return PreparedStation(selected, sources)
+        val sources = RadioFallbackStore(this).ordered(selected.alias, canonicalSources)
+        return PreparedStation(selected, sources, canonicalSources)
     }
 
     private fun releaseRendererForRadioStart(): Boolean = try {
@@ -435,20 +446,37 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
 
     override fun onStreamOpened(source: Any, sourceUrl: String) = execute {
         if (destroyed || !running || source !== proxy) return@execute
-        val alias = station?.alias ?: "radio"
+        val currentStation = station
+        val alias = currentStation?.alias ?: "radio"
         if (!safeVolumeApplied) {
             val activeChannel = channel ?: return@execute
             activeChannel.setVolumeRaw(audibleVolume())
             activeChannel.setMute(false)
             safeVolumeApplied = true
         }
-        station?.let { RadioStationStore(this).recordPlayed(it) }
+        activeSourceUrl = sourceUrl
+        val position = radioFallbackPosition(sourceUrl, canonicalSources)
+        activeFallback = position
+            ?.takeIf { (current, _) -> current > 1 }
+            ?.let { (current, total) -> "$current/$total" }
+        currentStation?.let {
+            RadioFallbackStore(this).recordSuccess(it.alias, sourceUrl)
+            RadioStationStore(this).recordPlayed(it)
+        }
+        val suffix = activeFallback?.let { " · fallback $it" }.orEmpty()
         lastStatus = when {
-            paused -> "Paused $alias"
-            muted -> "Muted $alias"
-            else -> "Playing $alias"
+            paused -> "Paused $alias$suffix"
+            muted -> "Muted $alias$suffix"
+            else -> "Playing $alias$suffix"
         }
         publish(lastStatus)
+    }
+
+    override fun onSourceFailed(source: Any, sourceUrl: String, message: String) = execute {
+        if (destroyed || source !== proxy) return@execute
+        // A Wi-Fi handoff is a transport failure, not evidence that this station URL is bad.
+        if (shouldRecoverFromWifiChange()) return@execute
+        station?.let { RadioFallbackStore(this).recordFailure(it.alias, sourceUrl) }
     }
 
     override fun onStreamClosed(source: Any) = execute {
@@ -480,7 +508,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         lastStatus = when {
             paused -> "Paused $alias"
             muted -> "Muted $alias"
-            else -> "Playing $alias · confirmed"
+            else -> "Playing $alias · confirmed" +
+                activeFallback?.let { " · fallback $it" }.orEmpty()
         }
         publish(lastStatus)
     }
@@ -589,6 +618,9 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             muted = false
             paused = false
             volumeChannel = null
+            activeSourceUrl = null
+            activeFallback = null
+            canonicalSources = emptyList()
             runCatching { channel?.close() }
             channel = null
             runCatching { proxy?.close() }
@@ -657,6 +689,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                 muted = muted,
                 volume = targetVolume,
                 stationAlias = station?.alias,
+                source = activeSourceUrl,
+                fallback = activeFallback,
                 status = message,
                 current = it,
             )
