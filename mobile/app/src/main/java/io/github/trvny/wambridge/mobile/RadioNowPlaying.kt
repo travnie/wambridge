@@ -8,7 +8,7 @@ data class RadioNowPlaying(
     val artworkUrl: String? = null,
 )
 
-internal fun likelyArtworkUrl(value: String?): String? {
+internal fun webArtworkUrl(value: String?): String? {
     val cleaned = value?.trim()?.takeIf(String::isNotEmpty) ?: return null
     val uri = runCatching { URI(cleaned) }.getOrNull() ?: return null
     if (
@@ -18,6 +18,12 @@ internal fun likelyArtworkUrl(value: String?): String? {
         return null
     }
     if (uri.host.isNullOrBlank()) return null
+    return cleaned
+}
+
+internal fun likelyArtworkUrl(value: String?): String? {
+    val cleaned = webArtworkUrl(value) ?: return null
+    val uri = URI(cleaned)
     val path = uri.path.orEmpty().lowercase(Locale.ROOT)
     return cleaned.takeIf { extension ->
         ARTWORK_EXTENSIONS.any(path::endsWith)
