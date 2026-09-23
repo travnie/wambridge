@@ -43,6 +43,9 @@ The Android adapter provides:
 - radio fallback routing remembers the last endpoint that actually opened, temporarily
   de-prioritizes failed endpoints for 15 minutes, and exposes active fallback position through
   the shared runtime/Diagnostics state without probing streams in parallel;
+- direct radio requests ICY metadata on the same upstream connection, strips metadata blocks
+  before forwarding audio to the M5, and publishes `StreamTitle` through the shared Now Playing
+  state used by Home, the controls widget, MediaSession/notification and Diagnostics;
 - radio playback owns an Android MediaSession, so its play/pause/stop state can appear in the
   notification shade, lock screen and compatible headset/Bluetooth controls; DLNA still belongs
   to the external player that started it;
@@ -99,6 +102,18 @@ playback.
 
 When a non-primary candidate is active, the radio status and shared speaker snapshot report
 `fallback N/M`; Diagnostics therefore shows both the active source URL and fallback position.
+
+### ICY now-playing metadata
+
+For direct streams that return `icy-metaint`, the phone asks for ICY metadata with
+`Icy-MetaData: 1`. The relay parses the interleaved metadata blocks, removes them from the
+audio sent to the M5, and publishes `StreamTitle` into the existing shared speaker snapshot.
+The same value therefore reaches Home, the expanded controls widget, MediaSession/system media
+controls, the foreground notification and Diagnostics without opening a second HTTP client.
+
+Streams without ICY metadata stay on the normal byte-for-byte relay path. Repeated identical
+titles are suppressed, an empty `StreamTitle` clears stale track text, and metadata decoding
+accepts UTF-8 with ISO-8859-1 fallback for older stations.
 
 ### Radio system controls
 
