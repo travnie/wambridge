@@ -12,6 +12,7 @@ import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import java.nio.file.FileSystems
 
 class RadioStationsActivity : Activity() {
     private lateinit var aliasInput: EditText
@@ -550,6 +551,10 @@ class RadioStationsActivity : Activity() {
         require(uri.scheme == ContentResolver.SCHEME_CONTENT) {
             "Station import must use a content URI"
         }
+        val normalized = FileSystems.getDefault().getPath(uri.path.orEmpty()).normalize()
+        if (normalized.startsWith("/data")) {
+            throw SecurityException("Private app paths cannot be imported")
+        }
         val reader = contentResolver.openInputStream(uri)
             ?.bufferedReader(Charsets.UTF_8)
             ?: error("Could not read the selected file")
@@ -571,6 +576,10 @@ class RadioStationsActivity : Activity() {
     private fun writeStationFile(uri: Uri, text: String) {
         require(uri.scheme == ContentResolver.SCHEME_CONTENT) {
             "Station export must use a content URI"
+        }
+        val normalized = FileSystems.getDefault().getPath(uri.path.orEmpty()).normalize()
+        if (normalized.startsWith("/data")) {
+            throw SecurityException("Private app paths cannot be exported")
         }
         contentResolver.openOutputStream(uri, "wt")
             ?.bufferedWriter(Charsets.UTF_8)
