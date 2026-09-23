@@ -80,6 +80,7 @@ class PhysicalPresetStoreTest {
         assertEquals(2, seen.size)
         assertEquals(3, seen[0].slots.size)
         assertEquals("One", seen[1].slots[0]?.title)
+        assertEquals(listOf("One"), seen[1].allPresets.map { it.title })
         assertEquals(false, seen[1].loading)
     }
 
@@ -97,6 +98,7 @@ class PhysicalPresetStoreTest {
 
         val snapshot = PhysicalPresetStore.current()
         assertEquals(listOf("One", "Two", "Three"), snapshot.slots.map { it?.title })
+        assertEquals(listOf("One", "Two", "Three"), snapshot.allPresets.map { it.title })
         assertEquals("Speaker is busy", snapshot.error)
         assertEquals(false, snapshot.loading)
     }
