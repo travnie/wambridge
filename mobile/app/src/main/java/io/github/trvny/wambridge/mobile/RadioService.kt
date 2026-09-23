@@ -21,7 +21,11 @@ internal fun radioOwnerActive(starting: Boolean, running: Boolean, recovering: B
 class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Listener {
     private data class StationRequest(val alias: String, val tuneInId: String?)
     private data class RecoveryControls(val volume: Int, val muted: Boolean, val paused: Boolean)
-    private data class PreparedStation(val station: MobileRadioStation, val sources: List<String>)
+    private data class PreparedStation(
+        val station: MobileRadioStation,
+        val sources: List<String>,
+        val canonicalSources: List<String>,
+    )
 
     private val worker = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, WORKER_THREAD_NAME).apply { isDaemon = true }
@@ -33,6 +37,9 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
     private var channel: SamsungWamChannel? = null
     @Volatile private var volumeChannel: SamsungWamChannel? = null
     private var station: MobileRadioStation? = null
+    private var canonicalSources: List<String> = emptyList()
+    private var activeSourceUrl: String? = null
+    private var activeFallback: String? = null
     private var safeVolumeApplied = false
     private var targetVolume = SAFE_START_VOLUME
     private var muted = false
@@ -234,6 +241,9 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         val prepared = prepareStation(alias, tuneInId) ?: return
         val selected = prepared.station
         val sources = prepared.sources
+        canonicalSources = prepared.canonicalSources
+        activeSourceUrl = null
+        activeFallback = null
 
         val clientUuid = radioClientUuid()
 
@@ -310,8 +320,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             fail("Radio station '$alias' is no longer saved.")
             return null
         }
-        val sources = TuneInResolver.candidateUrls(this, selected)
-        if (sources.isEmpty()) {
+        val canonicalSources = TuneInResolver.candidateUrls(this, selected)
+        if (canonicalSources.isEmpty()) {
             val catalogueOnly = selected.urls.isEmpty() && selected.tuneInId != null
             fail(
                 "TuneIn has no directly playable stream for ${selected.alias}.",
@@ -319,7 +329,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             )
             return null
         }
-        return PreparedStation(selected, sources)
+        val sources = RadioFallbackStore(this).ordered(selected.alias, canonicalSources)
+        return PreparedStation(selected, sources, canonicalSources)
     }
 
     private fun releaseRendererForRadioStart(): Boolean = try {
