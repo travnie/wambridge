@@ -90,10 +90,11 @@ Improve radio recovery without adding a second probing client to the active stre
 
 ## 7. ICY metadata pipeline
 
-**Software implemented 2026-09-23; physical metadata pass pending.** Direct radio requests
-ICY metadata on the existing upstream connection, strips metadata blocks before they reach the
-M5, and publishes `StreamTitle` through the shared speaker snapshot. No parallel probe/client
-is introduced.
+**Expanded 2026-09-23; physical metadata pass pending.** Direct radio requests ICY metadata on
+the existing upstream connection, strips metadata blocks before they reach the M5, and publishes
+`StreamTitle` plus image-like `StreamUrl` artwork through the shared speaker snapshot. Radio
+Paradise has a lightweight provider for its now-playing JSON API, including per-track cover art
+and the endpoint's remaining-track refresh hint. The audio stream is still observed only once.
 
 Extract metadata such as `StreamTitle` from direct radio and keep one shared playback
 state that can feed:

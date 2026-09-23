@@ -10,7 +10,7 @@ import java.nio.charset.StandardCharsets
 import kotlin.math.min
 
 /**
- * Relay an ICY stream while stripping the metadata blocks from the audio bytes.
+ * Relay an ICY stream while stripping metadata blocks from the audio bytes.
  *
  * The M5 only receives the original audio payload. Metadata is observed passively
  * from the same upstream connection; no second stream/probe is opened.
@@ -19,13 +19,13 @@ internal fun relayIcyAudio(
     input: InputStream,
     output: OutputStream,
     metadataInterval: Int,
-    onStreamTitle: (String?) -> Unit,
+    onMetadata: (RadioNowPlaying) -> Unit,
 ) {
     require(metadataInterval > 0) { "ICY metadata interval must be positive" }
 
     val audioBuffer = ByteArray(min(metadataInterval, COPY_BUFFER).coerceAtLeast(1))
-    var titleSeen = false
-    var lastTitle: String? = null
+    var current = RadioNowPlaying()
+    var emitted = false
 
     while (true) {
         var remaining = metadataInterval
@@ -43,28 +43,46 @@ internal fun relayIcyAudio(
 
         val metadata = ByteArray(metadataLength)
         readIcyBlock(input, metadata)
-        val parsed = parseIcyStreamTitle(metadata) ?: continue
-        val normalized = parsed.trim().takeIf(String::isNotEmpty)
-        if (!titleSeen || normalized != lastTitle) {
-            titleSeen = true
-            lastTitle = normalized
-            onStreamTitle(normalized)
+        val fields = parseIcyFields(metadata)
+        if (fields.isEmpty()) continue
+
+        val titlePresent = fields.containsKey("streamtitle")
+        val artworkPresent = fields.containsKey("streamurl")
+        var next = current
+
+        if (titlePresent) {
+            val title = fields["streamtitle"]?.trim()?.takeIf(String::isNotEmpty)
+            next = next.copy(title = title)
+            if (title != current.title && !artworkPresent) {
+                // A new track without new art should not keep the previous track's cover.
+                next = next.copy(artworkUrl = null)
+            }
+        }
+        if (artworkPresent) {
+            next = next.copy(artworkUrl = likelyArtworkUrl(fields["streamurl"]))
+        }
+
+        if (!emitted || next != current) {
+            emitted = true
+            current = next
+            onMetadata(next)
         }
     }
 }
 
-internal fun parseIcyStreamTitle(metadata: ByteArray): String? {
-    val text = decodeIcyMetadata(metadata)
-    val marker = "StreamTitle='"
-    val start = text.indexOf(marker, ignoreCase = true)
-    if (start < 0) return null
+internal fun parseIcyStreamTitle(metadata: ByteArray): String? =
+    parseIcyFields(metadata)["streamtitle"]
 
-    val valueStart = start + marker.length
-    val end = text.indexOf("';", startIndex = valueStart)
-    return if (end >= 0) {
-        text.substring(valueStart, end)
-    } else {
-        text.substring(valueStart)
+internal fun parseIcyArtworkUrl(metadata: ByteArray): String? =
+    likelyArtworkUrl(parseIcyFields(metadata)["streamurl"])
+
+internal fun parseIcyFields(metadata: ByteArray): Map<String, String> {
+    val text = decodeIcyMetadata(metadata)
+    return buildMap {
+        ICY_FIELD.findAll(text).forEach { match ->
+            val key = match.groupValues[1].lowercase()
+            put(key, match.groupValues[2])
+        }
     }
 }
 
@@ -94,5 +112,6 @@ private fun decodeIcyMetadata(bytes: ByteArray): String {
     }
 }
 
+private val ICY_FIELD = Regex("([A-Za-z][A-Za-z0-9_-]*)='(.*?)';")
 private const val ICY_LENGTH_BLOCK = 16
 private const val COPY_BUFFER = 64 * 1024

@@ -52,6 +52,7 @@ internal class RadioMediaSession(
         state: RadioMediaState,
         title: String?,
         source: String?,
+        artworkUrl: String? = null,
     ) {
         if (closed) return
         session.setPlaybackState(
@@ -64,18 +65,20 @@ internal class RadioMediaSession(
                 )
                 .build(),
         )
-        session.setMetadata(
-            MediaMetadata.Builder()
-                .putString(
-                    MediaMetadata.METADATA_KEY_TITLE,
-                    title?.takeIf { it.isNotBlank() } ?: "WAM Bridge Radio",
-                )
-                .putString(
-                    MediaMetadata.METADATA_KEY_ARTIST,
-                    source?.takeIf { it.isNotBlank() } ?: "Samsung M5",
-                )
-                .build(),
-        )
+        val metadata = MediaMetadata.Builder()
+            .putString(
+                MediaMetadata.METADATA_KEY_TITLE,
+                title?.takeIf { it.isNotBlank() } ?: "WAM Bridge Radio",
+            )
+            .putString(
+                MediaMetadata.METADATA_KEY_ARTIST,
+                source?.takeIf { it.isNotBlank() } ?: "Samsung M5",
+            )
+        artworkUrl?.takeIf { it.isNotBlank() }?.let {
+            metadata.putString(MediaMetadata.METADATA_KEY_ART_URI, it)
+            metadata.putString(MediaMetadata.METADATA_KEY_DISPLAY_ICON_URI, it)
+        }
+        session.setMetadata(metadata.build())
         session.isActive = state.playback != RadioMediaPlayback.STOPPED
     }
 

@@ -50,8 +50,12 @@ The Android adapter provides:
   de-prioritizes failed endpoints for 15 minutes, and exposes active fallback position through
   the shared runtime/Diagnostics state without probing streams in parallel;
 - direct radio requests ICY metadata on the same upstream connection, strips metadata blocks
-  before forwarding audio to the M5, and publishes `StreamTitle` through the shared Now Playing
-  state used by Home, the controls widget, MediaSession/notification and Diagnostics;
+  before forwarding audio to the M5, and publishes `StreamTitle` plus image-like `StreamUrl`
+  artwork through the shared Now Playing state used by Home, the controls widget,
+  MediaSession/notification and Diagnostics;
+- Radio Paradise additionally uses its small now-playing JSON endpoint for track metadata and
+  per-track cover art, refreshing from the API's remaining-track hint rather than polling the
+  audio stream a second time;
 - radio playback owns an Android MediaSession, so its play/pause/stop state can appear in the
   notification shade, lock screen and compatible headset/Bluetooth controls; DLNA still belongs
   to the external player that started it;
