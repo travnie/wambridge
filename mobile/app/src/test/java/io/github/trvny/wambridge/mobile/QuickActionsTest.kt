@@ -80,6 +80,14 @@ class QuickActionsTest {
     }
 
     @Test
+    fun stationWidgetLabelsMatchQuickActionNamesAndActiveState() {
+        assertEquals("BBC1", stationWidgetLabel("bbc1", null, false))
+        assertEquals("Trojka", stationWidgetLabel("trojka", null, false))
+        assertEquals("▶ BBC1", stationWidgetLabel("bbc1", "BBC1", true))
+        assertEquals("BBC1", stationWidgetLabel("bbc1", "BBC1", false))
+    }
+
+    @Test
     fun top3AliasesSelectCurrentStationsInPackOrder() {
         val available = listOf(quick[2], quick[0], quick[1])
         val selected = stationsForAliases(
