@@ -89,7 +89,7 @@ class WamBridgeStationWidget : AppWidgetProvider() {
             val views = RemoteViews(context.packageName, R.layout.widget_wam_bridge_station)
             if (station == null) {
                 views.setTextViewText(R.id.widget_station_label, "Choose")
-                views.setContentDescription(R.id.widget_station_label, "Choose station")
+                views.setContentDescription(R.id.widget_station_root, "Choose station")
                 views.setOnClickPendingIntent(
                     R.id.widget_station_root,
                     PendingIntent.getActivity(
@@ -108,7 +108,7 @@ class WamBridgeStationWidget : AppWidgetProvider() {
                     stationWidgetLabel(station.alias, snapshot.stationAlias, RadioService.running),
                 )
                 views.setContentDescription(
-                    R.id.widget_station_label,
+                    R.id.widget_station_root,
                     "Play ${station.alias} on Samsung M5",
                 )
                 views.setOnClickPendingIntent(
