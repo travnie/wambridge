@@ -1106,6 +1106,11 @@ a live suspect; the 2026-08-25 sweep below turned that into the answer.
 - Presets 2, 3 and 10 all started on the physical M5 on 2026-08-25, so the command itself is
   sound and only this station is not.
 
+**Android rolling release on 2026-09-23 reproduced the same split:** cold-start autodiscovery
+found the M5, Home played Czwórka and BBC Radio 1 from the three physical slots, and Trójka still
+did not start. That is the same preset-0 station failure above, not evidence that the Android
+`SetPlayPreset` path regressed.
+
 ### `StopPlaybackEvent` is an acknowledgement, not an error (measured 2026-08-25)
 
 Every `SetPlayPreset` answers `StopPlaybackEvent`, **including the calls that then play**. It
@@ -1212,6 +1217,16 @@ across client processes**. A fresh run that calls `GetSelectRadioList` assuming 
 root will descend from wherever the last run stopped - which produced an empty level and looked
 exactly like the CPM wedge described above. Normalise with `GetUpperRadioList` until
 `<category isroot="1">` before descending.
+
+### Standby-now hardware pass 2026-09-23
+
+The Android rolling release's **Standby now** path was exercised on the physical M5. After the
+app released its playback ownership and armed the one-second `SetSleepTimer` fallback, the front
+lamp went dark. That validates the one-second on-demand standby path on this unit.
+
+This does **not** by itself validate a full 15/30/45/60-minute countdown. Those presets still
+need a duration/readback pass where `GetSleepTimer` is checked after arming and after expiry or
+cancellation.
 
 ### The three presets behind the physical Radio button
 
