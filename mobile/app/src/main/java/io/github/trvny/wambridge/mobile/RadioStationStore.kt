@@ -61,6 +61,14 @@ internal fun orderRadioStations(
     return ordered
 }
 
+internal fun stationsForAliases(
+    stations: List<MobileRadioStation>,
+    aliases: List<String>,
+): List<MobileRadioStation> {
+    val byAlias = stations.associateBy { it.alias.lowercase() }
+    return aliases.mapNotNull { byAlias[it.lowercase()] }
+}
+
 /**
  * Pick the station a play request names.
  *
@@ -260,6 +268,11 @@ internal class RadioStationStore(context: Context) {
     fun lastPlayed(): MobileRadioStation? = stationByPreference(KEY_LAST_PLAYED)
     fun defaultStation(): MobileRadioStation? = stationByPreference(KEY_DEFAULT_STATION)
 
+    fun quickStations(): List<MobileRadioStation> {
+        val available = all()
+        return stationsForAliases(available, bundledPackAliases(QUICK_PACK))
+    }
+
     fun upsert(alias: String, urls: List<String>, tuneInId: String? = null): MobileRadioStation {
         val cleanedAlias = alias.trim()
         require(cleanedAlias.isNotEmpty()) { "Station name cannot be empty" }
@@ -408,10 +421,7 @@ internal class RadioStationStore(context: Context) {
     }
 
     private fun loadBundledFavorites(): List<MobileRadioStation> = runCatching {
-        val text = appContext.assets.open(BUNDLED_ASSET)
-            .bufferedReader(Charsets.UTF_8)
-            .use { it.readText() }
-        val root = JSONObject(text)
+        val root = bundledRoot()
         val byAlias = buildMap {
             val stations = root.getJSONArray("stations")
             for (index in 0 until stations.length()) {
@@ -420,8 +430,22 @@ internal class RadioStationStore(context: Context) {
                 }
             }
         }
-        jsonStrings(root.getJSONObject("packs").getJSONArray(DEFAULT_PACK)).mapNotNull(byAlias::get)
+        bundledPackAliases(DEFAULT_PACK, root).mapNotNull(byAlias::get)
     }.getOrDefault(emptyList())
+
+    private fun bundledPackAliases(
+        pack: String,
+        root: JSONObject = bundledRoot(),
+    ): List<String> = runCatching {
+        jsonStrings(root.getJSONObject("packs").getJSONArray(pack))
+    }.getOrDefault(emptyList())
+
+    private fun bundledRoot(): JSONObject {
+        val text = appContext.assets.open(BUNDLED_ASSET)
+            .bufferedReader(Charsets.UTF_8)
+            .use { it.readText() }
+        return JSONObject(text)
+    }
 
     private fun bundledStation(item: JSONObject): MobileRadioStation? {
         if (!item.optBoolean("mobile_supported", true)) return null
@@ -463,6 +487,7 @@ internal class RadioStationStore(context: Context) {
         private const val KEY_DEFAULT_STATION = "radio_default_station"
         private const val BUNDLED_ASSET = "station_packs.json"
         private const val DEFAULT_PACK = "favorites"
+        private const val QUICK_PACK = "top3"
         private const val RECENT_LIMIT = 8
     }
 }
