@@ -81,19 +81,35 @@ class WamBridgeStationWidget : AppWidgetProvider() {
 
         fun update(context: Context, manager: AppWidgetManager, appWidgetId: Int) {
             val alias = selectedAlias(context, appWidgetId)
+            val station = alias?.let { selected ->
+                RadioStationStore(context).all().firstOrNull {
+                    it.alias.equals(selected, ignoreCase = true)
+                }
+            }
             val views = RemoteViews(context.packageName, R.layout.widget_wam_bridge_station)
-            if (alias == null) {
+            if (station == null) {
                 views.setTextViewText(R.id.widget_station_label, "Choose")
                 views.setContentDescription(R.id.widget_station_label, "Choose station")
+                views.setOnClickPendingIntent(
+                    R.id.widget_station_root,
+                    PendingIntent.getActivity(
+                        context,
+                        appWidgetId,
+                        Intent(context, StationWidgetConfigActivity::class.java).apply {
+                            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+                        },
+                        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    ),
+                )
             } else {
                 val snapshot = SpeakerStateStore.current()
                 views.setTextViewText(
                     R.id.widget_station_label,
-                    stationWidgetLabel(alias, snapshot.stationAlias, RadioService.running),
+                    stationWidgetLabel(station.alias, snapshot.stationAlias, RadioService.running),
                 )
                 views.setContentDescription(
                     R.id.widget_station_label,
-                    "Play $alias on Samsung M5",
+                    "Play ${station.alias} on Samsung M5",
                 )
                 views.setOnClickPendingIntent(
                     R.id.widget_station_root,
@@ -138,7 +154,12 @@ class StationWidgetConfigActivity : Activity() {
             AppWidgetManager.EXTRA_APPWIDGET_ID,
             AppWidgetManager.INVALID_APPWIDGET_ID,
         )
-        if (appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID) {
+        val manager = AppWidgetManager.getInstance(this)
+        val expectedProvider = ComponentName(this, WamBridgeStationWidget::class.java)
+        if (
+            appWidgetId == AppWidgetManager.INVALID_APPWIDGET_ID ||
+            manager.getAppWidgetInfo(appWidgetId)?.provider != expectedProvider
+        ) {
             finish()
             return
         }
