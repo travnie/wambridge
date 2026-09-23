@@ -84,8 +84,7 @@ the same Wi-Fi-bound, size-limited artwork cache as the standalone TuneIn browse
 failed artwork falls back to the app icon; direct-radio logo discovery is intentionally not
 guessed from arbitrary stream URLs.
 
-Home
-shows exactly three physical preset slots read from the M5. These are the speaker-owned
+Home shows exactly three physical preset slots read from the M5. These are the speaker-owned
 `kind=speaker` presets cycled by the physical Radio button, not another local favourites list.
 Radio renders the same runtime preset snapshot above Saved stations and TuneIn Explore.
 
