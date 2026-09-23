@@ -22,11 +22,17 @@ class HomeSurfaceContractTest {
     }
 
     @Test
-    fun homeCreatesExactlyThreePhysicalPresetSlotsFromOneSharedStore() {
-        assertTrue(main.contains("PHYSICAL_PRESET_SLOTS"))
-        assertTrue(main.contains("homePresetButtons"))
-        assertTrue(main.contains("PhysicalPresetController.play"))
-        assertTrue(main.contains("PhysicalPresetController.refresh"))
+    fun homeKeepsPhysicalPresetsOutAndExposesDlnaToggle() {
+        val homeStart = main.indexOf("private fun buildHomePane")
+        val radioStart = main.indexOf("private fun buildRadioPane")
+        val home = main.substring(homeStart, radioStart)
+
+        assertFalse(home.contains("Physical presets"))
+        assertFalse(home.contains("homePresetButtons"))
+        assertTrue(home.contains("DLNA renderer"))
+        assertTrue(home.contains("homeDlnaButton"))
+        assertTrue(main.contains("toggleRenderer"))
+        assertTrue(main.contains("MobileUi.setToggleSelected"))
     }
 
     @Test
@@ -65,23 +71,33 @@ class HomeSurfaceContractTest {
     }
 
     @Test
-    fun radioUsesTheSamePhysicalPresetStoreAndKeepsLibraryEntrypoints() {
+    fun radioStartsWithTuneInThenShowsOtherStations() {
         val radioStart = main.indexOf("private fun buildRadioPane")
         val settingsStart = main.indexOf("private fun buildSettingsPane")
         assertTrue(radioStart >= 0)
         assertTrue(settingsStart > radioStart)
 
         val radio = main.substring(radioStart, settingsStart)
-        assertTrue(radio.contains("Physical presets"))
-        assertTrue(radio.contains("radioPresetButtons"))
-        assertTrue(radio.contains("PHYSICAL_PRESET_SLOTS"))
-        assertTrue(radio.contains("playPhysicalPreset"))
-        assertTrue(main.contains("PhysicalPresetStore.current()"))
-        assertTrue(main.contains("renderPhysicalPresets"))
-        assertTrue(radio.contains("Saved stations"))
+        assertTrue(radio.indexOf("\"TuneIn\"") < radio.indexOf("\"Other stations\""))
+        assertTrue(radio.contains("radioTuneInView"))
         assertTrue(radio.contains("Browse TuneIn"))
-        assertTrue(radio.contains("RadioStationsActivity::class.java"))
+        assertTrue(radio.contains("Refresh presets"))
+        assertTrue(radio.contains("radioStationsView"))
+        assertTrue(radio.contains("Manage stations"))
         assertTrue(radio.contains("CatalogueActivity::class.java"))
+        assertTrue(radio.contains("RadioStationsActivity::class.java"))
+        assertTrue(main.contains("snapshot.allPresets"))
+        assertTrue(main.contains("playTuneInPreset"))
+        assertTrue(main.contains("playSavedStation"))
+    }
+
+    @Test
+    fun settingsDoesNotDuplicateRadioNavigation() {
+        val settingsStart = main.indexOf("private fun buildSettingsPane")
+        val settings = main.substring(settingsStart)
+
+        assertFalse(settings.contains("Physical presets"))
+        assertFalse(settings.contains("Saved stations"))
     }
 
     @Test
