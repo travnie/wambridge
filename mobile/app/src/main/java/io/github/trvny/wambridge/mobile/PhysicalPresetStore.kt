@@ -25,6 +25,7 @@ internal fun physicalPresetSlots(
 
 internal data class PhysicalPresetSnapshot(
     val slots: List<SamsungTuneIn.Preset?> = List(PHYSICAL_PRESET_SLOTS) { null },
+    val allPresets: List<SamsungTuneIn.Preset> = emptyList(),
     val loading: Boolean = false,
     val error: String? = null,
 )
@@ -43,6 +44,7 @@ internal object PhysicalPresetStore {
         update {
             PhysicalPresetSnapshot(
                 slots = physicalPresetSlots(presets),
+                allPresets = presets,
                 loading = false,
                 error = null,
             )
