@@ -2,7 +2,7 @@ name: Release
 
 # Two shapes, one pipeline.
 #
-# While everything is alpha the useful thing is a single rolling prerelease:
+# While the project is beta the useful thing is still a single rolling prerelease:
 # one tag, one permanent download link, assets replaced whenever main moves.
 # Nobody has to invent a version number to ship a fix.
 #
@@ -27,7 +27,7 @@ on:
       version:
         description: >-
           Cut a fixed, versioned release instead of refreshing the rolling one,
-          e.g. 0.2.0. Leave empty for the rolling alpha.
+          e.g. 0.2.0. Leave empty for the rolling beta.
         type: string
         required: false
         default: ""
@@ -49,6 +49,14 @@ jobs:
       title: ${{ steps.parse.outputs.title }}
       rolling: ${{ steps.parse.outputs.rolling }}
     steps:
+      - name: Require main for releases
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "Releases must be built from main, got $GITHUB_REF" >&2
+            exit 1
+          fi
+
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
@@ -84,15 +92,16 @@ jobs:
           else
             base="$(grep -m1 '^version' pyproject.toml | cut -d'"' -f2)"
             test -n "$base"
-            name="${base}-alpha.$(date -u +%Y%m%d).${SHA:0:7}"
-            echo "tag=alpha" >> "$GITHUB_OUTPUT"
+            name="${base}-beta.$(date -u +%Y%m%d).${SHA:0:7}"
+            echo "tag=beta" >> "$GITHUB_OUTPUT"
             echo "name=$name" >> "$GITHUB_OUTPUT"
-            echo "title=WAM Bridge alpha" >> "$GITHUB_OUTPUT"
+            echo "title=WAM Bridge beta" >> "$GITHUB_OUTPUT"
             echo "rolling=true" >> "$GITHUB_OUTPUT"
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
 
   component:
+    needs: version
     uses: ./.github/workflows/build.yml
 
   apk:
@@ -142,7 +151,7 @@ jobs:
 
           if [[ "$ROLLING" == "true" ]]; then
             {
-              echo "Rolling alpha, rebuilt from main. Currently ${VERSION}."
+              echo "Rolling beta, rebuilt from main. Currently ${VERSION}."
               echo
               echo "The foobar2000 component and the Android APK always come from the same commit. The tag is replaced in place, so these download links keep working."
             } > release-notes.md
@@ -152,6 +161,14 @@ jobs:
             fi
           else
             echo "foobar2000 component and signed Android APK for ${VERSION}." > release-notes.md
+          fi
+
+          if [[ "$ROLLING" != "true" ]]; then
+            existing_tag="$(gh api "repos/${GH_REPO}/git/ref/tags/${TAG}" --jq '.object.sha' 2>/dev/null || true)"
+            if [[ -n "$existing_tag" && "$existing_tag" != "$GITHUB_SHA" ]]; then
+              echo "Tag $TAG already points to $existing_tag, refusing to publish this commit." >&2
+              exit 1
+            fi
           fi
 
           if gh release view "$TAG" >/dev/null 2>&1; then
