@@ -28,6 +28,7 @@ internal class RadioProxyServer(
     interface Listener {
         fun onStreamOpened(source: Any, sourceUrl: String)
         fun onSourceFailed(source: Any, sourceUrl: String, message: String)
+        fun onMetadata(source: Any, title: String?)
         fun onStreamClosed(source: Any)
         fun onProxyError(source: Any, message: String)
     }
@@ -35,6 +36,7 @@ internal class RadioProxyServer(
     private data class OpenSource(
         val connection: HttpURLConnection,
         val contentType: String,
+        val metadataInterval: Int?,
     )
 
     private val appContext = context.applicationContext
@@ -128,7 +130,19 @@ internal class RadioProxyServer(
             listener.onStreamOpened(this, source)
             try {
                 opened.connection.inputStream.use { raw ->
-                    BufferedInputStream(raw, COPY_BUFFER).copyTo(output, COPY_BUFFER)
+                    val buffered = BufferedInputStream(raw, COPY_BUFFER)
+                    val metadataInterval = opened.metadataInterval
+                    if (metadataInterval == null) {
+                        buffered.copyTo(output, COPY_BUFFER)
+                    } else {
+                        relayIcyAudio(
+                            input = buffered,
+                            output = output,
+                            metadataInterval = metadataInterval,
+                        ) { title ->
+                            listener.onMetadata(this, title)
+                        }
+                    }
                     output.flush()
                 }
             } catch (error: Exception) {
@@ -166,7 +180,7 @@ internal class RadioProxyServer(
                 requestMethod = "GET"
                 instanceFollowRedirects = true
                 setRequestProperty("User-Agent", "WAMBridge-Mobile/0.1")
-                setRequestProperty("Icy-MetaData", "0")
+                setRequestProperty("Icy-MetaData", "1")
             }
             try {
                 connection.connect()
@@ -183,9 +197,14 @@ internal class RadioProxyServer(
                 require(contentType !in OGG_TYPES) {
                     "Ogg radio needs transcoding and is not supported by the mobile relay yet"
                 }
+                val metadataInterval = connection.getHeaderField("icy-metaint")
+                    ?.trim()
+                    ?.toIntOrNull()
+                    ?.takeIf { it > 0 }
                 return OpenSource(
                     connection = connection,
                     contentType = contentType.ifBlank { "application/octet-stream" },
+                    metadataInterval = metadataInterval,
                 )
             } catch (error: Exception) {
                 lastError = error
