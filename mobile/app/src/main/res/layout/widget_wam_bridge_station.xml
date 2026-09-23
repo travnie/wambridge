@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/widget_station_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_background"
+    android:clickable="true"
+    android:contentDescription="@string/widget_station_name"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/widget_station_label"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center"
+        android:maxLines="2"
+        android:text="@string/widget_station_name"
+        android:textColor="@color/wam_text"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+</FrameLayout>
