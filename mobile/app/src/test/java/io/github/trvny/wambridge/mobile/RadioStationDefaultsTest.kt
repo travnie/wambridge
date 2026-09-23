@@ -105,6 +105,17 @@ class RadioStationDefaultsTest {
     }
 
     @Test
+    fun tuneInArtworkUsesOnlyValidatedStationIds() {
+        assertEquals(
+            "https://cdn-profiles.tunein.com/s24939/images/logod.png",
+            tuneInArtworkUrl(" s24939 "),
+        )
+        assertNull(tuneInArtworkUrl(null))
+        assertNull(tuneInArtworkUrl("p123"))
+        assertNull(tuneInArtworkUrl("https://example.test/logo.png"))
+    }
+
+    @Test
     fun m3uImportUsesExtinfTitles() {
         val imported = importRadioStations(
             "stations.m3u",

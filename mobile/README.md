@@ -80,9 +80,10 @@ root destinations reuses the same panes instead of recreating Activities.
 
 Home renders Now Playing from the same runtime snapshot used by renderer/radio controls.
 Native TuneIn playback carries the preset thumbnail in that shared snapshot, and Home reuses
-the same Wi-Fi-bound, size-limited artwork cache as the standalone TuneIn browser. Missing or
-failed artwork falls back to the app icon; direct-radio logo discovery is intentionally not
-guessed from arbitrary stream URLs.
+the same Wi-Fi-bound, size-limited artwork cache as the standalone TuneIn browser. Saved radio
+stations with a validated TuneIn station ID derive their logo from TuneIn's station CDN even
+when playback falls back to a direct URL. Missing or failed artwork, and URL-only stations,
+fall back to the app icon; artwork is never guessed from arbitrary stream URLs.
 
 Home shows exactly three physical preset slots read from the M5. These are the speaker-owned
 `kind=speaker` presets cycled by the physical Radio button, not another local favourites list.
