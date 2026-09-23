@@ -1190,6 +1190,7 @@ class MainActivity : Activity() {
     }
 
     private fun handleQuickAction(sourceIntent: Intent?) {
+        if (!LauncherQuickActions.isTrusted(this, sourceIntent)) return
         val action = appQuickAction(
             sourceIntent?.action,
             sourceIntent?.getStringExtra(LauncherQuickActions.EXTRA_ALIAS),
@@ -1197,6 +1198,7 @@ class MainActivity : Activity() {
 
         sourceIntent?.action = Intent.ACTION_MAIN
         sourceIntent?.removeExtra(LauncherQuickActions.EXTRA_ALIAS)
+        sourceIntent?.removeExtra(LauncherQuickActions.EXTRA_TOKEN)
         cancelAutoDiscovery()
 
         when (action) {
