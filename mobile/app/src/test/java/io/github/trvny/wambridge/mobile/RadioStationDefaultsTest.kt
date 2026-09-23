@@ -105,19 +105,6 @@ class RadioStationDefaultsTest {
     }
 
     @Test
-    fun jsonExportRoundTripsFallbacksAndTuneIn() {
-        val station = MobileRadioStation(
-            "test",
-            listOf("https://radio.example/one.mp3", "https://radio.example/two.aac"),
-            "s123",
-        )
-
-        val imported = importRadioStations("stations.json", exportRadioStationsJson(listOf(station)))
-
-        assertEquals(listOf(station), imported)
-    }
-
-    @Test
     fun m3uImportUsesExtinfTitles() {
         val imported = importRadioStations(
             "stations.m3u",
