@@ -101,6 +101,9 @@ tasks.named("preBuild").configure {
 
 dependencies {
     implementation("androidx.recyclerview:recyclerview:1.4.0")
+    implementation("androidx.media3:media3-exoplayer:1.11.1")
+    implementation("androidx.media3:media3-exoplayer-hls:1.11.1")
+    implementation("androidx.media3:media3-datasource-okhttp:1.11.1")
 
     // Plain JVM unit tests only. The parts worth testing here are arithmetic
     // (subnet planning) rather than anything that needs a device or Robolectric,
