@@ -31,6 +31,7 @@ internal fun diagnosticsReport(
     rows["Playback"] = snapshot.playback.name
     rows["Discovery"] = snapshot.discovery.name
     rows["Source"] = snapshot.source ?: "None"
+    rows["Now playing"] = snapshot.metadata ?: "None"
     rows["Fallback"] = snapshot.fallback ?: "None"
     rows["Renderer"] = rendererPhase + " · " + rendererStatus
     rows["Radio"] = radioStatus
