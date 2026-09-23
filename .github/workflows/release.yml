@@ -164,7 +164,7 @@ jobs:
           fi
 
           if [[ "$ROLLING" != "true" ]]; then
-            existing_tag="$(gh api "repos/${GH_REPO}/git/ref/tags/${TAG}" --jq '.object.sha' 2>/dev/null || true)"
+            existing_tag="$(gh api "repos/${GH_REPO}/git/refs/tags/${TAG}" --jq '.object.sha' 2>/dev/null || true)"
             if [[ -n "$existing_tag" && "$existing_tag" != "$GITHUB_SHA" ]]; then
               echo "Tag $TAG already points to $existing_tag, refusing to publish this commit." >&2
               exit 1
