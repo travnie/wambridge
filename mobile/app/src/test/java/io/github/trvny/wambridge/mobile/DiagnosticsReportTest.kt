@@ -32,8 +32,9 @@ class DiagnosticsReportTest {
                 playback = SpeakerPlaybackState.PLAYING,
                 speakerIp = "10.0.0.44",
                 deviceId = "ABC123",
-                source = "TuneIn preset",
-                fallback = "https://example.invalid/fallback",
+                source = "https://example.invalid/live.mp3",
+                metadata = "Artist - Track",
+                fallback = "2/3",
                 lastError = "Previous timeout",
             ),
             wifiEndpoint = WifiLan.Endpoint(42L, "10.0.0.117"),
@@ -47,8 +48,9 @@ class DiagnosticsReportTest {
         assertTrue(text.contains("Speaker IP: 10.0.0.44"))
         assertTrue(text.contains("Device ID: ABC123"))
         assertTrue(text.contains("Wi-Fi: 10.0.0.117 (network 42)"))
-        assertTrue(text.contains("Source: TuneIn preset"))
-        assertTrue(text.contains("Fallback: https://example.invalid/fallback"))
+        assertTrue(text.contains("Source: https://example.invalid/live.mp3"))
+        assertTrue(text.contains("Now playing: Artist - Track"))
+        assertTrue(text.contains("Fallback: 2/3"))
         assertTrue(text.contains("Last error: Previous timeout"))
 
         assertTrue(text.indexOf("Speaker IP:") < text.indexOf("Owner:"))
