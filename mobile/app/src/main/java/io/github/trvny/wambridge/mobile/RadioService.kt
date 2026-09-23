@@ -442,6 +442,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             activeChannel.setMute(false)
             safeVolumeApplied = true
         }
+        station?.let { RadioStationStore(this).recordPlayed(it) }
         lastStatus = when {
             paused -> "Paused $alias"
             muted -> "Muted $alias"
