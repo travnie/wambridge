@@ -3,7 +3,7 @@ package io.github.trvny.wambridge.mobile
 import java.net.URI
 import java.util.Locale
 
-internal data class RadioNowPlaying(
+data class RadioNowPlaying(
     val title: String? = null,
     val artworkUrl: String? = null,
 )
