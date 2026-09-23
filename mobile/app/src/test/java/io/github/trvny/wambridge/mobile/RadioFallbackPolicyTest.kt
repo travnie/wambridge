@@ -82,6 +82,20 @@ class RadioFallbackPolicyTest {
     }
 
     @Test
+    fun singleCoolingCandidateRemainsPlayable() {
+        val only = candidates.first()
+        assertEquals(
+            listOf(only),
+            prioritizeRadioCandidates(
+                candidates = listOf(only),
+                memory = RadioFallbackMemory(failedAt = mapOf(only to 900L)),
+                nowMs = 1_000L,
+                cooldownMs = 500L,
+            ),
+        )
+    }
+
+    @Test
     fun duplicateCandidatesAreRemovedWithoutReordering() {
         assertEquals(
             candidates,
