@@ -119,7 +119,6 @@ Make common actions reachable without opening the app.
 
 - launcher shortcuts for favourite stations, Stop and Standby
 - optional Radio Quick Settings tile
-- small one-tap station widgets
 - reuse the same command/state routing as the app instead of duplicating control logic
 
 ## 10. Human-friendly Diagnostics
