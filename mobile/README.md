@@ -31,9 +31,10 @@ The Android adapter provides:
   capped by the launcher's per-app shortcut limit;
 - a daily-driver Home screen with shared Now Playing state, play/pause, mute and raw-volume
   controls, plus the M5's three speaker-owned physical Radio presets;
-- an in-app speaker remote plus two explicit home-screen widget choices: a compact
-  DLNA toggle and a full remote; the app and remote widget share play/pause, mute and
-  raw-volume routing for radio and native speaker playback;
+- an in-app speaker remote plus three home-screen widget choices: a compact DLNA toggle,
+  a full remote and a configurable 1×1 station button backed by the shared `top3` pack;
+  the app and remote widget share play/pause, mute and raw-volume routing for radio and
+  native speaker playback;
 - optional launcher-icon hiding;
 - native TuneIn preset browsing and safe playback through the speaker CPM API, with station
   artwork/metadata when TuneIn exposes it and play/pause, mute, raw-volume and confirmed Stop
@@ -129,6 +130,11 @@ as many of the ordered station/control actions as the launcher reports it can ho
 A second Quick Settings tile is radio-specific: when idle it starts last-played, then the
 configured default, then the first `top3` station. While WAM Bridge radio is already active,
 successive taps cycle through that same `top3` list. The original DLNA tile remains unchanged.
+
+The 1×1 Station widget uses the same `top3` source. Each widget instance chooses one station
+during setup and starts it with one tap; active playback is marked directly on the widget.
+If a selected station later disappears from the local library, the widget falls back to a
+Choose state instead of becoming a dead button.
 
 ### Radio system controls
 
