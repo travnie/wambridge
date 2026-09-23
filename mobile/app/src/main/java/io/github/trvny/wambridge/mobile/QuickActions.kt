@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
+import java.util.UUID
 
 internal sealed interface AppQuickAction {
     data class PlayStation(val alias: String) : AppQuickAction
@@ -55,12 +56,19 @@ internal object LauncherQuickActions {
     const val ACTION_STOP = "trvny.wambridge.mobile.QUICK_STOP"
     const val ACTION_STANDBY = "trvny.wambridge.mobile.QUICK_STANDBY"
     const val EXTRA_ALIAS = "quick_station_alias"
+    const val EXTRA_TOKEN = "quick_action_token"
+
+    fun isTrusted(context: Context, intent: Intent?): Boolean {
+        val provided = intent?.getStringExtra(EXTRA_TOKEN) ?: return false
+        return provided == token(context)
+    }
 
     fun sync(context: Context) {
         val manager = context.getSystemService(ShortcutManager::class.java) ?: return
         val max = manager.maxShortcutCountPerActivity
         if (max <= 0) return
 
+        val shortcutToken = token(context)
         val candidates = buildList {
             RadioStationStore(context).quickStations().forEach { station ->
                 add(
@@ -87,6 +95,7 @@ internal object LauncherQuickActions {
                         action = spec.action
                         addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
                         spec.alias?.let { putExtra(EXTRA_ALIAS, it) }
+                        putExtra(EXTRA_TOKEN, shortcutToken)
                     },
                 )
                 .setRank(index)
@@ -98,6 +107,20 @@ internal object LauncherQuickActions {
 
         runCatching { manager.setDynamicShortcuts(desired) }
     }
+
+    private fun token(context: Context): String {
+        val preferences = context.applicationContext.getSharedPreferences(
+            RendererService.PREFS,
+            Context.MODE_PRIVATE,
+        )
+        return preferences.getString(KEY_TOKEN, null)
+            ?.takeIf(String::isNotBlank)
+            ?: UUID.randomUUID().toString().also {
+                preferences.edit().putString(KEY_TOKEN, it).apply()
+            }
+    }
+
+    private const val KEY_TOKEN = "launcher_quick_action_token"
 
     private fun shortcutLabel(alias: String): String {
         val trimmed = alias.trim()
