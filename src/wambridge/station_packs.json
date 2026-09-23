@@ -29,7 +29,8 @@
       "url": "http://stream.radioparadise.com/ogg-192m",
       "fallback_urls": [
         "http://stream.radioparadise.com/flacm"
-      ]
+      ],
+      "tunein_id": "s13606"
     },
     {
       "alias": "electroswing",
@@ -41,7 +42,8 @@
     {
       "alias": "bbc6",
       "url": "https://as-hls-ww-live.akamaized.net/pool_81827798/live/ww/bbc_6music/bbc_6music.isml/bbc_6music-audio=320000.norewind.m3u8",
-      "mobile_supported": false
+      "mobile_supported": false,
+      "tunein_id": "s44491"
     },
     {
       "alias": "radioplus",
@@ -52,7 +54,8 @@
     },
     {
       "alias": "minimalmix",
-      "url": "http://orion.shoutca.st:8750/"
+      "url": "http://orion.shoutca.st:8750/",
+      "tunein_id": "s151855"
     },
     {
       "alias": "radiozet",
@@ -73,11 +76,13 @@
       "url": "http://x.radiokaszebe.pl:9000/;",
       "fallback_urls": [
         "https://stream4.nadaje.com:10125/kaszebe128"
-      ]
+      ],
+      "tunein_id": "s77862"
     },
     {
       "alias": "cinemix",
-      "url": "https://kathy.torontocast.com:1190/stream"
+      "url": "https://kathy.torontocast.com:1190/stream",
+      "tunein_id": "s96408"
     },
     {
       "alias": "soundtrack",
@@ -98,7 +103,8 @@
     },
     {
       "alias": "streamingsoundtracks",
-      "url": "http://lo4.streamingsoundtracks.com/;"
+      "url": "http://lo4.streamingsoundtracks.com/;",
+      "tunein_id": "s1562"
     }
   ],
   "packs": {
