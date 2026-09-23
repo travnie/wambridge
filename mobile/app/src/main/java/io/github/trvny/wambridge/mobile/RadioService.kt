@@ -30,6 +30,9 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
     private val worker = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, WORKER_THREAD_NAME).apply { isDaemon = true }
     }
+    private val metadataWorker = Executors.newSingleThreadScheduledExecutor { runnable ->
+        Thread(runnable, METADATA_THREAD_NAME).apply { isDaemon = true }
+    }
     private val startPending = AtomicBoolean(false)
     private lateinit var mediaSession: RadioMediaSession
 
@@ -40,7 +43,9 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
     private var canonicalSources: List<String> = emptyList()
     private var activeSourceUrl: String? = null
     private var activeFallback: String? = null
-    private var activeMetadata: String? = null
+    private var streamNowPlaying = RadioNowPlaying()
+    private var providerNowPlaying = RadioNowPlaying()
+    private var metadataRefresh: ScheduledFuture<*>? = null
     private var safeVolumeApplied = false
     private var targetVolume = SAFE_START_VOLUME
     private var muted = false
@@ -223,6 +228,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             // Best effort during process teardown.
         }
         worker.shutdownNow()
+        cancelMetadataProvider()
+        metadataWorker.shutdownNow()
         mediaSession.close()
         super.onDestroy()
     }
@@ -245,7 +252,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         canonicalSources = prepared.canonicalSources
         activeSourceUrl = null
         activeFallback = null
-        activeMetadata = null
+        streamNowPlaying = RadioNowPlaying()
+        providerNowPlaying = RadioNowPlaying()
 
         val clientUuid = radioClientUuid()
 
@@ -278,6 +286,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             // Recovery keeps pause/mute/volume; an explicit play starts from clean defaults.
             running = true
             cancelWifiRecovery()
+            startMetadataProvider(selected)
             lastStatus = "Starting ${selected.alias}…"
             publish(lastStatus)
         } catch (error: Exception) {
@@ -474,12 +483,10 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         publish(lastStatus)
     }
 
-    override fun onMetadata(source: Any, title: String?) = execute {
+    override fun onMetadata(source: Any, metadata: RadioNowPlaying) = execute {
         if (destroyed || !running || source !== proxy) return@execute
-        activeMetadata = title?.takeIf(String::isNotBlank)
-        publishRuntimeState(lastStatus)
-        startForeground(NOTIFICATION_ID, buildNotification(lastStatus))
-        WamBridgeWidget.updateAll(applicationContext)
+        streamNowPlaying = metadata
+        publishMetadataUpdate()
     }
 
     override fun onSourceFailed(source: Any, sourceUrl: String, message: String) = execute {
@@ -630,7 +637,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             volumeChannel = null
             activeSourceUrl = null
             activeFallback = null
-            activeMetadata = null
+            streamNowPlaying = RadioNowPlaying()
+            cancelMetadataProvider()
             canonicalSources = emptyList()
             runCatching { channel?.close() }
             channel = null
@@ -691,6 +699,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
     }
 
     private fun publishRuntimeState(message: String) {
+        val nowPlaying = effectiveNowPlaying()
         SpeakerStateStore.update {
             speakerSnapshotForRadio(
                 starting = starting,
@@ -700,8 +709,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                 muted = muted,
                 volume = targetVolume,
                 stationAlias = station?.alias,
-                metadata = activeMetadata,
-                artworkUrl = tuneInArtworkUrl(station?.tuneInId ?: desiredStation?.tuneInId),
+                metadata = nowPlaying.title,
+                artworkUrl = nowPlaying.artworkUrl,
                 source = activeSourceUrl,
                 fallback = activeFallback,
                 status = message,
@@ -715,13 +724,68 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                 recovering = wifiRecovery,
                 paused = paused,
             ),
-            title = activeMetadata ?: station?.alias ?: desiredStation?.alias,
-            source = if (activeMetadata.isNullOrBlank()) {
+            title = nowPlaying.title ?: station?.alias ?: desiredStation?.alias,
+            source = if (nowPlaying.title.isNullOrBlank()) {
                 "Samsung M5"
             } else {
                 station?.alias ?: desiredStation?.alias ?: "Samsung M5"
             },
+            artworkUrl = nowPlaying.artworkUrl,
         )
+    }
+
+    private fun effectiveNowPlaying(): RadioNowPlaying = RadioNowPlaying(
+        title = providerNowPlaying.title ?: streamNowPlaying.title,
+        artworkUrl = providerNowPlaying.artworkUrl
+            ?: streamNowPlaying.artworkUrl
+            ?: tuneInArtworkUrl(station?.tuneInId ?: desiredStation?.tuneInId),
+    )
+
+    private fun publishMetadataUpdate() {
+        publishRuntimeState(lastStatus)
+        startForeground(NOTIFICATION_ID, buildNotification(lastStatus))
+        WamBridgeWidget.updateAll(applicationContext)
+    }
+
+    private fun startMetadataProvider(selected: MobileRadioStation) {
+        cancelMetadataProvider()
+        if (hasRadioParadiseMetadata(selected)) {
+            scheduleRadioParadiseMetadata(selected.alias, 0L)
+        }
+    }
+
+    private fun scheduleRadioParadiseMetadata(alias: String, delayMs: Long) {
+        if (destroyed) return
+        metadataRefresh = metadataWorker.schedule(
+            {
+                val result = runCatching { fetchRadioParadiseNowPlaying(applicationContext) }
+                val poll = result.getOrNull()
+                execute {
+                    if (
+                        destroyed ||
+                        !running ||
+                        !station?.alias.equals(alias, ignoreCase = true)
+                    ) {
+                        return@execute
+                    }
+                    if (poll != null) {
+                        providerNowPlaying = poll.nowPlaying
+                        publishMetadataUpdate()
+                        scheduleRadioParadiseMetadata(alias, poll.refreshAfterMs)
+                    } else {
+                        scheduleRadioParadiseMetadata(alias, METADATA_RETRY_MS)
+                    }
+                }
+            },
+            delayMs,
+            TimeUnit.MILLISECONDS,
+        )
+    }
+
+    private fun cancelMetadataProvider() {
+        metadataRefresh?.cancel(false)
+        metadataRefresh = null
+        providerNowPlaying = RadioNowPlaying()
     }
 
     private fun publish(message: String) {
@@ -760,7 +824,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             @Suppress("DEPRECATION")
             Notification.Builder(this)
         }
-        val nowPlaying = activeMetadata?.takeIf(String::isNotBlank)
+        val nowPlaying = effectiveNowPlaying().title?.takeIf(String::isNotBlank)
         val stationName = station?.alias ?: desiredStation?.alias
         return builder
             .setSmallIcon(R.drawable.ic_qs_tile)
@@ -834,6 +898,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             }
 
         private const val WORKER_THREAD_NAME = "wam-mobile-radio"
+        private const val METADATA_THREAD_NAME = "wam-mobile-radio-metadata"
+        private const val METADATA_RETRY_MS = 30_000L
 
         @Volatile var starting = false
             private set
