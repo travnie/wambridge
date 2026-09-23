@@ -7,8 +7,10 @@ first in-app speaker controls and fresh-install fixes.
 
 **Foundation shipped 2026-09-22; TuneIn artwork + ICY metadata shipped 2026-09-23.** Home is
 the daily-driver surface with shared Now Playing state, direct controls and the three
-speaker-owned physical presets. Native TuneIn thumbnails now reuse the same bounded artwork
-cache as the preset browser; direct-radio logo discovery remains follow-up work.
+speaker-owned physical presets. Native TuneIn thumbnails reuse the same bounded artwork cache
+as the preset browser, and saved radio entries with a validated TuneIn station ID derive their
+logo from TuneIn's station CDN. URL-only streams still fall back to the app icon instead of
+guessing artwork from arbitrary stream URLs.
 
 Turn the main screen into a daily-driver view instead of a service panel.
 
