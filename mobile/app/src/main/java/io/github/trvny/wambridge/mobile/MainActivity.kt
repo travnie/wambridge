@@ -363,7 +363,7 @@ class MainActivity : Activity() {
             MobileUi.header(
                 this,
                 "Settings",
-                "Speaker, playback, radio and troubleshooting.",
+                "Speaker, playback and troubleshooting.",
             ),
         )
 
