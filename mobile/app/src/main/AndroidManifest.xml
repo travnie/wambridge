@@ -42,6 +42,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".RadioOrderActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".CatalogueActivity"
             android:exported="false" />
 
