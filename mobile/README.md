@@ -30,7 +30,8 @@ The Android adapter provides:
 - launcher long-press actions publish the same shared `top3` stations plus Stop and Standby,
   capped by the launcher's per-app shortcut limit;
 - a daily-driver Home screen with shared Now Playing state, play/pause, mute and raw-volume
-  controls, plus the M5's three speaker-owned physical Radio presets;
+  controls, TuneIn artwork when the M5 exposes a thumbnail, plus the M5's three speaker-owned
+  physical Radio presets;
 - an in-app speaker remote plus three home-screen widget choices: a compact DLNA toggle,
   a full remote and a configurable 1×1 station button backed by the shared `top3` pack;
   the app and remote widget share play/pause, mute and raw-volume routing for radio and
@@ -77,7 +78,13 @@ root destinations reuses the same panes instead of recreating Activities.
 
 ### Home and physical presets
 
-Home renders Now Playing from the same runtime snapshot used by renderer/radio controls and
+Home renders Now Playing from the same runtime snapshot used by renderer/radio controls.
+Native TuneIn playback carries the preset thumbnail in that shared snapshot, and Home reuses
+the same Wi-Fi-bound, size-limited artwork cache as the standalone TuneIn browser. Missing or
+failed artwork falls back to the app icon; direct-radio logo discovery is intentionally not
+guessed from arbitrary stream URLs.
+
+Home
 shows exactly three physical preset slots read from the M5. These are the speaker-owned
 `kind=speaker` presets cycled by the physical Radio button, not another local favourites list.
 Radio renders the same runtime preset snapshot above Saved stations and TuneIn Explore.
