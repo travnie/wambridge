@@ -1198,7 +1198,7 @@ class MainActivity : Activity() {
 
         setIntent(
             Intent(sourceIntent).apply {
-                action = Intent.ACTION_MAIN
+                this.action = Intent.ACTION_MAIN
                 removeExtra(LauncherQuickActions.EXTRA_ALIAS)
                 removeExtra(LauncherQuickActions.EXTRA_TOKEN)
             },
