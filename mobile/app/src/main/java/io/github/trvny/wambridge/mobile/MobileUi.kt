@@ -239,6 +239,30 @@ internal object MobileUi {
         )
     }
 
+    fun setToggleSelected(
+        button: Button,
+        selected: Boolean,
+        transitioning: Boolean = false,
+    ) {
+        val context = button.context
+        val fill = when {
+            transitioning -> R.color.wam_accent_soft
+            selected -> R.color.wam_success_soft
+            else -> R.color.wam_surface_alt
+        }
+        val ink = when {
+            transitioning -> R.color.wam_accent
+            selected -> R.color.wam_success
+            else -> R.color.wam_text
+        }
+        button.background = RippleDrawable(
+            ColorStateList.valueOf(Color.argb(24, 0, 0, 0)),
+            rounded(context, context.getColor(fill), context.getColor(fill), 14),
+            null,
+        )
+        button.setTextColor(context.getColor(ink))
+    }
+
     fun setEnabled(view: View, enabled: Boolean) {
         view.isEnabled = enabled
         view.alpha = if (enabled) 1f else 0.45f
