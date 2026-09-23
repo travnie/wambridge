@@ -40,6 +40,9 @@ The Android adapter provides:
 - radio favourites support pinning, drag ordering, recently played, a default station,
   Play last, duplicate/edit helpers and Storage Access Framework import/export for JSON,
   M3U and PLS;
+- radio fallback routing remembers the last endpoint that actually opened, temporarily
+  de-prioritizes failed endpoints for 15 minutes, and exposes active fallback position through
+  the shared runtime/Diagnostics state without probing streams in parallel;
 - radio playback owns an Android MediaSession, so its play/pause/stop state can appear in the
   notification shade, lock screen and compatible headset/Bluetooth controls; DLNA still belongs
   to the external player that started it;
@@ -85,6 +88,17 @@ locally while newly-added bundled stations append without resetting it.
 JSON import/export preserves TuneIn IDs and ordered fallback URLs. M3U/PLS exchange the primary
 direct URL for compatibility with normal playlist tools. Recent history is recorded only after
 the radio proxy actually opens a source, so a failed tap does not become “last played”.
+
+### Smart radio fallback routing
+
+Fallback learning is passive: the app records only what the existing radio proxy already sees.
+A successfully opened endpoint becomes the preferred candidate for the next start/recovery.
+An endpoint that fails is moved behind healthy candidates for 15 minutes, while the original
+station order stays the deterministic tie-breaker. No second HTTP probe is opened beside active
+playback.
+
+When a non-primary candidate is active, the radio status and shared speaker snapshot report
+`fallback N/M`; Diagnostics therefore shows both the active source URL and fallback position.
 
 ### Radio system controls
 
