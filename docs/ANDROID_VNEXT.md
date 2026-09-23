@@ -5,13 +5,14 @@ first in-app speaker controls and fresh-install fixes.
 
 ## 1. Home / Now Playing
 
-**Foundation shipped 2026-09-22.** Home is now the daily-driver surface with shared Now Playing
-state, direct controls and the three speaker-owned physical presets. Artwork/ICY metadata remain
-follow-up work.
+**Foundation shipped 2026-09-22; TuneIn artwork + ICY metadata shipped 2026-09-23.** Home is
+the daily-driver surface with shared Now Playing state, direct controls and the three
+speaker-owned physical presets. Native TuneIn thumbnails now reuse the same bounded artwork
+cache as the preset browser; direct-radio logo discovery remains follow-up work.
 
 Turn the main screen into a daily-driver view instead of a service panel.
 
-- artwork or station logo
+- direct-radio station logo/artwork when a trusted source is available
 - source / station / current playback state
 - M5 state
 - play / pause, mute, volume and Stop
