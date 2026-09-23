@@ -342,13 +342,16 @@ internal class RadioStationStore(context: Context) {
     fun saveOrder(aliases: List<String>) {
         val available = all().map { it.alias }
         val requested = aliases.map(String::trim).filter(String::isNotEmpty)
+        val seen = mutableSetOf<String>()
         val normalized = buildList {
             requested.forEach { alias ->
                 available.firstOrNull { it.equals(alias, true) }?.let { candidate ->
-                    if (none { seen -> seen.equals(candidate, true) }) add(candidate)
+                    if (seen.add(candidate.lowercase())) add(candidate)
                 }
             }
-            available.forEach { alias -> if (none { it.equals(alias, true) }) add(alias) }
+            available.forEach { alias ->
+                if (seen.add(alias.lowercase())) add(alias)
+            }
         }
         preferences.edit().putString(KEY_ORDER, JSONArray(normalized).toString()).apply()
     }
