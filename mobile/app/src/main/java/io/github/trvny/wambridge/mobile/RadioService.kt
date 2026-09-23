@@ -474,6 +474,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
 
     override fun onSourceFailed(source: Any, sourceUrl: String, message: String) = execute {
         if (destroyed || source !== proxy) return@execute
+        // A Wi-Fi handoff is a transport failure, not evidence that this station URL is bad.
+        if (shouldRecoverFromWifiChange()) return@execute
         station?.let { RadioFallbackStore(this).recordFailure(it.alias, sourceUrl) }
     }
 
