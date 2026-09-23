@@ -133,7 +133,15 @@ class MainActivity : Activity() {
 
         refreshLauncherButton()
         refreshStatus()
+        LauncherQuickActions.sync(applicationContext)
+        handleQuickAction(intent)
         window.decorView.post(autoDiscoveryRetry)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleQuickAction(intent)
     }
 
     private fun buildHomePane(): View {
@@ -440,15 +448,33 @@ class MainActivity : Activity() {
             setPadding(0, MobileUi.dp(this@MainActivity, 8), 0, 0)
             MobileUi.addWeighted(
                 this,
-                MobileUi.button(this@MainActivity, "Quick Settings") {
-                    requestQuickSettingsTile()
+                MobileUi.button(this@MainActivity, "Add DLNA tile") {
+                    requestQuickSettingsTile(
+                        WamBridgeTileService::class.java,
+                        getString(R.string.widget_toggle_name),
+                    )
                 },
             )
-            launcherButton = MobileUi.button(this@MainActivity, "Launcher") {
-                if (isLauncherHidden()) setLauncherVisible(true) else confirmHideLauncher()
-            }
-            MobileUi.addWeighted(this, launcherButton, marginDp = 0)
+            MobileUi.addWeighted(
+                this,
+                MobileUi.button(this@MainActivity, "Add Radio tile") {
+                    requestQuickSettingsTile(
+                        WamBridgeRadioTileService::class.java,
+                        getString(R.string.tile_radio_name),
+                    )
+                },
+                marginDp = 0,
+            )
         })
+        launcherButton = MobileUi.button(this, "Launcher icon") {
+            if (isLauncherHidden()) setLauncherVisible(true) else confirmHideLauncher()
+        }.apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+            ).apply { topMargin = MobileUi.dp(this@MainActivity, 8) }
+        }
+        playbackCard.addView(launcherButton)
         content.addView(playbackCard)
 
         content.addView(MobileUi.sectionTitle(this, "Radio"))
@@ -804,6 +830,7 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        LauncherQuickActions.sync(applicationContext)
         if (::statusView.isInitialized) refreshStatus()
         if (currentDestination == MainDestination.SETTINGS) refreshSleepTimerState()
     }
@@ -1162,6 +1189,42 @@ class MainActivity : Activity() {
         refreshSpeakerControlButtons()
     }
 
+    private fun handleQuickAction(sourceIntent: Intent?) {
+        val action = appQuickAction(
+            sourceIntent?.action,
+            sourceIntent?.getStringExtra(LauncherQuickActions.EXTRA_ALIAS),
+        ) ?: return
+
+        sourceIntent?.action = Intent.ACTION_MAIN
+        sourceIntent?.removeExtra(LauncherQuickActions.EXTRA_ALIAS)
+
+        when (action) {
+            is AppQuickAction.PlayStation -> {
+                val station = RadioStationStore(this).all().firstOrNull {
+                    it.alias.equals(action.alias, ignoreCase = true)
+                }
+                if (station == null) {
+                    showDestination(MainDestination.RADIO)
+                    Toast.makeText(this, "Station is no longer available.", Toast.LENGTH_SHORT).show()
+                    return
+                }
+                showDestination(MainDestination.RADIO)
+                startForegroundService(
+                    Intent(this, RadioService::class.java).apply {
+                        this.action = RadioService.ACTION_PLAY
+                        putExtra(RadioService.EXTRA_ALIAS, station.alias)
+                    },
+                )
+                MobileUi.setStatus(homeStatusView, "Starting ${station.alias}…")
+            }
+
+            AppQuickAction.Stop -> stopHomePlayback()
+
+            AppQuickAction.Standby ->
+                runSleepTimerAction { SleepTimerControls.standbyNow(applicationContext) }
+        }
+    }
+
     private fun stopHomePlayback() {
         MobileUi.setStatus(homeStatusView, "Stopping playback…")
         when {
@@ -1249,32 +1312,35 @@ class MainActivity : Activity() {
         speakerControlButtons.forEach { MobileUi.setEnabled(it, enabled) }
     }
 
-    private fun requestQuickSettingsTile() {
+    private fun requestQuickSettingsTile(
+        serviceClass: Class<out android.service.quicksettings.TileService>,
+        label: String,
+    ) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
             Toast.makeText(
                 this,
-                "Add the WAM Bridge tile manually from Android Quick Settings before hiding the launcher icon.",
+                "Add the WAM Bridge tile manually from Android Quick Settings.",
                 Toast.LENGTH_LONG,
             ).show()
             return
         }
 
         val statusBar = getSystemService(StatusBarManager::class.java)
-        val component = ComponentName(this, WamBridgeTileService::class.java)
+        val component = ComponentName(this, serviceClass)
         val icon = Icon.createWithResource(this, R.drawable.ic_qs_tile)
 
         statusBar.requestAddTileService(
             component,
-            getString(R.string.app_name),
+            label,
             icon,
             mainExecutor,
         ) { result ->
             val ready = result == StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ADDED ||
                 result == StatusBarManager.TILE_ADD_REQUEST_RESULT_TILE_ALREADY_ADDED
-            preferences.edit().putBoolean("recovery_tile_ready", ready).apply()
+            if (ready) preferences.edit().putBoolean("recovery_tile_ready", true).apply()
             Toast.makeText(
                 this,
-                if (ready) "Quick Settings toggle ready." else "Quick Settings tile was not added.",
+                if (ready) "$label ready." else "$label was not added.",
                 Toast.LENGTH_SHORT,
             ).show()
         }
