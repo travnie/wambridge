@@ -8,13 +8,13 @@ import java.net.HttpURLConnection
 import java.net.Inet4Address
 import java.net.ServerSocket
 import java.net.Socket
-import java.net.URI
 import java.net.URL
 import java.nio.charset.StandardCharsets
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 internal class RadioProxyServer(
     context: Context,
@@ -41,11 +41,13 @@ internal class RadioProxyServer(
 
     private val appContext = context.applicationContext
     private val running = AtomicBoolean(false)
+    private val activeStreamClient = AtomicReference<Socket?>()
     private val executor = Executors.newCachedThreadPool()
     private val clients = mutableSetOf<Socket>()
     private val clientLock = Any()
     private val path = "/radio/${UUID.randomUUID().toString().replace("-", "")}"
     private var server: ServerSocket? = null
+    @Volatile private var activeTranscoder: Media3RadioTranscoder? = null
 
     lateinit var localAddress: Inet4Address
         private set
@@ -111,65 +113,104 @@ internal class RadioProxyServer(
             writeError(output, 403, "Forbidden")
             return
         }
-
-        var lastError: Exception? = null
-        for (source in sources) {
-            val opened = try {
-                openSource(source)
-            } catch (error: Exception) {
-                lastError = error
-                listener.onSourceFailed(
-                    this,
-                    source,
-                    error.message ?: error.javaClass.simpleName,
-                )
-                continue
-            }
-
-            writeSuccess(output, opened.contentType)
-            listener.onStreamOpened(this, source)
-            try {
-                opened.connection.inputStream.use { raw ->
-                    val buffered = BufferedInputStream(raw, COPY_BUFFER)
-                    val metadataInterval = opened.metadataInterval
-                    if (metadataInterval == null) {
-                        buffered.copyTo(output, COPY_BUFFER)
-                    } else {
-                        relayIcyAudio(
-                            input = buffered,
-                            output = output,
-                            metadataInterval = metadataInterval,
-                        ) { metadata ->
-                            listener.onMetadata(this, metadata)
-                        }
-                    }
-                    output.flush()
-                }
-            } catch (error: Exception) {
-                listener.onSourceFailed(
-                    this,
-                    source,
-                    error.message ?: error.javaClass.simpleName,
-                )
-                listener.onProxyError(this, error.message ?: error.javaClass.simpleName)
-            } finally {
-                opened.connection.disconnect()
-                listener.onStreamClosed(this)
-            }
+        if (!claimStream(client)) {
+            if (running.get()) writeError(output, 409, "Radio stream already active")
             return
         }
 
-        val message = lastError?.message ?: "No usable station URL"
-        listener.onProxyError(this, message)
-        runCatching { writeError(output, 502, "Bad Gateway") }
+        try {
+            var lastError: Exception? = null
+            for (source in sources) {
+                if (!running.get()) return
+                if (radioNeedsPhoneTranscode(source)) {
+                    val result = relayTranscodedSource(source, output)
+                    if (!running.get() || result.started) return
+                    lastError = result.error
+                    continue
+                }
+
+                val opened = try {
+                    openSource(source)
+                } catch (error: Exception) {
+                    lastError = error
+                    listener.onSourceFailed(
+                        this,
+                        source,
+                        error.message ?: error.javaClass.simpleName,
+                    )
+                    continue
+                }
+
+                if (radioNeedsPhoneTranscode(source, opened.contentType)) {
+                    opened.connection.disconnect()
+                    val result = relayTranscodedSource(source, output, opened.contentType)
+                    if (!running.get() || result.started) return
+                    lastError = result.error
+                    continue
+                }
+
+                writeSuccess(output, opened.contentType)
+                listener.onStreamOpened(this, source)
+                try {
+                    opened.connection.inputStream.use { raw ->
+                        val buffered = BufferedInputStream(raw, COPY_BUFFER)
+                        val metadataInterval = opened.metadataInterval
+                        if (metadataInterval == null) {
+                            buffered.copyTo(output, COPY_BUFFER)
+                        } else {
+                            relayIcyAudio(
+                                input = buffered,
+                                output = output,
+                                metadataInterval = metadataInterval,
+                            ) { metadata ->
+                                listener.onMetadata(this, metadata)
+                            }
+                        }
+                        output.flush()
+                    }
+                } catch (error: Exception) {
+                    listener.onSourceFailed(
+                        this,
+                        source,
+                        error.message ?: error.javaClass.simpleName,
+                    )
+                    listener.onProxyError(this, error.message ?: error.javaClass.simpleName)
+                } finally {
+                    opened.connection.disconnect()
+                    listener.onStreamClosed(this)
+                }
+                return
+            }
+
+            if (!running.get()) return
+            val message = lastError?.message ?: "No usable station URL"
+            listener.onProxyError(this, message)
+            runCatching { writeError(output, 502, "Bad Gateway") }
+        } finally {
+            activeStreamClient.compareAndSet(client, null)
+        }
+    }
+
+    private fun claimStream(client: Socket): Boolean {
+        val deadlineNanos = System.nanoTime() + CLAIM_TAKEOVER_TIMEOUT_MS * 1_000_000L
+        while (running.get()) {
+            if (activeStreamClient.compareAndSet(null, client)) return true
+
+            runCatching { activeStreamClient.get()?.close() }
+            runCatching { activeTranscoder?.close() }
+
+            if (System.nanoTime() >= deadlineNanos) return false
+            try {
+                Thread.sleep(CLAIM_RETRY_MS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                return false
+            }
+        }
+        return false
     }
 
     private fun openSource(source: String): OpenSource {
-        val uri = URI(source)
-        require(!uri.path.orEmpty().lowercase(Locale.ROOT).endsWith(".m3u8")) {
-            "HLS radio streams are not supported by the mobile relay yet"
-        }
-
         var lastError: Exception? = null
         val sourceUrl = URL(source)
         for (connection in WifiLan.openHttpConnections(appContext, sourceUrl)) {
@@ -191,12 +232,6 @@ internal class RadioProxyServer(
                     .substringBefore(';')
                     .trim()
                     .lowercase(Locale.ROOT)
-                require(contentType !in HLS_TYPES) {
-                    "HLS radio streams are not supported by the mobile relay yet"
-                }
-                require(contentType !in OGG_TYPES) {
-                    "Ogg radio needs transcoding and is not supported by the mobile relay yet"
-                }
                 val metadataInterval = connection.getHeaderField("icy-metaint")
                     ?.trim()
                     ?.toIntOrNull()
@@ -212,6 +247,57 @@ internal class RadioProxyServer(
             }
         }
         throw lastError ?: IOException("No active Wi-Fi network")
+    }
+
+    private data class TranscodeAttempt(
+        val started: Boolean,
+        val error: Exception?,
+    )
+
+    private fun relayTranscodedSource(
+        source: String,
+        output: BufferedOutputStream,
+        contentType: String? = null,
+    ): TranscodeAttempt {
+        val started = AtomicBoolean(false)
+        val transcoder = Media3RadioTranscoder(appContext, wifiTarget.network)
+        activeTranscoder = transcoder
+        if (!running.get()) {
+            if (activeTranscoder === transcoder) activeTranscoder = null
+            transcoder.close()
+            return TranscodeAttempt(false, null)
+        }
+        return try {
+            transcoder.relay(
+                source = source,
+                contentType = contentType,
+                output = output,
+                beforeFirstBytes = {
+                    writeSuccess(output, "audio/wav")
+                    listener.onStreamOpened(this, source)
+                    started.set(true)
+                },
+                onMetadata = { metadata ->
+                    listener.onMetadata(this, metadata)
+                },
+            )
+            if (started.get()) listener.onStreamClosed(this)
+            TranscodeAttempt(started.get(), null)
+        } catch (error: Exception) {
+            listener.onSourceFailed(
+                this,
+                source,
+                error.message ?: error.javaClass.simpleName,
+            )
+            if (started.get()) {
+                listener.onProxyError(this, error.message ?: error.javaClass.simpleName)
+                listener.onStreamClosed(this)
+            }
+            TranscodeAttempt(started.get(), error)
+        } finally {
+            if (activeTranscoder === transcoder) activeTranscoder = null
+            transcoder.close()
+        }
     }
 
     private fun readRequestLine(input: BufferedInputStream): Pair<String, String> {
@@ -263,6 +349,9 @@ internal class RadioProxyServer(
         if (!running.getAndSet(false)) return
         runCatching { server?.close() }
         server = null
+        runCatching { activeStreamClient.getAndSet(null)?.close() }
+        runCatching { activeTranscoder?.close() }
+        activeTranscoder = null
         synchronized(clientLock) {
             clients.forEach { runCatching { it.close() } }
             clients.clear()
@@ -276,11 +365,7 @@ internal class RadioProxyServer(
         private const val SOURCE_READ_TIMEOUT_MS = 30_000
         private const val MAX_HEADER_BYTES = 64 * 1024
         private const val COPY_BUFFER = 64 * 1024
-        private val HLS_TYPES = setOf(
-            "application/vnd.apple.mpegurl",
-            "application/x-mpegurl",
-            "audio/mpegurl",
-        )
-        private val OGG_TYPES = setOf("audio/ogg", "application/ogg")
+        private const val CLAIM_TAKEOVER_TIMEOUT_MS = 2_000L
+        private const val CLAIM_RETRY_MS = 25L
     }
 }
