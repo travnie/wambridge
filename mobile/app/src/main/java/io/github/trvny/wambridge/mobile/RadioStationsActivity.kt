@@ -2,7 +2,9 @@ package io.github.trvny.wambridge.mobile
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.content.ContentResolver
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.text.InputType
@@ -203,14 +205,19 @@ class RadioStationsActivity : Activity() {
         super.onActivityResult(requestCode, resultCode, data)
         if (resultCode != RESULT_OK) return
         val uri = data?.data ?: return
+        if (uri.scheme != ContentResolver.SCHEME_CONTENT) {
+            MobileUi.setStatus(
+                statusView,
+                "Only documents selected through Android's file picker are supported.",
+                MobileUi.StatusKind.ERROR,
+            )
+            return
+        }
 
         when (requestCode) {
             REQUEST_IMPORT -> runCatching {
                 val name = displayName(uri) ?: "stations.json"
-                val text = contentResolver.openInputStream(uri)
-                    ?.bufferedReader(Charsets.UTF_8)
-                    ?.use { it.readText() }
-                    ?: error("Could not read the selected file")
+                val text = readStationFile(uri)
                 val imported = importRadioStations(name, text)
                 store.importStations(imported)
             }.fold(
@@ -242,10 +249,7 @@ class RadioStationsActivity : Activity() {
                         ExportFormat.M3U -> exportRadioStationsM3u(stations)
                         ExportFormat.PLS -> exportRadioStationsPls(stations)
                     }
-                    contentResolver.openOutputStream(uri, "wt")
-                        ?.bufferedWriter(Charsets.UTF_8)
-                        ?.use { it.write(text) }
-                        ?: error("Could not write the selected file")
+                    writeStationFile(uri, text)
                 }.fold(
                     onSuccess = {
                         MobileUi.setStatus(
@@ -542,7 +546,39 @@ class RadioStationsActivity : Activity() {
         )
     }
 
-    private fun displayName(uri: android.net.Uri): String? =
+    private fun readStationFile(uri: Uri): String {
+        require(uri.scheme == ContentResolver.SCHEME_CONTENT) {
+            "Station import must use a content URI"
+        }
+        val reader = contentResolver.openInputStream(uri)
+            ?.bufferedReader(Charsets.UTF_8)
+            ?: error("Could not read the selected file")
+        return reader.use {
+            val result = StringBuilder()
+            val buffer = CharArray(8192)
+            while (true) {
+                val count = it.read(buffer)
+                if (count < 0) break
+                require(result.length + count <= MAX_IMPORT_CHARS) {
+                    "Station file is too large"
+                }
+                result.append(buffer, 0, count)
+            }
+            result.toString()
+        }
+    }
+
+    private fun writeStationFile(uri: Uri, text: String) {
+        require(uri.scheme == ContentResolver.SCHEME_CONTENT) {
+            "Station export must use a content URI"
+        }
+        contentResolver.openOutputStream(uri, "wt")
+            ?.bufferedWriter(Charsets.UTF_8)
+            ?.use { it.write(text) }
+            ?: error("Could not write the selected file")
+    }
+
+    private fun displayName(uri: Uri): String? =
         contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
             val column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
             if (column >= 0 && cursor.moveToFirst()) cursor.getString(column) else null
@@ -665,5 +701,6 @@ class RadioStationsActivity : Activity() {
         private const val KEY_CLIENT_UUID = "radio_stations_client_uuid"
         private const val REQUEST_IMPORT = 7101
         private const val REQUEST_EXPORT = 7102
+        private const val MAX_IMPORT_CHARS = 2 * 1024 * 1024
     }
 }
