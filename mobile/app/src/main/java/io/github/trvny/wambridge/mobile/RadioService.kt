@@ -701,6 +701,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                 volume = targetVolume,
                 stationAlias = station?.alias,
                 metadata = activeMetadata,
+                artworkUrl = tuneInArtworkUrl(station?.tuneInId ?: desiredStation?.tuneInId),
                 source = activeSourceUrl,
                 fallback = activeFallback,
                 status = message,
