@@ -153,10 +153,12 @@ class SpeakerServiceStateTest {
                 playback = SpeakerPlaybackState.PLAYING,
                 stationAlias = "bbc1",
                 metadata = "Old track",
+                artworkUrl = "https://example.test/old.png",
             ),
         )
 
         assertEquals(null, snapshot.metadata)
+        assertEquals(null, snapshot.artworkUrl)
     }
 
     @Test
@@ -182,6 +184,7 @@ class SpeakerServiceStateTest {
             contentId = "2",
             title = "BBC Radio 1",
             kind = "speaker",
+            thumbnail = "https://example.test/bbc1.png",
         )
 
         val snapshot = nativePresetPlayingSnapshot(
@@ -193,6 +196,7 @@ class SpeakerServiceStateTest {
         assertEquals(SpeakerPlaybackState.PLAYING, snapshot.playback)
         assertEquals("BBC Radio 1", snapshot.stationAlias)
         assertEquals("TuneIn preset", snapshot.source)
+        assertEquals("https://example.test/bbc1.png", snapshot.artworkUrl)
         assertEquals("10.0.0.44", snapshot.speakerIp)
     }
 }

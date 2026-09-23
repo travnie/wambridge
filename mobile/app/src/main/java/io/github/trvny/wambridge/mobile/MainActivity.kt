@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -38,6 +39,7 @@ class MainActivity : Activity() {
     private lateinit var stopRendererButton: Button
     private lateinit var statusView: TextView
     private lateinit var homeStatusView: TextView
+    private lateinit var homeArtworkView: ImageView
     private lateinit var homeNowPlayingTitle: TextView
     private lateinit var homeNowPlayingMeta: TextView
     private lateinit var homePlayPauseButton: Button
@@ -157,9 +159,20 @@ class MainActivity : Activity() {
         val nowPlaying = MobileUi.card(this)
         nowPlaying.addView(MobileUi.label(this, "Now Playing"))
         nowPlaying.addView(MobileUi.row(this).apply {
-            val badge = MobileUi.heroBadge(this@MainActivity, "♪")
+            homeArtworkView = ImageView(this@MainActivity).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setImageResource(R.mipmap.ic_launcher)
+                background = MobileUi.rounded(
+                    this@MainActivity,
+                    fill = getColor(R.color.wam_accent_soft),
+                    stroke = getColor(R.color.wam_accent_soft),
+                    radiusDp = 22,
+                )
+                clipToOutline = true
+                contentDescription = "Now playing artwork"
+            }
             addView(
-                badge,
+                homeArtworkView,
                 LinearLayout.LayoutParams(
                     MobileUi.dp(this@MainActivity, 76),
                     MobileUi.dp(this@MainActivity, 76),
@@ -586,6 +599,19 @@ class MainActivity : Activity() {
             if (snapshot.muted == true) add("muted")
         }.joinToString(" · ")
         homeNowPlayingMeta.text = detail
+
+        if (::homeArtworkView.isInitialized) {
+            homeArtworkView.contentDescription = snapshot.stationAlias
+                ?.takeIf(String::isNotBlank)
+                ?.let { "Artwork for $it" }
+                ?: "WAM Bridge"
+            ArtworkLoader.load(
+                context = this,
+                view = homeArtworkView,
+                url = snapshot.artworkUrl,
+                placeholderRes = R.mipmap.ic_launcher,
+            )
+        }
 
         if (::homePlayPauseButton.isInitialized) {
             homePlayPauseButton.text = when (snapshot.playback) {
