@@ -2,11 +2,11 @@ name: Release
 
 # Two shapes, one pipeline.
 #
-# While the project is beta the useful thing is still a single rolling prerelease:
-# one tag, one permanent download link, assets replaced whenever main moves.
+# The default channel is one normal rolling GitHub Release:
+# one mutable tag, one permanent download link, assets replaced whenever main moves.
 # Nobody has to invent a version number to ship a fix.
 #
-# Pushing a v* tag still cuts a fixed, versioned release for when a build is
+# workflow_dispatch with a version cuts a fixed, versioned release when a build is
 # worth pinning.
 on:
   push:
@@ -27,7 +27,7 @@ on:
       version:
         description: >-
           Cut a fixed, versioned release instead of refreshing the rolling one,
-          e.g. 0.2.0. Leave empty for the rolling beta.
+          e.g. 0.2.0. Leave empty for the rolling release.
         type: string
         required: false
         default: ""
@@ -92,10 +92,10 @@ jobs:
           else
             base="$(grep -m1 '^version' pyproject.toml | cut -d'"' -f2)"
             test -n "$base"
-            name="${base}-beta.$(date -u +%Y%m%d).${SHA:0:7}"
-            echo "tag=beta" >> "$GITHUB_OUTPUT"
+            name="$base"
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
             echo "name=$name" >> "$GITHUB_OUTPUT"
-            echo "title=WAM Bridge beta" >> "$GITHUB_OUTPUT"
+            echo "title=WAM Bridge rolling" >> "$GITHUB_OUTPUT"
             echo "rolling=true" >> "$GITHUB_OUTPUT"
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
@@ -151,9 +151,9 @@ jobs:
 
           if [[ "$ROLLING" == "true" ]]; then
             {
-              echo "Rolling beta, rebuilt from main. Currently ${VERSION}."
+              echo "Rolling release rebuilt from main at ${GITHUB_SHA:0:7}. Version ${VERSION}."
               echo
-              echo "The foobar2000 component and the Android APK always come from the same commit. The tag is replaced in place, so these download links keep working."
+              echo "The foobar2000 component and the Android APK always come from the same commit. The latest tag is replaced in place, so these download links keep working."
             } > release-notes.md
             # Move the rolling tag onto this commit, creating it the first time.
             if ! gh api --method PATCH "repos/${GH_REPO}/git/refs/tags/${TAG}" -f sha="$GITHUB_SHA" -F force=true >/dev/null 2>&1; then
@@ -172,12 +172,19 @@ jobs:
           fi
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "$TITLE" --notes-file release-notes.md --prerelease --target "$GITHUB_SHA"
+            gh release edit "$TAG" --title "$TITLE" --notes-file release-notes.md --latest --target "$GITHUB_SHA"
             gh release upload "$TAG" "${assets[@]}" --clobber
+          else
+            gh release create "$TAG" "${assets[@]}" --target "$GITHUB_SHA" --title "$TITLE" --latest --notes-file release-notes.md
+          fi
+
+          if [[ "$ROLLING" == "true" ]]; then
             # A rolling release keeps one APK, not a growing pile of them.
-            gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^wambridge-.*[.]apk$' | grep -vxF "wambridge-${VERSION}.apk" | while read -r stale; do
+            gh release view "$TAG" --json assets --jq '.assets[].name' | grep -E '^wambridge-.*[.]apk | grep -vxF "wambridge-${VERSION}.apk" | while read -r stale; do
               gh release delete-asset "$TAG" "$stale" --yes
             done
-          else
-            gh release create "$TAG" "${assets[@]}" --target "$GITHUB_SHA" --title "$TITLE" --prerelease --notes-file release-notes.md
+
+            # One-time cleanup of the superseded rolling prerelease channel.
+            gh release delete beta --yes >/dev/null 2>&1 || true
+            gh api --method DELETE "repos/${GH_REPO}/git/refs/tags/beta" >/dev/null 2>&1 || true
           fi
