@@ -446,20 +446,35 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
 
     override fun onStreamOpened(source: Any, sourceUrl: String) = execute {
         if (destroyed || !running || source !== proxy) return@execute
-        val alias = station?.alias ?: "radio"
+        val currentStation = station
+        val alias = currentStation?.alias ?: "radio"
         if (!safeVolumeApplied) {
             val activeChannel = channel ?: return@execute
             activeChannel.setVolumeRaw(audibleVolume())
             activeChannel.setMute(false)
             safeVolumeApplied = true
         }
-        station?.let { RadioStationStore(this).recordPlayed(it) }
+        activeSourceUrl = sourceUrl
+        val position = radioFallbackPosition(sourceUrl, canonicalSources)
+        activeFallback = position
+            ?.takeIf { (current, _) -> current > 1 }
+            ?.let { (current, total) -> "$current/$total" }
+        currentStation?.let {
+            RadioFallbackStore(this).recordSuccess(it.alias, sourceUrl)
+            RadioStationStore(this).recordPlayed(it)
+        }
+        val suffix = activeFallback?.let { " · fallback $it" }.orEmpty()
         lastStatus = when {
-            paused -> "Paused $alias"
-            muted -> "Muted $alias"
-            else -> "Playing $alias"
+            paused -> "Paused $alias$suffix"
+            muted -> "Muted $alias$suffix"
+            else -> "Playing $alias$suffix"
         }
         publish(lastStatus)
+    }
+
+    override fun onSourceFailed(source: Any, sourceUrl: String, message: String) = execute {
+        if (destroyed || source !== proxy) return@execute
+        station?.let { RadioFallbackStore(this).recordFailure(it.alias, sourceUrl) }
     }
 
     override fun onStreamClosed(source: Any) = execute {
