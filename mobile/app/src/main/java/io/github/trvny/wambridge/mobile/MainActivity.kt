@@ -1197,6 +1197,7 @@ class MainActivity : Activity() {
 
         sourceIntent?.action = Intent.ACTION_MAIN
         sourceIntent?.removeExtra(LauncherQuickActions.EXTRA_ALIAS)
+        cancelAutoDiscovery()
 
         when (action) {
             is AppQuickAction.PlayStation -> {
