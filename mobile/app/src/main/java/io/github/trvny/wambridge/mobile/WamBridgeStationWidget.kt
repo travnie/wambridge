@@ -16,8 +16,13 @@ internal fun stationWidgetLabel(
     activeAlias: String?,
     radioRunning: Boolean,
 ): String {
-    val label = alias.trim().replaceFirstChar { first ->
-        if (first.isLowerCase()) first.titlecase() else first.toString()
+    val trimmed = alias.trim()
+    val label = if (trimmed.startsWith("bbc", ignoreCase = true)) {
+        trimmed.uppercase()
+    } else {
+        trimmed.replaceFirstChar { first ->
+            if (first.isLowerCase()) first.titlecase() else first.toString()
+        }
     }
     return if (radioRunning && alias.equals(activeAlias, ignoreCase = true)) {
         "▶ $label"
