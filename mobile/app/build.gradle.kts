@@ -106,4 +106,5 @@ dependencies {
     // (subnet planning) rather than anything that needs a device or Robolectric,
     // so the adapter stays free of an instrumentation harness.
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20260814")
 }
