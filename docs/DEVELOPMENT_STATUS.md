@@ -49,9 +49,11 @@ branch or implementing another timing layer.
   Home/Radio share one runtime view of the three `kind=speaker` presets read from the M5.
   Those three tiles are the same slots cycled by the physical Radio button; no local duplicate
   is persisted. Preset editing is deliberately not shipped yet: `SetSavePreset` /
-  `SetMovePreset` remain behind the existing hardware-validation gate. Real-device follow-up
-  is to confirm the displayed slot order against the physical button and start all three from
-  the phone.
+  `SetMovePreset` remain behind the existing hardware-validation gate. **Rolling-release
+  hardware pass 2026-09-23:** cold-start autodiscovery found and connected the M5 automatically;
+  Czwórka and BBC Radio 1 started from the three Home presets. Trójka still did not start, which
+  matches the already measured dead preset-0 station endpoint rather than an Android preset-call
+  regression.
 
   **Radio MediaSession 2026-09-22:** RadioService now owns one framework MediaSession while
   radio is starting/recovering/playing. It mirrors the existing runtime state into Android
@@ -66,8 +68,10 @@ branch or implementing another timing layer.
   `pwron`. Requests stay on RadioService/RendererService when either owns the control plane;
   idle requests go through the normal speaker gate/resolver. Standby now stops app-owned
   playback and then arms a one-second speaker timer without restarting the prior owner.
-  Software/CI coverage is present; the one-second standby behavior and active-owner timer
-  routing still require the physical M5 checklist before being called hardware-validated.
+  **Rolling-release hardware pass 2026-09-23:** Standby now turned the M5 front lamp dark, so
+  the one-second Standby-now path is hardware-confirmed on this speaker. The normal 15/30/45/60
+  countdown path was exercised from Android but still needs a duration/readback pass before the
+  timed presets are called fully hardware-validated.
 
 The stable universal transport is local HTTP started through `SetUrlPlayback`. The speaker
 paces the HTTP side through TCP backpressure. Finite share/DLNA playback is proven as a
