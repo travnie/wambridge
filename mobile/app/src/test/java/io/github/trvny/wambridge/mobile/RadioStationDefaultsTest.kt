@@ -3,6 +3,7 @@ package io.github.trvny.wambridge.mobile
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RadioStationDefaultsTest {
@@ -25,6 +26,7 @@ class RadioStationDefaultsTest {
         assertEquals(custom, merged.first { it.alias == "trojka" })
         assertEquals(3, merged.size)
     }
+
     @Test
     fun hiddenBundledStationStaysDeleted() {
         val merged = mergeRadioStations(
@@ -57,6 +59,26 @@ class RadioStationDefaultsTest {
     }
 
     @Test
+    fun userOrderWinsAndNewBundledStationsAreAppended() {
+        val ordered = orderRadioStations(
+            bundled,
+            listOf("czworka", "BBC1"),
+        )
+
+        assertEquals(listOf("czworka", "bbc1", "trojka"), ordered.map { it.alias })
+    }
+
+    @Test
+    fun staleAndDuplicateOrderEntriesAreIgnored() {
+        val ordered = orderRadioStations(
+            bundled,
+            listOf("nothing", "trojka", "TROJKA"),
+        )
+
+        assertEquals(listOf("trojka", "bbc1", "czworka"), ordered.map { it.alias })
+    }
+
+    @Test
     fun aSavedAliasIsPlayedFromWhatWasSaved() {
         assertEquals(bundled.first { it.alias == "trojka" }, radioStationToPlay("Trojka", null, bundled))
     }
@@ -69,8 +91,6 @@ class RadioStationDefaultsTest {
 
     @Test
     fun aCatalogueStationIsPlayedFromItsTuneInIdAlone() {
-        // Browsed out of the speaker, so it is in no store and carries no URLs:
-        // the resolver turns the id into a stream at play time.
         val station = radioStationToPlay("PR3 Trójka", "s15984", bundled)
 
         assertEquals(MobileRadioStation("PR3 Trójka", emptyList(), "s15984"), station)
@@ -78,11 +98,61 @@ class RadioStationDefaultsTest {
 
     @Test
     fun aCatalogueStationIsNotConfusedWithASavedOneOfTheSameName() {
-        // The bundled `trojka` holds its own URL; naming the id must not fall
-        // back to it, or a station picked in the catalogue would play another.
         val station = radioStationToPlay("trojka", "s99999", bundled)
 
         assertEquals("s99999", station?.tuneInId)
         assertEquals(emptyList<String>(), station?.urls)
+    }
+
+    @Test
+    fun m3uImportUsesExtinfTitles() {
+        val imported = importRadioStations(
+            "stations.m3u",
+            """
+            #EXTM3U
+            #EXTINF:-1,One
+            https://one.example/live.mp3
+            #EXTINF:-1,Two
+            http://two.example/live.aac
+            """.trimIndent(),
+        )
+
+        assertEquals(listOf("One", "Two"), imported.map { it.alias })
+        assertEquals(listOf("https://one.example/live.mp3"), imported.first().urls)
+    }
+
+    @Test
+    fun plsImportPairsFileAndTitleEntries() {
+        val imported = importRadioStations(
+            "stations.pls",
+            """
+            [playlist]
+            File1=https://one.example/live.mp3
+            Title1=One
+            File2=http://two.example/live.aac
+            Title2=Two
+            NumberOfEntries=2
+            Version=2
+            """.trimIndent(),
+        )
+
+        assertEquals(listOf("One", "Two"), imported.map { it.alias })
+    }
+
+    @Test
+    fun m3uAndPlsExportsKeepEveryDirectlyAddressableStation() {
+        val stations = listOf(
+            MobileRadioStation("one", listOf("https://one.example/live.mp3")),
+            MobileRadioStation("two", listOf("http://two.example/live.aac")),
+            MobileRadioStation("tune-only", emptyList(), "s123"),
+        )
+
+        val m3u = exportRadioStationsM3u(stations)
+        val pls = exportRadioStationsPls(stations)
+
+        assertTrue(m3u.contains("#EXTINF:-1,one"))
+        assertTrue(m3u.contains("#EXTINF:-1,two"))
+        assertFalse(m3u.contains("tune-only"))
+        assertTrue(pls.contains("NumberOfEntries=2"))
     }
 }

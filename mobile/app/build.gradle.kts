@@ -100,6 +100,8 @@ tasks.named("preBuild").configure {
 }
 
 dependencies {
+    implementation("androidx.recyclerview:recyclerview:1.4.0")
+
     // Plain JVM unit tests only. The parts worth testing here are arithmetic
     // (subnet planning) rather than anything that needs a device or Robolectric,
     // so the adapter stays free of an instrumentation harness.

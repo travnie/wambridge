@@ -35,8 +35,11 @@ The Android adapter provides:
   artwork/metadata when TuneIn exposes it and play/pause, mute, raw-volume and confirmed Stop
   controls on the standalone screen;
 - saved direct radio stations with optional TuneIn station IDs, resolved at play time ahead of
-  ordered fallback URLs and relayed locally by the phone; a fresh install starts with the
-  BBC Radio 1, Trójka and Czwórka bundle;
+  ordered fallback URLs and relayed locally by the phone; mobile defaults now come from the
+  shared `favorites` pack in `station_packs.json`, filtered by `mobile_supported`;
+- radio favourites support pinning, drag ordering, recently played, a default station,
+  Play last, duplicate/edit helpers and Storage Access Framework import/export for JSON,
+  M3U and PLS;
 - radio playback owns an Android MediaSession, so its play/pause/stop state can appear in the
   notification shade, lock screen and compatible headset/Bluetooth controls; DLNA still belongs
   to the external player that started it;
@@ -71,6 +74,17 @@ Radio renders the same runtime preset snapshot above Saved stations and TuneIn E
 The slots are read-only in this release. Android can play them through the already measured
 `SetPlayPreset` path, but preset editing stays disabled until the write-side
 `SetSavePreset`/`SetMovePreset` behavior is hardware-validated on the physical M5.
+
+### Radio favourites
+
+The Android station library uses the shared `station_packs.json` `favorites` pack as its
+default source instead of maintaining a second Kotlin list. User changes are overlays: hidden
+bundled stations, pins, custom order, default station and recent history. Drag ordering is kept
+locally while newly-added bundled stations append without resetting it.
+
+JSON import/export preserves TuneIn IDs and ordered fallback URLs. M3U/PLS exchange the primary
+direct URL for compatibility with normal playlist tools. Recent history is recorded only after
+the radio proxy actually opens a source, so a failed tap does not become “last played”.
 
 ### Radio system controls
 
