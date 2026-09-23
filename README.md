@@ -17,7 +17,7 @@ but not integrated.
 Everything here was measured against one physical Shape M5 (`SPK-WAM550`,
 firmware `WAM550WWB-3117.1`). Other models in the family are untested.
 
-## Status: working [`beta`](https://github.com/travnie/wambridge/releases/tag/beta)
+## Status: working [rolling release](https://github.com/travnie/wambridge/releases/tag/latest)
 
 Both paths play audio on real hardware. The foobar component passed its full
 physical checklist on 2026-08-02: a complete 213-second track start to finish at
@@ -65,15 +65,17 @@ facts from a physical `SPK-WAM550` are in
 
 ## Foobar2000 output
 
-Rolling beta prerelease:
-[`beta`](https://github.com/travnie/wambridge/releases/tag/beta), rebuilt whenever tested
-`main` moves. The tag and download link stay put while the component/APK assets are replaced
-from the same commit. The base version still comes from `version` in `pyproject.toml`.
+Normal rolling release:
+[`latest`](https://github.com/travnie/wambridge/releases/tag/latest), rebuilt whenever tested
+`main` moves. It is a regular GitHub Release, not a pre-release. The tag and download links
+stay put while the component/APK assets are replaced from the same commit. The displayed
+version still comes from `version` in `pyproject.toml`; Android `versionCode` keeps rising
+independently for upgrades.
 
-Each rolling beta contains:
+Each rolling release contains:
 
 - `foo_out_wam.fb2k-component` - the foobar2000 output
-- `wambridge-<version>-beta.<date>.<commit>.apk` - the signed Android adapter
+- `wambridge-<version>.apk` - the signed Android adapter
 - a source archive
 
 Open the `.fb2k-component` file with foobar2000 2.x x64, then select:
@@ -82,7 +84,7 @@ Open the `.fb2k-component` file with foobar2000 2.x x64, then select:
 Preferences → Playback → Output → Samsung M5 (Wi-Fi)
 ```
 
-This is beta software built primarily against one physical M5. The core transport has
+This project is built primarily against one physical M5. The core transport has
 repeated hardware validation and Android now covers discovery, renderer/radio controls,
 MediaSession, widgets and speaker-side sleep controls, but other Shape models remain largely
 untested and some hardware-specific follow-up is still documented. If you own a Shape speaker
