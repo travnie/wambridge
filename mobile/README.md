@@ -30,8 +30,7 @@ The Android adapter provides:
 - launcher long-press actions publish the same shared `top3` stations plus Stop and Standby,
   capped by the launcher's per-app shortcut limit;
 - a daily-driver Home screen with shared Now Playing state, play/pause, mute and raw-volume
-  controls, TuneIn artwork when the M5 exposes a thumbnail, plus the M5's three speaker-owned
-  physical Radio presets;
+  controls, plus TuneIn/direct-radio artwork when a trusted source exposes it;
 - an in-app speaker remote plus three home-screen widget choices: a compact DLNA toggle,
   a full remote and a configurable 1×1 station button backed by the shared `top3` pack;
   the app and remote widget share play/pause, mute and raw-volume routing for radio and
@@ -90,13 +89,14 @@ stations with a validated TuneIn station ID derive their logo from TuneIn's stat
 when playback falls back to a direct URL. Missing or failed artwork, and URL-only stations,
 fall back to the app icon; artwork is never guessed from arbitrary stream URLs.
 
-Home shows exactly three physical preset slots read from the M5. These are the speaker-owned
-`kind=speaker` presets cycled by the physical Radio button, not another local favourites list.
-Radio renders the same runtime preset snapshot above Saved stations and TuneIn Explore.
+Physical presets live only under **Radio**, inside the full M5-owned TuneIn preset list. The
+three `kind=speaker` entries cycled by the physical Radio button are not duplicated on Home or
+Settings and are not a second local favourites list.
 
-The slots are read-only in this release. Android can play them through the already measured
-`SetPlayPreset` path, but preset editing stays disabled until the write-side
-`SetSavePreset`/`SetMovePreset` behavior is hardware-validated on the physical M5.
+The M5 preset list is read-only in this release. Android can play entries through the already
+measured `SetPlayPreset` path, but preset editing stays disabled until the write-side
+`SetSavePreset`/`SetMovePreset`/`SetRemovePreset` behavior is hardware-validated on the
+physical M5.
 
 ### Radio favourites
 
