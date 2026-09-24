@@ -107,11 +107,14 @@ state that can feed:
 
 ## 8. Phone-side HLS / Ogg support
 
-Add a dedicated mobile transcoding path so streams currently rejected by the phone relay
-can play through the M5.
+**Software implemented in PR #187; final-head Mobile and Build CI are green, physical M5
+validation still required before merge.** The isolated Media3 path decodes HLS/Ogg/Opus,
+normalizes to PCM16 stereo 44.1 kHz and serves endless WAV to the speaker while MP3/AAC/FLAC
+stay on the lightweight direct relay. The transcoded path also feeds Media3 title/artist/web
+artwork into the shared Now Playing state.
 
-Keep this isolated from the normal direct relay because it is a larger transport subsystem,
-not a small codec toggle.
+The remaining gate is hardware: confirm HLS and Ogg playback, metadata/artwork, stream takeover,
+reconnect and unchanged direct-format playback on the physical M5.
 
 ## 9. Quick actions everywhere
 
@@ -145,18 +148,14 @@ Keep protocol archaeology out of the normal UI while still making failures expla
 
 ## Suggested order
 
-Build the daily-driver layer first:
+Most of the daily-driver layer is shipped. The remaining sequence is deliberately hardware-led:
 
-1. Home / Now Playing
-2. MediaSession
-3. Sleep Timer / Standby
-4. Radio favourites 2.0
-5. ICY metadata
-6. Quick actions
+1. validate PR #187 on the physical M5, including HLS/Ogg playback and metadata/artwork;
+2. finish the 15/30/45/60-minute sleep-timer duration/readback pass;
+3. validate preset write commands before exposing physical preset editing on Android.
 
-Then continue with speaker-specific preset management, smarter fallback routing and the
-larger HLS/Ogg transport work. Diagnostics should grow alongside those changes rather than
-becoming a separate second control stack.
+Diagnostics should grow alongside those checks rather than becoming a separate second control
+stack.
 
 The goal is to keep WAM Bridge small, local and useful: no account system, cloud backend or
 framework migration unless a concrete feature eventually requires one.
