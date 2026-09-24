@@ -640,9 +640,10 @@ operating system records.
     **Extended on 2026-09-21:** Android still consumes the shared
     `src/wambridge/station_packs.json`, but a fresh install now starts with the focused `top3`
     pack: BBC Radio 1 (`s24939`), Trójka (`s15984`) and Czwórka (`s118200`), each with its
-    ordered fallback URLs. User edits override bundled entries and deletions stay deleted. BBC
-    and Trójka still have HLS/Ogg fallbacks, so mobile tries their TuneIn resolution first while
-    the phone-side relay remains non-transcoding; `bbc6` and `falloutfm5` stay desktop-only.
+    ordered fallback URLs. User edits override bundled entries and deletions stay deleted. On
+    current `main`, HLS/Ogg sources still prefer TuneIn or a direct-format fallback; PR #187
+    adds the isolated phone-side Media3 transcoder and exposes `bbc6` / `falloutfm5` for its
+    physical M5 validation pass.
 
     Renderer startup is also an explicit `STARTING/RUNNING/STOPPING/STOPPED` lifecycle now.
     Discovery can be cancelled by Stop, saved speakers are re-found by stable `GetDeviceId` after
@@ -659,13 +660,18 @@ operating system records.
     widget and Quick Settings after clearing or staling the saved target, and repeat across a
     real Wi-Fi/DHCP move on the physical M5.
 
-    **Home 3.5 added 2026-09-22:** Home now consumes the shared speaker snapshot for
-    Now Playing and direct controls, and Home + Radio consume one runtime list of exactly three
-    `kind=speaker` TuneIn presets read from the M5. Those are the same slots cycled by the
-    physical Radio button; there is no second local copy. Playback reuses the measured
+    **HLS/Ogg transport candidate 2026-09-23:** PR #187 implements an isolated Media3
+    HLS/Ogg/Opus -> PCM16/WAV path while leaving MP3/AAC/FLAC on the lightweight relay. Final
+    Mobile and Build CI are green; merge remains gated on physical M5 playback plus
+    metadata/artwork, takeover and reconnect checks.
+
+    **Home/Radio navigation updated 2026-09-23:** Home consumes the shared speaker snapshot for
+    Now Playing and direct controls, including the stateful DLNA toggle. Radio owns station
+    selection and renders the full M5 TuneIn preset list, including the three `kind=speaker`
+    entries cycled by the physical Radio button, followed by the app-side station library.
+    Physical presets are no longer duplicated on Home or Settings. Playback reuses the measured
     `SetPlayPreset` path. Editing remains deliberately absent until the write-side preset
-    commands are hardware-validated. Physical follow-up: confirm all three displayed slots
-    match the button order and start correctly from both Home and Radio.
+    commands are hardware-validated.
 
     **Settings/Diagnostics 2026-09-22:** normal Settings now keeps speaker discovery/testing,
     renderer/system controls and Radio entry points visible while manual IPv4 and dedicated
