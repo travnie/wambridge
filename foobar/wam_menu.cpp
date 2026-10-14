@@ -6,7 +6,6 @@
 #include <foobar2000/SDK/foobar2000.h>
 
 #include "wam_control.h"
-#include "wam_updates.h"
 
 #include <algorithm>
 #include <array>
@@ -120,14 +119,6 @@ constexpr GUID kSendToShareGuid = {
     {0x89, 0x0d, 0xe8, 0xee, 0x2f, 0x09, 0x73, 0xa7},
 };
 
-// {F8C4F6ED-BE37-4BD7-BE81-A7B17492F872}
-constexpr GUID kCheckUpdatesGuid = {
-    0xf8c4f6ed,
-    0xbe37,
-    0x4bd7,
-    {0xbe, 0x81, 0xa7, 0xb1, 0x74, 0x92, 0xf8, 0x72},
-};
-
 struct MenuItem {
     GUID guid;
     const char* name;
@@ -136,7 +127,7 @@ struct MenuItem {
     bool stopsFoobar;
 };
 
-constexpr std::array<MenuItem, 8> kMenuItems = {{
+constexpr std::array<MenuItem, 7> kMenuItems = {{
     {
         kEmergencyStopGuid,
         "Emergency stop",
@@ -184,13 +175,6 @@ constexpr std::array<MenuItem, 8> kMenuItems = {{
         "Volume to safe level",
         "Set the physical Samsung WAM volume to the configured startup level.",
         L"safe-volume",
-        false,
-    },
-    {
-        kCheckUpdatesGuid,
-        "Check for updates",
-        "Check the latest rolling release and open the download page on request.",
-        L"check-updates",
         false,
     },
 }};
@@ -1072,10 +1056,6 @@ public:
     ) override {
         if (index >= kMenuItems.size()) return;
         const auto& item = kMenuItems[index];
-        if (std::wcscmp(item.action, L"check-updates") == 0) {
-            wam::check_for_updates();
-            return;
-        }
         if (std::wcscmp(item.action, L"start-sleep-timer") == 0) {
             const int seconds = configured_sleep_after_stop();
             if (seconds <= 0) {

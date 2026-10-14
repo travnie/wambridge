@@ -6,6 +6,7 @@
 #include <foobar2000/SDK/coreDarkMode.h>
 
 #include "wam_settings.h"
+#include "wam_updates.h"
 
 #include <algorithm>
 #include <array>
@@ -49,6 +50,7 @@ enum ControlId {
     kSleepAfterStop,
     kDiagnostics,
     kHelper,
+    kCheckUpdates,
 };
 
 using wam_settings::Values;
@@ -253,6 +255,25 @@ private:
         return control;
     }
 
+    HWND make_button(HINSTANCE instance, int id, const wchar_t* text) {
+        HWND control = CreateWindowExW(
+            0,
+            L"BUTTON",
+            text,
+            WS_CHILD | WS_VISIBLE | WS_TABSTOP | BS_PUSHBUTTON,
+            0,
+            0,
+            0,
+            0,
+            m_window,
+            reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
+            instance,
+            nullptr
+        );
+        set_font(control);
+        return control;
+    }
+
     void create_controls(HINSTANCE instance, HWND parent) {
         m_font = reinterpret_cast<HFONT>(SendMessageW(parent, WM_GETFONT, 0, 0));
         if (m_font == nullptr) {
@@ -313,6 +334,9 @@ private:
 
         m_helperLabel = make_label(instance, L"PCM helper override (blank = bundled)");
         m_helper = make_edit(instance, kHelper);
+
+        m_updatesLabel = make_label(instance, L"Component updates");
+        m_checkUpdates = make_button(instance, kCheckUpdates, L"Check for updates");
     }
 
     void set_font(HWND control) const {
@@ -395,6 +419,7 @@ private:
         const int diagnosticsTop = dpi_scale(kRowBase + 9 * kRowPitch);
         MoveWindow(m_diagnostics, margin, diagnosticsTop, width, dpi_scale(23), TRUE);
         place_row(m_helperLabel, m_helper, 10);
+        place_row(m_updatesLabel, m_checkUpdates, 11);
     }
 
     static void set_text(HWND control, const std::wstring& value) {
@@ -491,6 +516,11 @@ private:
     void on_command(WPARAM wParam, LPARAM) {
         if (m_loading) return;
         const int code = HIWORD(wParam);
+        if (LOWORD(wParam) == kCheckUpdates && code == BN_CLICKED) {
+            // A read-only action, not a configuration change: leave Apply untouched.
+            wam::check_for_updates();
+            return;
+        }
         if (code == EN_CHANGE || code == CBN_SELCHANGE || code == BN_CLICKED) {
             m_callback->on_state_changed();
         }
@@ -527,6 +557,8 @@ private:
     HWND m_diagnostics = nullptr;
     HWND m_helperLabel = nullptr;
     HWND m_helper = nullptr;
+    HWND m_updatesLabel = nullptr;
+    HWND m_checkUpdates = nullptr;
 };
 
 class WamPreferencesPage : public preferences_page_v4 {
