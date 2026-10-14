@@ -90,9 +90,11 @@ second control connection. `Cancel sleep timer` clears the pending timer.
 
 ## Component updates
 
-Open `Playback -> WAM Bridge -> Check for updates` to compare the installed
+Open `Preferences -> Playback -> Output -> WAM Bridge` and click
+**Check for updates** under **Component updates** to compare the installed
 component build against the published [rolling release](https://github.com/travnie/wambridge/releases/tag/latest).
-The check is manual, runs in a background thread and requires GitHub access.
+The check is manual, runs in a background thread, requires GitHub access and
+does not mark the preferences as changed or require pressing Apply.
 It compares commit IDs, not the display version (`0.0.5` can stay unchanged
 across rolling releases). Official CI builds embed their source commit; locally
 compiled and older components without an ID show **unknown**, never an

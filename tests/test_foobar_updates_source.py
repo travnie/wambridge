@@ -6,6 +6,7 @@ from unittest import TestCase
 
 ROOT = Path(__file__).parents[1]
 MENU = ROOT / "foobar" / "wam_menu.cpp"
+PREFERENCES = ROOT / "foobar" / "wam_preferences.cpp"
 UPDATER = ROOT / "foobar" / "wam_updates.cpp"
 PROJECT = ROOT / "foobar" / "foo_out_wam.vcxproj"
 BUILD = ROOT / ".github" / "workflows" / "build.yml"
@@ -13,17 +14,18 @@ RELEASE = ROOT / ".github" / "workflows" / "release.yml"
 
 
 class FoobarUpdateCheckerTests(TestCase):
-    def test_menu_dispatches_exact_update_action(self) -> None:
+    def test_preferences_button_dispatches_without_dirtying_settings(self) -> None:
+        page = PREFERENCES.read_text(encoding="utf-8")
         menu = MENU.read_text(encoding="utf-8")
+        self.assertIn('m_checkUpdates = make_button(instance, kCheckUpdates, L"Check for updates");', page)
+        self.assertIn('place_row(m_updatesLabel, m_checkUpdates, 11);', page)
         self.assertRegex(
-            menu,
-            r'(?s)"Check for updates",.*?L"check-updates",\s*false,'
+            page,
+            r'(?s)if \(LOWORD\(wParam\) == kCheckUpdates && code == BN_CLICKED\) \{'
+            r'\s*//[^\n]*\n\s*wam::check_for_updates\(\);\s*return;\s*\}'
         )
-        self.assertRegex(
-            menu,
-            r'(?s)std::wcscmp\(item.action, L"check-updates"\) == 0\)\s*'
-            r'\{\s*wam::check_for_updates\(\);\s*return;\s*\}'
-        )
+        self.assertNotIn('"Check for updates"', menu)
+        self.assertNotIn('L"check-updates"', menu)
 
     def test_rollout_publication_precedes_advertised_sha(self) -> None:
         updater = UPDATER.read_text(encoding="utf-8")

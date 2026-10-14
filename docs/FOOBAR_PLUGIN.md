@@ -10,7 +10,8 @@ Current implementation and remaining control-surface work for `foo_out_wam`.
 - PCM pipeline: foobar `f32le` -> FFmpeg FLAC -> local HTTP -> Samsung M5.
 - `%LOCALAPPDATA%\WAMBridge\foobar.ini` configuration with environment overrides.
 - Native `Preferences -> Playback -> Output -> WAM Bridge` page editing the same INI,
-  with foobar2000 dark-mode theming.
+  with foobar2000 dark-mode theming and a read-only `Check for updates` button.
+  The update check opens the release page on request, never installs a DLL.
 - `Playback -> WAM Bridge` submenu containing:
   - Emergency stop,
   - Stop & mute,
