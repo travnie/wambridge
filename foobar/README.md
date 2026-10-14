@@ -88,6 +88,21 @@ the foobar console. `Start sleep timer` uses the existing `sleep_after_stop` pre
 delay; when playback is active it is routed through the running PCM helper instead of opening a
 second control connection. `Cancel sleep timer` clears the pending timer.
 
+## Component updates
+
+Open `Playback -> WAM Bridge -> Check for updates` to compare the installed
+component build against the published [rolling release](https://github.com/travnie/wambridge/releases/tag/latest).
+The check is manual, runs in a background thread and requires GitHub access.
+It compares commit IDs, not the display version (`0.0.5` can stay unchanged
+across rolling releases). Official CI builds embed their source commit; locally
+compiled and older components without an ID show **unknown**, never an
+unverified "up to date" result.
+
+If a newer/different build is available, the menu can open the GitHub Release
+page. It does not download, install or replace a running DLL. Install the
+`.fb2k-component` through foobar2000 and restart when prompted. The checker
+does not modify the speaker, playback or existing configuration.
+
 ## Current output behavior
 
 - One helper session owns one PCM stream.

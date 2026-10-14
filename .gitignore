@@ -16,3 +16,5 @@ _scratch/
 !.claude/hooks/
 !.claude/rules/
 .claude.local.md
+# CI-generated component commit ID; not a source-of-truth file.
+foobar/wam_build_sha.h
