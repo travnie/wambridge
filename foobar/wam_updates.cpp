@@ -167,13 +167,41 @@ ReleaseCheck fetch_latest_release() {
     const auto name = assets == std::string::npos
         ? std::string::npos
         : body.find("\"foo_out_wam.fb2k-component\"", assets);
-    const auto objectEnd = name == std::string::npos
-        ? std::string::npos : body.find('}', name);
-    if (objectEnd == std::string::npos) {
+    if (name == std::string::npos) {
         return {{}, L"The latest release has no foobar component asset."};
     }
-    const auto asset = body.substr(name, objectEnd - name);
-    if (json_string(asset, "state") != std::optional<std::string>("uploaded")) {
+    // GitHub nests an uploader object before the asset's state field.
+    // Balance JSON object braces, ignoring braces embedded in strings.
+    const auto begin = body.rfind('{', name);
+    if (begin == std::string::npos || begin < assets) {
+        return {{}, L"Invalid foobar asset metadata."};
+    }
+    size_t end = std::string::npos;
+    int depth = 0;
+    bool quoted = false;
+    bool escaped = false;
+    for (size_t i = begin; i < body.size(); ++i) {
+        const char c = body[i];
+        if (quoted) {
+            if (escaped) escaped = false;
+            else if (c == '\\') escaped = true;
+            else if (c == '"') quoted = false;
+        } else if (c == '"') {
+            quoted = true;
+        } else if (c == '{') {
+            ++depth;
+        } else if (c == '}' && --depth == 0) {
+            end = i;
+            break;
+        }
+    }
+    if (end == std::string::npos) {
+        return {{}, L"Invalid foobar asset metadata."};
+    }
+    const auto asset = body.substr(begin, end - begin + 1);
+    if (json_string(asset, "name") !=
+            std::optional<std::string>("foo_out_wam.fb2k-component") ||
+        json_string(asset, "state") != std::optional<std::string>("uploaded")) {
         return {{}, L"The foobar component asset is not ready."};
     }
     return {*sha, {}};
