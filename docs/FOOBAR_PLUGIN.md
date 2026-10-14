@@ -21,13 +21,17 @@ Current implementation and remaining control-surface work for `foo_out_wam`.
   - Volume to safe level.
 - Serialized control-helper queue with output reported in the foobar console.
 - Restart and cleanup paths for format change, seek, stop and helper failure.
+- Track context menu: `Send to WAM (Share)` launches the bundled `wambridge-share.exe`
+  outside the PCM output path. Windows SDK/MSBuild CI passed on 2026-10-10;
+  hardware testing of this *foobar integration* is still unrecorded.
 
 ## Not implemented
 
 - Discovery and connection test UI.
 - TuneIn/radio submenu.
 - Dockable panel.
-- Integrated finite share/DLNA playback for native duration and seek.
+- Native foobar pause/seek/progress on finite share/DLNA playback. The shipped
+  Share context-menu command is a separate helper, not a second output device.
 
 ## Configuration
 
@@ -191,17 +195,14 @@ In normal use a timer is not needed at all. Since the stream path tells the spea
 is over, a released speaker reaches its own idle standby unaided — measured at 17 min 4 s. The
 timer is worth arming when an exact deadline is wanted or something might not let go.
 
-The **automatic after-stop path is still not finished**, and the gap is in the seek path. A seek restarts the helper
-mid-session, so the departing helper arms a timer that the stream replacing it never asked
-for. The replacement clears any pending timer before offering its stream, which closes the
-common case but is a race, not a guarantee: it only gets there after discovery, probing and
-its own server coming up, so a short enough timer fires first and the speaker goes into
-standby mid-track. Closing that properly needs the component to tell the helper whether it is
-being replaced or the session is ending — it knows, and the helper does not. Two consequences
-worth stating while it stands: the clear removes **any** pending timer, including one set from
-the Samsung app, because the speaker does not say who armed it; and a configured install that
-goes back to `0` leaves the last timer armed with nothing left to clear it. A default install
-never sends either command.
+The old **seek / automatic-after-stop race was addressed on 2026-08-29**.
+The component now sends `release` for a true stop and `discard` for a replacement
+helper (seek/format change) over the existing control channel, before teardown.
+`discard` stops the old stream without arming an automatic sleep timer.
+The replacement still clears pending timers as defense in depth; the M5 exposes
+no timer owner, so this can cancel a timer set from Samsung's app too.
+With `sleep_after_stop=0`, the default install does not arm the automatic timer.
+See the measured sequence in [the lab journal](DEVELOPMENT_STATUS.md).
 
 ## Startup volume is per session, not per helper
 

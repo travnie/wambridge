@@ -1,7 +1,7 @@
 # Android vNext roadmap
 
-This is the maintained backlog for the next WAM Bridge Android improvements after the
-first in-app speaker controls and fresh-install fixes.
+This is the maintained **Android hardware-check backlog**. Most planned UI features are
+shipped. A checked item means a physical M5 pass is recorded, not just successful CI.
 
 ## 1. Home / Now Playing
 
@@ -54,7 +54,9 @@ Expose the measured M5 sleep path through normal UI.
 
 ## 4. Physical Radio preset manager
 
-Manage the presets cycled by the M5's physical Radio button.
+Read-only slots and playback are shipped. Adjacent `my` preset moves were checked on
+the M5 on 2026-09-13; save/remove and moving into physical slots 0-2 remain untested.
+Editing stays disabled until risky writes are validated with a backup and the owner present.
 
 - show physical preset slots
 - select a station for a slot
@@ -125,11 +127,15 @@ Still to check on hardware:
 - [x] Quick Stop during transcoder startup: one 2026-09-30 pass showed no wedge.
 - [ ] 60-second stability for the remaining transcoded defaults: BBC 6 Music and Fallout FM 5.
   BBC Radio 1, Trójka and Radio Paradise passed on 2026-09-30.
-- [ ] Safe-start volume regression: the 2026-09-30 pass stayed at raw volume 0 instead of
-  returning to step 3. The radio-polish fix rejects the delayed startup `VolumeLevel=0` event
-  that was overwriting the safe target; re-check 0 -> 3 on the physical M5. Since 2026-10-02 a
-  station switch while one is already audible passes through the same 0 + mute but lifts back
-  to the listener's volume instead of 3; check that too. The Radio tab now has its own Stop.
+- [x] Cold start 0 -> 3 and Stop -> Play -> 3. The failing 2026-09-30
+  observation was superseded by the M5 checklist in
+  [PR #213](https://github.com/travnie/wambridge/pull/213) (merged 2026-10-02).
+  The late `VolumeLevel=0` guard remains implemented.
+- [x] Switching an audible station preserves the listener's level (tested at raw
+  step 8), without a loud burst, per PR #213's M5 checklist.
+- [x] Radio-tab Stop works during playback and startup, per PR #213.
+- [ ] Switch while muted or paused should start the new station at safe step 3;
+  PR #213 left this *specific* physical check open.
 - [x] BBC HLS shows no track title (`Now playing: None`): expected. Checked 2026-10-01 against
   the BBC Radio 1 320k rendition: segments carry only PAT, PMT and one audio PID (no ID3
   timed-metadata PES), the playlist has no `EXT-X-DATERANGE`, and every `#EXTINF` title is
@@ -169,8 +175,8 @@ Keep protocol archaeology out of the normal UI while still making failures expla
 
 Most of the daily-driver layer is shipped. The remaining sequence is deliberately hardware-led:
 
-1. finish the remaining HLS/Ogg hardware checks from section 8: BBC6/Fallout stability,
-   re-test safe-start volume;
+1. check BBC 6 Music/Fallout FM 5 stability and the remaining muted/paused
+   volume-switch case from section 8 (ordinary start and audible switch already passed);
 2. finish the 15/30/45/60-minute sleep-timer duration/readback pass;
 3. validate preset write commands before exposing physical preset editing on Android.
 

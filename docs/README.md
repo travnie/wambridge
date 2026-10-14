@@ -1,9 +1,19 @@
 # Documentation
 
-- [Development status](DEVELOPMENT_STATUS.md) records the current state of `main`, active pull requests, failed approaches and the next implementation order.
-- [Samsung WAM protocol notes](WAM_PROTOCOL.md) records facts measured on a physical Shape M5 and separates confirmed behavior from remaining inference.
-- [WAM event listener](EVENT_LISTENER.md) explains the persistent TCP `55001` diagnostic and useful playback events.
-- [foobar2000 component design](FOOBAR_PLUGIN.md) sketches the menu commands, preferences page and later dockable panel, and the rules the protocol work imposes on them.
-- [Android mobile adapter](../mobile/README.md) summarizes the current renderer, discovery, widgets, TuneIn controls and direct-radio support.
+## Current state and next steps
 
-Read these before continuing playback work. They are intended to survive long issue threads, abandoned experiments and future context loss.
+- [Project README](../README.md): what ships, installation and rolling release.
+- [Android vNext](ANDROID_VNEXT.md): **maintained Android hardware-check backlog**, including tests still needed on the M5.
+- [foobar2000 component](FOOBAR_PLUGIN.md): implemented features, transport constraints and missing foobar features.
+- [Codebase concerns](CONCERNS.md): current risks and accepted limitations.
+
+## Measurement and historical reference
+
+- [Development status / lab journal](DEVELOPMENT_STATUS.md): historical experiments, decisions and measurements, **not** the live task queue.
+- [Samsung WAM protocol](WAM_PROTOCOL.md): commands and behavior measured on a physical M5.
+- [Event listener](EVENT_LISTENER.md): TCP `55001` events and diagnostics.
+- [Android adapter](../mobile/README.md): mobile architecture and existing features.
+
+A merged PR, green CI and a physical speaker test are different evidence levels.
+Keep each status labelled; use the latest dated hardware measurement when older notes conflict.
+Do not duplicate the Android checklist in the long development journal.

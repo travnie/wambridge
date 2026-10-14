@@ -1,9 +1,24 @@
 # Development status
 
-Last reviewed: 2026-08-27.
+Last cross-checked: 2026-10-14 (main branch, PR #213 and 2026-10-10 Build).
 
-Continuity note for playback work. Read this with `WAM_PROTOCOL.md` before reviving an old
-branch or implementing another timing layer.
+Historical lab journal. Measurement dates inside entries are retained. The numbered
+investigation log is **not the current task queue**. Read [the documentation index](README.md),
+[Android vNext](ANDROID_VNEXT.md) and `WAM_PROTOCOL.md` before playback work.
+
+## Current status pointers
+
+- **Android:** remaining hardware tests live in [Android vNext](ANDROID_VNEXT.md).
+  PR #213 records that cold start 0 -> 3, Stop -> Play 3 and audible station-switch
+  volume retention passed on the M5 (2026-10-02). Muted/paused switching and
+  BBC 6 Music/Fallout FM 5 stability still need physical checks.
+- **foobar:** universal PCM remains the default output. The separate
+  `Send to WAM (Share)` context-menu command compiles and packages in the
+  [2026-10-10 Build](https://github.com/travnie/wambridge/actions/runs/38056249154),
+  but that foobar-to-M5 Share action has not been marked hardware-validated.
+- **Other physical checks:** timed Android sleep presets and risky TuneIn writes.
+
+## Historical investigations
 
 ## Stable on `main`
 
@@ -33,8 +48,8 @@ branch or implementing another timing layer.
   `playstatus` and `GetMusicInfo` answers `errCode: Wifi Sub Mode is CP`; neither means the
   playback failed.
 - Speaker-facing output profiles `flac` (default), `wav`, `wav24` and `mp3`, selected by
-  `format` in the INI or `--format` on the helper. Only `flac` has played a full track on
-  hardware; `wav24` was accepted by the M5 on 2026-08-15 but dropped the stream twice at
+  `format` in the INI or `--format` on the helper. Both `flac` and `wav` passed physical playback checks;
+  `wav24` was accepted by the M5 on 2026-08-15 but dropped the stream twice at
   thirteen minutes. See `FOOBAR_PLUGIN.md` for what each one costs.
 - A bounded helper restart loop from merged PR #55, measured on hardware. A spawn that never
   reaches `PLAYING` is charged and the next one waits 0.5 s, then 1 s, 2 s, 4 s, up to an 8 s
@@ -46,9 +61,9 @@ branch or implementing another timing layer.
   TuneIn screen exposes station artwork/metadata plus play/pause, mute, raw-volume and Stop.
   **Root UI 2026-09-22:** the launcher is now a persistent Home · Radio · Settings shell.
   Home consumes the shared runtime speaker snapshot for Now Playing and direct controls, and
-  Home/Radio share one runtime view of the three `kind=speaker` presets read from the M5.
-  Those three tiles are the same slots cycled by the physical Radio button; no local duplicate
-  is persisted. Preset editing is deliberately not shipped yet: `SetSavePreset` /
+  Radio owns the three `kind=speaker` presets read from the M5, while Home
+  displays shared Now Playing state. They are the physical Radio-button slots; no
+  local duplicate is persisted. Preset editing is deliberately not shipped yet: `SetSavePreset` /
   `SetMovePreset` remain behind the existing hardware-validation gate. **Rolling-release
   hardware pass 2026-09-23:** cold-start autodiscovery found and connected the M5 automatically;
   Czwórka and BBC Radio 1 started from the three Home presets. Trójka still did not start, which
@@ -336,7 +351,10 @@ that timestamps its own `Stop-Process` calls reports its own polling period - th
 showed a flat 0.33 s that was the loop, not the component. Use the process `StartTime` the
 operating system records.
 
-## Open, in the order that makes sense
+## Investigation ledger (historical numbering, not priority)
+
+The completed and uncompleted numbered entries below are retained as evidence.
+Use [Android vNext](ANDROID_VNEXT.md) for current Android work.
 
 1. ~~**Physical checklist for PR #30**~~ (routed volume slider). PR #30 is closed; the routed
    slider is in `Stable on main` above. Struck 2026-08-19 during a claim-by-claim audit.
@@ -438,10 +456,10 @@ operating system records.
     handler and its cleanup entirely. Confirmed by rerunning with `PYTHONUNBUFFERED=1` piped to
     a file and stopping the real `python.exe` PID directly.
 
-    **What's still missing is product integration, and it is an architecture decision, not
-    just an untried code path**: `foobar/foo_out_wam.cpp` has zero `SetSharePlaybackControl`/
-    DLNA references, so the actual plugin still only offers the universal PCM path for local
-    files. `WamOutput` is an `output_v6` - it receives already-decoded PCM in `process_samples`
+    **The foobar output device itself still offers only universal PCM playback**:
+    `foobar/foo_out_wam.cpp` has no `SetSharePlaybackControl`/DLNA handling.
+    A separate context-menu Share action was added later (below), not a second
+    output-device transport. `WamOutput` is an `output_v6` - it receives already-decoded PCM in `process_samples`
     and has no access to `playable_location`/file path anywhere in the file (confirmed by
     grep). The share/DLNA path instead needs the speaker to fetch the *original file* over
     HTTP, which means the output component must not be in the signal path for those tracks at
@@ -475,14 +493,12 @@ operating system records.
     tool out of step with the rest of the project). Pause, seek and a progress display are still
     out of scope, per the unmeasured-seek finding above.
 
-    **Written but not yet verified**: no foobar2000 SDK or MSVC toolchain is set up on the
-    machine this landed on, so the new `contextmenu_item` class has not been compiled - it
-    follows the standard `contextmenu_item_simple` pattern from public foobar2000 components, but
-    needs a real build (CI or a local toolchain) before it can be trusted. The Python-side change
-    (`--device` resolution, the new `wambridge-share.exe` packaging) is unit-tested and green.
-    Hardware validation is unstarted and deliberately deferred to a session with the owner
-    present, per `AGENTS.md`'s full physical checklist (complete track, stable seekbar, second
-    track, pause/resume, stop/change, clean shutdown) - nothing here has touched the real M5.
+    **Build verified on 2026-10-10:** the native `contextmenu_item` compiles with
+    the foobar SDK and MSBuild, and `wambridge-share.exe` is packaged in the
+    successful [Build workflow](https://github.com/travnie/wambridge/actions/runs/38056249154).
+    Python tests pass. **The foobar context-menu Share action itself has not
+    been recorded as tested end to end on the M5.** Its CLI transport was tested
+    separately on 2026-09-13; pause, seek and progress are outside this path's scope.
 11. ~~Add a proper foobar preferences page while retaining legacy INI compatibility.~~
     **Done** - `foobar/wam_preferences.cpp` implements `preferences_page_instance` in 524
     lines, and the INI keys still load. Struck 2026-08-19 during a claim-by-claim audit; it had
@@ -640,10 +656,10 @@ operating system records.
     **Extended on 2026-09-21:** Android still consumes the shared
     `src/wambridge/station_packs.json`, but a fresh install now starts with the focused `top3`
     pack: BBC Radio 1 (`s24939`), Trójka (`s15984`) and Czwórka (`s118200`), each with its
-    ordered fallback URLs. User edits override bundled entries and deletions stay deleted. On
-    current `main`, HLS/Ogg sources still prefer TuneIn or a direct-format fallback; PR #187
-    adds the isolated phone-side Media3 transcoder and exposes `bbc6` / `falloutfm5` for its
-    physical M5 validation pass.
+    ordered fallback URLs. User edits override bundled entries and deletions stay deleted. At
+    the time, HLS/Ogg used TuneIn or a fallback; PR #187 subsequently merged
+    the isolated phone-side Media3 transcoder on 2026-09-28, exposing
+    `bbc6` / `falloutfm5` for further physical checks.
 
     Renderer startup is also an explicit `STARTING/RUNNING/STOPPING/STOPPED` lifecycle now.
     Discovery can be cancelled by Stop, saved speakers are re-found by stable `GetDeviceId` after
@@ -663,10 +679,10 @@ operating system records.
     **HLS/Ogg transport merged 2026-09-28:** PR #187 implements an isolated Media3
     HLS/Ogg/Opus -> PCM16/WAV path while leaving MP3/AAC/FLAC on the lightweight relay. The
     first physical M5 pass played BBC Radio 1 (HLS), Trójka (Ogg, with `StreamTitle`) and
-    Czwórka (direct MP3), switched HLS -> Ogg and restarted after Stop. Merged with open
-    hardware items tracked in `docs/ANDROID_VNEXT.md` section 8: Stop during transcoder
-    startup, 60 s stability per transcoded station, the 0 -> 3 safe-start volume on every
-    station start. Missing BBC HLS titles are expected: the stream carries no timed metadata
+    Czwórka (direct MP3), switched HLS -> Ogg and restarted after Stop. Follow-up
+    hardware checks closed quick Stop, cold-start 0 -> 3 and audible
+    station-switch volume retention (PR #213, 2026-10-02). BBC6/Fallout
+    stability and muted/paused switches remain in `docs/ANDROID_VNEXT.md` section 8. Missing BBC HLS titles are expected: the stream carries no timed metadata
     (checked 2026-10-01).
 
     **Home/Radio navigation updated 2026-09-23:** Home consumes the shared speaker snapshot for

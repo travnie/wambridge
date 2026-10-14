@@ -11,7 +11,10 @@
 | medium | Documentation can contradict newer measured history | `foobar/README.md` vs root/status docs | wrong next-step decisions | treat newest measured status as authoritative and extend drift tests |
 
 ## 2) Technical Debt
-Finite DLNA/share playback is proven but remains a separate experimental path rather than the default transport. TuneIn preset write operations are still deliberately unproven on hardware.
+Finite share/DLNA playback works through the optional CLI and foobar context-menu
+helper, but is not the default output transport; the foobar integration still needs
+a physical pass, and native share seek/progress is not implemented. TuneIn preset
+save/remove and moves across physical slots are still unproven on hardware.
 
 ## 3) Security Concerns
 
