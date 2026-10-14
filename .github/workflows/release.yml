@@ -155,10 +155,6 @@ jobs:
               echo
               echo "The foobar2000 component and the Android APK always come from the same commit. The latest tag is replaced in place, so these download links keep working."
             } > release-notes.md
-            # Move the rolling tag onto this commit, creating it the first time.
-            if ! gh api --method PATCH "repos/${GH_REPO}/git/refs/tags/${TAG}" -f sha="$GITHUB_SHA" -F force=true >/dev/null 2>&1; then
-              gh api --method POST "repos/${GH_REPO}/git/refs" -f ref="refs/tags/${TAG}" -f sha="$GITHUB_SHA" >/dev/null
-            fi
           else
             echo "foobar2000 component and signed Android APK for ${VERSION}." > release-notes.md
           fi
@@ -172,13 +168,20 @@ jobs:
           fi
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "$TITLE" --notes-file release-notes.md --latest --target "$GITHUB_SHA"
+            # Preserve the old advertised SHA until every replacement asset uploaded.
             gh release upload "$TAG" "${assets[@]}" --clobber
+            gh release edit "$TAG" --title "$TITLE" --notes-file release-notes.md --latest --target "$GITHUB_SHA"
           else
             gh release create "$TAG" "${assets[@]}" --target "$GITHUB_SHA" --title "$TITLE" --latest --notes-file release-notes.md
           fi
 
           if [[ "$ROLLING" == "true" ]]; then
+            # Move tag only after the assets and release target are published.
+            # The foobar update checker reads target_commitish from the release API.
+            if ! gh api --method PATCH "repos/${GH_REPO}/git/refs/tags/${TAG}" -f sha="$GITHUB_SHA" -F force=true >/dev/null 2>&1; then
+              gh api --method POST "repos/${GH_REPO}/git/refs" -f ref="refs/tags/${TAG}" -f sha="$GITHUB_SHA" >/dev/null
+            fi
+
             # A rolling release keeps one APK, not a growing pile of them.
             gh release view "$TAG" --json assets --jq '.assets[].name' > release-assets.txt
             while IFS= read -r asset; do
