@@ -47,6 +47,22 @@ Start hardware tests at raw volume step `3` or lower. Transport changes are
 merge-ready after these pass on the physical M5: complete track, stable seekbar,
 second track, pause/resume, stop/change and clean process shutdown.
 
+### Cloud sessions
+
+Setup (uv sync, Android SDK, foobar2000 SDK headers) comes from the cloud environment's
+session-start hook, not from this repo. What runs there:
+
+- Python: `uv run ruff check src tests foobar/wambridge_pcm_entry.py tools`,
+  `uv run python -m unittest discover -s tests -v`, CLI `--help` smoke checks.
+- Android (`mobile/`): `./mobile/gradlew -p mobile :app:lintDebug :app:testDebugUnitTest :app:assembleDebug`.
+  Inspect APKs with `androguard`.
+- foobar2000 SDK headers are at `$FOOBAR_SDK_ROOT` for reading only.
+
+Only in GitHub Actions: the fb2k component (MSVC, `build.yml` on windows-2022), PyInstaller
+`.exe` helpers, signed APKs. Push a branch, open a PR and read the `build` / `android` job
+logs; treat that as the compiler. No physical M5 there: hardware acceptance (list above)
+stays with a human; say which of those checks a change needs.
+
 ## Code review rules
 
 - Do not comment on README-only, documentation-only, changelog, formatting or
