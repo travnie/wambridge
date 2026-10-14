@@ -162,6 +162,14 @@ jobs:
       - name: Build x64 component
         shell: pwsh
         run: |
+          # Keep the installed rolling build distinguishable when version stays 0.0.5.
+          $sha = "$env:GITHUB_SHA"
+          if ($sha -notmatch '^[0-9a-f]{40}$') { throw "Invalid build SHA" }
+          @(
+            '#pragma once'
+            "#define WAMBRIDGE_BUILD_SHA `"$sha`""
+          ) | Set-Content foobar/wam_build_sha.h -Encoding ascii
+
           $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
           $msbuild = & $vswhere -latest `
             -requires Microsoft.Component.MSBuild `

@@ -54,7 +54,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <!-- ws2_32 for the loopback control channel to the running helper. -->
-      <AdditionalDependencies>$(FoobarSdkRoot)\foobar2000\shared\shared-$(Platform).lib;winmm.lib;ws2_32.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>$(FoobarSdkRoot)\foobar2000\shared\shared-$(Platform).lib;winmm.lib;ws2_32.lib;winhttp.lib;shell32.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -79,6 +79,7 @@
       <ForcedIncludeFiles>wam_write_probe.h;%(ForcedIncludeFiles)</ForcedIncludeFiles>
     </ClCompile>
     <ClCompile Include="wam_menu.cpp" />
+    <ClCompile Include="wam_updates.cpp" />
     <ClCompile Include="wam_preferences.cpp" />
     <ClCompile Include="wam_settings.cpp" />
   </ItemGroup>
