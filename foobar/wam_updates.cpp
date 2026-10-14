@@ -222,7 +222,7 @@ void open_release_page() {
 }
 
 // Dialogs run on foobar's main thread, never on the network worker.
-class ShowUpdateResult final : public main_thread_callback {
+class ShowUpdateResult : public main_thread_callback {
 public:
     explicit ShowUpdateResult(ReleaseCheck result) : m_result(std::move(result)) {}
 
@@ -287,7 +287,7 @@ void check_worker() {
     g_checking.store(false);
 }
 
-class UpdateShutdown final : public initquit {
+class UpdateShutdown : public initquit {
 public:
     void on_init() override {}
     void on_quit() override {
