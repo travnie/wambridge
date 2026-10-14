@@ -48,8 +48,9 @@ investigation log is **not the current task queue**. Read [the documentation ind
   `playstatus` and `GetMusicInfo` answers `errCode: Wifi Sub Mode is CP`; neither means the
   playback failed.
 - Speaker-facing output profiles `flac` (default), `wav`, `wav24` and `mp3`, selected by
-  `format` in the INI or `--format` on the helper. Both `flac` and `wav` passed physical playback checks;
-  `wav24` was accepted by the M5 on 2026-08-15 but dropped the stream twice at
+  `format` in the INI or `--format` on the helper. `flac` passed the full M5
+  playback checklist; `wav` passed transport checks, but audible artifacts remain
+  unverified. `wav24` was accepted by the M5 on 2026-08-15 but dropped the stream twice at
   thirteen minutes. See `FOOBAR_PLUGIN.md` for what each one costs.
 - A bounded helper restart loop from merged PR #55, measured on hardware. A spawn that never
   reaches `PLAYING` is charged and the next one waits 0.5 s, then 1 s, 2 s, 4 s, up to an 8 s

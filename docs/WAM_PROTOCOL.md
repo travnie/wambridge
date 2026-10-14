@@ -18,7 +18,7 @@ Primary evidence is preserved in PR #7, PR #21 and `tools/wam-probes/`.
 | Path | What confirms or anchors it | Current state |
 | --- | --- | --- |
 | URL/PCM through `SetUrlPlayback` | `AUDIO_STARTED` anchors bounded host flow | Validated on hardware 2026-08-02: full checklist at a median 1.00x |
-| Share/DLNA through `SetSharePlaybackControl` | `StartPlaybackEvent` | Audible finite-file playback is proven; integration is not active |
+| Share/DLNA through `SetSharePlaybackControl` | `StartPlaybackEvent` | CLI path validated on the M5 (2026-09-13); foobar `Send to WAM (Share)` context-menu helper is built and packaged, but its foobar-to-M5 physical path remains unverified; not a PCM output transport |
 | Generic UPnP AVTransport | none exists on this M5 | Rejected |
 
 `MusicInfo` and `PlayStatus` are not reliable success signals. They have reported `play`
@@ -644,10 +644,11 @@ problem and the open list said otherwise for longer than it was true.
 
 What the app has and this project does not is on either side of that:
 
-- **Writing presets.** `README.md` says changing the preset list "still belongs to Samsung's
-  plugin because no reliable write API is known". The app has `SetSavePreset`,
-  `SetRemovePreset` (`presetindex`) and `SetMovePreset`. Untested here, but they are not
-  unknown any more.
+- **Writing presets (historical 2026-08-19 gap).** `SetSavePreset`,
+  `SetRemovePreset` (`presetindex`) and `SetMovePreset` are implemented in the CLI.
+  `SetMovePreset 10 11 0` swapped adjacent `my` entries on the physical M5 on
+  2026-09-13 and the swap back restored the list. Save, remove, cross-group moves and
+  the physical slots 0-2 remain untested; removal has no undo.
 - **Finding stations that are not already saved.** The catalogue really is a tree, and it has
   now been walked - see "Walking the radio tree" below for the measured shapes, and for the
   price of doing it. Nothing in this project browses it yet; only what the speaker already
@@ -1270,21 +1271,22 @@ currently selected, so a station has to be playing or selected before it can be 
 also why browsing matters - `SetSelectRadio`, `GetCurrentRadioList`, `GetSelectRadioList` and
 `GetUpperRadioList` are how the app reaches a station that is not already a preset.
 
-**Untested hypothesis, and the reason to be careful.** The list above is one sequence, with the
-three `speaker` entries at indices 0-2 and `my` from 3 onwards. If that ordering is the speaker's
-own and not a presentation choice by this client, then `SetMovePreset` from an index in the `my`
-range to 0, 1 or 2 would promote an existing station into the physical-button set without having
-to browse or re-save anything. That would make the whole feature two commands. It is a guess:
-nothing has been sent, and `movedirection` has an unknown meaning and an unknown valid range.
+**Partially measured, still risky at the physical-button boundary.** The list has
+`speaker` entries at 0-2 and `my` from 3 onward. On 2026-09-13,
+`SetMovePreset 10 11 0` swapped adjacent `my` entries on the M5; moving them
+back restored the snapshot. It remains a hypothesis that crossing from `my`
+into 0-2 will assign a station to the physical Radio button. Non-adjacent
+moves, `SetSavePreset` and `SetRemovePreset` have not been validated.
 
 Order to settle it, cheapest first, and **dump `--tunein-list` to a file before the first write**
 - `SetRemovePreset` takes only an index and there is no undo:
 
 1. Re-read `--tunein-list` after any change; it is the only way to see the result.
-2. `SetMovePreset` between two adjacent `my` entries, far from the speaker slots. Harmless if it
-   works, informative if it errors, and it settles what `movedirection` wants.
-3. Only then a move that crosses into 0-2, which is the interesting one.
-4. `SetSavePreset` last, since it needs a selected station and therefore needs browsing first.
+2. ~~Swap adjacent `my` entries with `SetMovePreset`.~~ Done 2026-09-13 on M5:
+   indices 10/11 with `movedirection=0`, then restored.
+3. Test a non-adjacent move and only with a fresh backup consider crossing 0-2.
+4. Test `SetSavePreset` with a selected station; `SetRemovePreset` requires
+   separate explicit approval because there is no undo.
 
 
 ### Adopting any of this, safest first

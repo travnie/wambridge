@@ -37,6 +37,11 @@ Use a proper MediaSession for radio playback so controls can appear naturally in
 DLNA playback should remain owned by the external player that started it, rather than
 having two apps fight over the speaker.
 
+Pending M5 hardware check:
+
+- [ ] Verify notification, lock-screen/system actions and headset/Bluetooth media buttons
+  while native radio is playing (not just JVM MediaSession tests).
+
 ## 3. Sleep Timer / Standby
 
 **Software implemented 2026-09-22; Standby now hardware-validated 2026-09-23.** Android exposes
@@ -162,6 +167,12 @@ copyable text output and controlled Fix connection recovery; manual IP moved und
 
 Keep protocol archaeology out of the normal UI while still making failures explainable.
 
+Pending physical network recovery check:
+
+- [ ] Start DLNA from the widget and Quick Settings after clearing or staling
+  the saved target, then repeat across a real Wi-Fi/DHCP move. JVM coverage exists;
+  the full hardware handoff observation is still missing.
+
 - speaker ID and IP
 - Wi-Fi / Android Network binding
 - current M5 owner: radio, renderer or idle
@@ -178,7 +189,10 @@ Most of the daily-driver layer is shipped. The remaining sequence is deliberatel
 1. check BBC 6 Music/Fallout FM 5 stability and the remaining muted/paused
    volume-switch case from section 8 (ordinary start and audible switch already passed);
 2. finish the 15/30/45/60-minute sleep-timer duration/readback pass;
-3. validate preset write commands before exposing physical preset editing on Android.
+3. validate risky preset writes before exposing physical preset editing;
+4. exercise the outstanding ICY metadata physical pass (section 7), MediaSession
+   lock-screen/headset controls (section 2), and widget/Quick Settings DLNA
+   reconnection across a real Wi-Fi/DHCP move (section 10).
 
 Diagnostics should grow alongside those checks rather than becoming a separate second control
 stack.
