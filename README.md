@@ -11,8 +11,10 @@ Multiroom speakers, including Shape M5 (`WAM550`/`WAM551`).
 
 The CLI serves a tokenized local stream and starts it through Samsung's
 `SetUrlPlayback` API. The foobar2000 output component sends whatever foobar is
-playing, including internet radio. Finite share/DLNA playback is protocol-proven
-but not integrated.
+playing, including internet radio. Finite share/DLNA playback is available
+through `wambridge-share` and foobar's **Send to WAM (Share)** track context menu,
+outside the normal PCM output path. The CLI path is hardware-validated; the
+foobar context-menu integration still needs a physical M5 pass.
 
 Everything here was measured against one physical Shape M5 (`SPK-WAM550`,
 firmware `WAM550WWB-3117.1`). Other models in the family are untested.
@@ -258,8 +260,9 @@ wambridge --device M5 --tunein-play 0 --volume 3
 wambridge --device M5 --tunein-play "Radio Paradise" --volume 3
 ```
 
-Presets can also be written from here, untested on hardware so far - back up
-`--tunein-list` first, since `--tunein-remove` has no undo:
+Preset write commands are available: adjacent `my` moves were hardware-tested,
+but saving, removing and moving into physical slots 0-2 remain unverified. Back up
+`--tunein-list` first; `--tunein-remove` has no undo:
 
 ```powershell
 wambridge --device M5 --tunein-save

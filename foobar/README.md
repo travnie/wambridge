@@ -77,6 +77,12 @@ Playback -> WAM Bridge -> Volume down
 Playback -> WAM Bridge -> Volume to safe level
 ```
 
+The track context menu also offers **Send to WAM (Share)** for a single local
+file. It launches the bundled `wambridge-share.exe` independently of foobar's
+PCM output device. The share CLI plays on the M5; hardware validation of the
+foobar context-menu handoff is still pending. It does not provide native foobar
+seek, pause or playback progress.
+
 Commands run through a serialized bundled control helper and report completion or errors in
 the foobar console. `Start sleep timer` uses the existing `sleep_after_stop` preference as its
 delay; when playback is active it is routed through the running PCM helper instead of opening a
