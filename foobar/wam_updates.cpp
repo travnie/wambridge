@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <shellapi.h>
 #include <winhttp.h>
+#include <foobar2000/SDK/foobar2000.h>
 
 #include "wam_updates.h"
 
@@ -15,6 +16,8 @@
 #include <atomic>
 #include <cctype>
 #include <optional>
+#include <mutex>
+#include <utility>
 #include <string>
 #include <string_view>
 #include <thread>
@@ -28,6 +31,9 @@ constexpr wchar_t kReleasePage[] =
     L"https://github.com/travnie/wambridge/releases/tag/latest";
 constexpr size_t kMaxResponseBytes = 256 * 1024;
 std::atomic<bool> g_checking{false};
+std::atomic<bool> g_stopping{false};
+std::mutex g_worker_mutex;
+std::thread g_worker;
 
 struct InternetHandle {
     HINTERNET value = nullptr;
@@ -152,8 +158,20 @@ ReleaseCheck fetch_latest_release() {
     if (!sha || !valid_sha(*sha)) {
         return {{}, L"Latest release has no valid commit identifier."};
     }
-    if (body.find("\"foo_out_wam.fb2k-component\"") == std::string::npos) {
+    // The publisher uploads assets before advertising a new target commit.
+    // Reject an absent or unfinished component rather than suggesting a stale download.
+    const auto assets = body.find("\"assets\"");
+    const auto name = assets == std::string::npos
+        ? std::string::npos
+        : body.find("\"foo_out_wam.fb2k-component\"", assets);
+    const auto objectEnd = name == std::string::npos
+        ? std::string::npos : body.find('}', name);
+    if (objectEnd == std::string::npos) {
         return {{}, L"The latest release has no foobar component asset."};
+    }
+    const auto asset = body.substr(name, objectEnd - name);
+    if (json_string(asset, "state") != std::optional<std::string>("uploaded")) {
+        return {{}, L"The foobar component asset is not ready."};
     }
     return {*sha, {}};
 }
@@ -163,55 +181,112 @@ std::wstring short_sha(const std::string& value) {
 }
 
 void open_release_page() {
-    ShellExecuteW(nullptr, L"open", kReleasePage, nullptr, nullptr, SW_SHOWNORMAL);
+    const auto result = ShellExecuteW(
+        nullptr, L"open", kReleasePage, nullptr, nullptr, SW_SHOWNORMAL
+    );
+    if (reinterpret_cast<INT_PTR>(result) <= 32) {
+        MessageBoxW(nullptr, L"Could not open the GitHub release page in your browser.",
+                    L"WAM Bridge updates", MB_OK | MB_ICONWARNING);
+    }
 }
 
-void check_worker() {
-    try {
-        const ReleaseCheck latest = fetch_latest_release();
-        if (!latest.error.empty()) {
-            MessageBoxW(nullptr, latest.error.c_str(), L"WAM Bridge updates",
-                        MB_OK | MB_ICONWARNING | MB_SETFOREGROUND);
-        } else {
+// Dialogs run on foobar's main thread, never on the network worker.
+class ShowUpdateResult final : public main_thread_callback {
+public:
+    explicit ShowUpdateResult(ReleaseCheck result) : m_result(std::move(result)) {}
+
+    void callback_run() override {
+        if (g_stopping.load()) return;
+        try {
+            if (!m_result.error.empty()) {
+                MessageBoxW(nullptr, m_result.error.c_str(), L"WAM Bridge updates",
+                            MB_OK | MB_ICONWARNING | MB_SETFOREGROUND);
+                return;
+            }
             const std::string installed = WAMBRIDGE_BUILD_SHA;
-            if (valid_sha(installed) && installed == latest.sha) {
+            if (valid_sha(installed) && installed == m_result.sha) {
                 const std::wstring message =
                     L"WAM Bridge is up to date.\n\nInstalled build: " +
                     short_sha(installed);
                 MessageBoxW(nullptr, message.c_str(), L"WAM Bridge updates",
                             MB_OK | MB_ICONINFORMATION | MB_SETFOREGROUND);
-            } else {
-                const std::wstring current = valid_sha(installed)
-                    ? short_sha(installed)
-                    : L"unknown (older or local build)";
-                const std::wstring message =
-                    L"Installed build: " + current +
-                    L"\nLatest release: " + short_sha(latest.sha) +
-                    L"\n\nOpen the GitHub release page to install the component?\n"
-                    L"This check does not modify or install files automatically.";
-                const int choice = MessageBoxW(
+                return;
+            }
+
+            const std::wstring current = valid_sha(installed)
+                ? short_sha(installed)
+                : L"unknown (older or local build)";
+            const std::wstring message =
+                L"Installed build: " + current +
+                L"\nLatest release: " + short_sha(m_result.sha) +
+                L"\n\nOpen the GitHub release page to install the component?\n"
+                L"This check does not modify or install files automatically.";
+            if (MessageBoxW(
                     nullptr, message.c_str(), L"WAM Bridge updates",
                     MB_YESNO | MB_ICONQUESTION | MB_SETFOREGROUND
-                );
-                if (choice == IDYES) open_release_page();
+                ) == IDYES) {
+                open_release_page();
             }
+        } catch (...) {
+            MessageBoxW(nullptr, L"Unable to display the WAM Bridge update result.",
+                        L"WAM Bridge updates", MB_OK | MB_ICONWARNING);
         }
+    }
+
+private:
+    ReleaseCheck m_result;
+};
+
+void check_worker() {
+    ReleaseCheck latest;
+    try {
+        latest = fetch_latest_release();
     } catch (...) {
-        MessageBoxW(nullptr, L"Unable to check for WAM Bridge updates.",
-                    L"WAM Bridge updates", MB_OK | MB_ICONWARNING);
+        latest.error = L"Unable to check for WAM Bridge updates.";
+    }
+    if (!g_stopping.load()) {
+        try {
+            main_thread_callback_manager::get()->add_callback(
+                new service_impl_t<ShowUpdateResult>(std::move(latest))
+            );
+        } catch (...) {
+            // Shutdown may have started; no UI or SDK callbacks from this worker.
+        }
     }
     g_checking.store(false);
 }
+
+class UpdateShutdown final : public initquit {
+public:
+    void on_init() override {}
+    void on_quit() override {
+        g_stopping.store(true);
+        std::thread owned;
+        {
+            std::lock_guard<std::mutex> lock(g_worker_mutex);
+            owned = std::move(g_worker);
+        }
+        if (owned.joinable()) owned.join();
+    }
+};
+
+initquit_factory_t<UpdateShutdown> g_update_shutdown;
 
 }  // namespace
 
 namespace wam {
 
 void check_for_updates() {
-    if (g_checking.exchange(true)) return;
+    if (g_stopping.load() || g_checking.exchange(true)) return;
+    std::lock_guard<std::mutex> lock(g_worker_mutex);
+    if (g_stopping.load()) {
+        g_checking.store(false);
+        return;
+    }
+    // A previous check has finished before g_checking became false.
+    if (g_worker.joinable()) g_worker.join();
     try {
-        // No network work on foobar's UI thread; the user explicitly starts checks.
-        std::thread(check_worker).detach();
+        g_worker = std::thread(check_worker);
     } catch (...) {
         g_checking.store(false);
         MessageBoxW(nullptr, L"Unable to start update check.",
