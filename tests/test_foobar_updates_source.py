@@ -17,7 +17,10 @@ class FoobarUpdateCheckerTests(TestCase):
     def test_preferences_button_dispatches_without_dirtying_settings(self) -> None:
         page = PREFERENCES.read_text(encoding="utf-8")
         menu = MENU.read_text(encoding="utf-8")
-        self.assertIn('m_checkUpdates = make_button(instance, kCheckUpdates, L"Check for updates");', page)
+        self.assertIn(
+            'm_checkUpdates = make_button(instance, kCheckUpdates, L"Check for updates");',
+            page,
+        )
         self.assertIn('place_row(m_updatesLabel, m_checkUpdates, 11);', page)
         self.assertRegex(
             page,
