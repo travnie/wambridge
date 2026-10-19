@@ -10,6 +10,7 @@ from __future__ import annotations
 import socket
 import threading
 import unittest
+from unittest.mock import patch
 
 from wambridge.control_channel import ControlChannel
 
@@ -72,6 +73,42 @@ class ControlChannelTests(unittest.TestCase):
     def _send(self, client: socket.socket, line: str) -> None:
         self.applied.clear()
         client.sendall(f"{line}\n".encode())
+
+    def test_dispatch_timing_preserves_fire_and_forget_and_sleep_reply(self) -> None:
+        with (
+            patch(
+                "wambridge.control_channel.time.perf_counter_ns",
+                side_effect=[1_000_000_000, 1_125_000_000],
+            ),
+            self.assertLogs("wambridge.control_channel", level="INFO") as captured,
+        ):
+            self.assertIsNone(self.channel._dispatch("pause"))
+        self.assertEqual(self.paused, [True])
+        self.assertTrue(
+            any(
+                "WAMBRIDGE CONTROL_TIMING command=pause dispatch_ms=125.000" in line
+                for line in captured.output
+            )
+        )
+
+        with (
+            patch(
+                "wambridge.control_channel.time.perf_counter_ns",
+                side_effect=[2_000_000_000, 2_010_000_000],
+            ),
+            self.assertLogs("wambridge.control_channel", level="INFO") as captured,
+        ):
+            self.assertEqual(self.channel._dispatch("sleep 30"), "ok")
+        self.assertEqual(self.sleep_timers, [30])
+        self.assertIn("command=sleep dispatch_ms=10.000", captured.output[0])
+
+    def test_dispatch_does_not_time_unknown_commands(self) -> None:
+        with (
+            patch("wambridge.control_channel.time.perf_counter_ns") as timer,
+            self.assertLogs("wambridge.control_channel", level="WARNING"),
+        ):
+            self.assertIsNone(self.channel._dispatch("unrecognized"))
+        timer.assert_not_called()
 
     def test_binds_loopback_only(self) -> None:
         # It moves a speaker in someone's room; the network has no business
