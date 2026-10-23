@@ -46,13 +46,15 @@ cut by another two seconds.** On 2026-08-27 the physical M5 stayed stable with
 ear-to-clock total has not been measured yet, so the old 6.7 s figure is historical
 rather than a claim about current stock behavior.
 
-Playback itself is unaffected — the stream runs at wall-clock speed and the
-seekbar is honest. **Pause, stop and skip still carry pipeline latency** because they act
-through the PCM path; with `hardware_volume=1`, the volume slider is routed to the speaker instead. Lowering
-the bitrate makes the speaker prebuffer worse rather than better, and raising it helped by
-about a second in the older measurements. The remaining latency-sensitive controls belong
-on the speaker's own `55001` command path, which answers in about a second, rather
-than to keep shortening the audio path; that work is in progress.
+Playback runs at wall-clock speed and the seekbar is honest. **Pause/resume
+already use the speaker's raw-volume command on the existing `55001` connection**
+(hardware-validated on 2026-08-28), with paced PCM silence as fallback.
+With `hardware_volume=1`, the volume slider also routes to the speaker.
+**Stop and skip still have transport lifecycle costs** and require physical
+M5 validation before changing the release/handover protocol. Lowering the
+bitrate worsened prebuffering in older measurements; it is not a safe latency fix.
+Callback timing instrumentation and a before/after report are described in
+[`tools/wam-probes/README.md`](tools/wam-probes/README.md).
 
 Everything else is documented honestly, including the approaches that failed:
 
