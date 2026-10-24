@@ -29,7 +29,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-2022
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -142,9 +142,13 @@ jobs:
       - name: Download foobar2000 SDK
         shell: pwsh
         run: |
+          $sdkVersion = (Get-Content foobar/sdk-version.txt -Raw).Trim()
+          if ($sdkVersion -notmatch '^\d{4}-\d{2}-\d{2}$') {
+            throw "Invalid foobar2000 SDK version"
+          }
           New-Item -ItemType Directory -Force external/foobar-sdk | Out-Null
           Invoke-WebRequest `
-            -Uri "https://www.foobar2000.org/downloads/SDK-2025-03-07.7z" `
+            -Uri "https://www.foobar2000.org/downloads/SDK-$sdkVersion.7z" `
             -OutFile external/foobar-sdk.7z
           7z x external/foobar-sdk.7z -oexternal/foobar-sdk -y
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
@@ -182,7 +186,7 @@ jobs:
             /m `
             /p:Configuration=Release `
             /p:Platform=x64 `
-            /p:VCToolsVersion=14.29.30133 `
+            /p:PlatformToolset=v145 `
             "/p:FoobarSdkRoot=$env:FOOBAR_SDK_ROOT"
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE

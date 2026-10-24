@@ -56,9 +56,11 @@ jobs:
 
       - name: Download foobar2000 SDK
         run: |
+          sdk_version="$(tr -d '\r\n' < foobar/sdk-version.txt)"
+          [[ "$sdk_version" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]]
           mkdir -p external/foobar-sdk
           curl -fsSL --retry 3 \
-            https://www.foobar2000.org/downloads/SDK-2025-03-07.7z \
+            https://www.foobar2000.org/downloads/SDK-${sdk_version}.7z \
             -o external/foobar-sdk.7z
           7z x external/foobar-sdk.7z -oexternal/foobar-sdk -y >/dev/null
 
