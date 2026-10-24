@@ -15,6 +15,12 @@ on: # yamllint disable-line rule:truthy
 permissions:
   contents: read
 
+# Coalesce duplicate automated requests for one release version without
+# replacing queued releases of other versions. Manual runs have unique groups.
+concurrency:
+  group: pypi-${{ github.event_name == 'repository_dispatch' && github.event.client_payload.version || github.run_id }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-slim
