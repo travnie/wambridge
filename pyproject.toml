@@ -10,7 +10,14 @@ readme = "README.md"
 requires-python = ">=3.14"
 license = "ISC"
 authors = [{ name = "trvny" }]
+keywords = ["samsung", "multiroom", "wifi", "audio", "radio", "cli"]
+
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/travnie/wambridge"
+Source = "https://github.com/travnie/wambridge"
+Issues = "https://github.com/travnie/wambridge/issues"
 
 [project.scripts]
 wambridge = "wambridge.radio_cli:main"

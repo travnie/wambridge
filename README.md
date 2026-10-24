@@ -351,3 +351,7 @@ py -m unittest discover -s tests -v
 <i>❝E-Mail was invented before Internet. Shocked!!!! ” I also got shocked after hearing this.”❞</i>
 <!--ENDS_HERE_QUOTE_README-->
 <!-- markdownlint-enable MD033 -->
+
+## Python package / PyPI
+
+The Python CLI is prepared for public release as `trvny-wambridge`. Build artifacts and Trusted Publishing setup live in [PUBLISHING.md](PUBLISHING.md). After the first upload to PyPI, install with `uv tool install trvny-wambridge`; the foobar2000 plugin remains a separate `.fb2k-component` release.
