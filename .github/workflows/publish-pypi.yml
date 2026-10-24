@@ -4,10 +4,6 @@ on: # yamllint disable-line rule:truthy
   # Authenticated repository_dispatch is used by the GPTomek release operator.
   repository_dispatch:
     types: [publish_wambridge_pypi]
-  pull_request:
-    paths:
-      - ".github/workflows/publish-pypi.yml"
-      - "pyproject.toml"
   workflow_dispatch:
     inputs:
       publish:
@@ -18,10 +14,6 @@ on: # yamllint disable-line rule:truthy
 
 permissions:
   contents: read
-
-concurrency:
-  group: pypi-release
-  cancel-in-progress: false
 
 jobs:
   build:
@@ -73,4 +65,4 @@ jobs:
         with:
           name: wambridge-python-distributions
           path: dist
-      - run: uv publish dist/*
+      - run: uv publish --check-url https://pypi.org/simple/ dist/*
