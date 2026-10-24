@@ -1,6 +1,8 @@
 # Development status
 
-Last cross-checked: 2026-10-14 (main branch, PR #213 and 2026-10-10 Build).
+Last full status cross-check: 2026-10-14 (main branch, PR #213 and 2026-10-10 Build).
+Additional physical foobar URL/PCM measurements from 2026-10-21 are recorded below; the
+older dated validation and investigations remain historical evidence.
 
 Historical lab journal. Measurement dates inside entries are retained. The numbered
 investigation log is **not the current task queue**. Read [the documentation index](README.md),
@@ -8,6 +10,17 @@ investigation log is **not the current task queue**. Read [the documentation ind
 
 ## Current status pointers
 
+- **foobar URL/PCM full-track recheck (2026-10-21, unchanged `main`):** Three
+  249-second source runs failed wall-clock acceptance (reported wall durations include
+  305 and 310 seconds). Instrument logs showed 20–50-second gaps with full host buffering
+  while the M5 stopped pulling the HTTP stream, plus `MEDIA_BUFFER_ERROR`. The speaker's
+  2.4 GHz Wi-Fi link showed packet loss, but a network root cause is **not proven**.
+  Nobody listened and acoustic control latency was not measured. The shorter start,
+  pause/resume, next, seek and cleanup smoke succeeded; the full-track gate remains open.
+  See the [short smoke](https://github.com/travnie/wambridge/pull/234#issuecomment-6320693289)
+  and [full-track correction](https://github.com/travnie/wambridge/pull/234#issuecomment-6321793511).
+  The dated 2026-08-02 checklist under “Stable on `main`” below was a valid earlier run,
+  **not proof of current reliability**. The protocol summary links to this latest observation.
 - **Android:** remaining hardware tests live in [Android vNext](ANDROID_VNEXT.md).
   PR #213 records that cold start 0 -> 3, Stop -> Play 3 and audible station-switch
   volume retention passed on the M5 (2026-10-02). Muted/paused switching and
