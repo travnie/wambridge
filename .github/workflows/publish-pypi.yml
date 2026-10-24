@@ -51,7 +51,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    if: ${{ github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_dispatch' && inputs.publish == true) || (github.event_name == 'repository_dispatch' && github.event.action == 'publish_wambridge_pypi' && github.event.client_payload.publish == true)) }}
+    if: ${{ github.ref == 'refs/heads/main' && ((github.event_name == 'workflow_dispatch' && inputs.publish == true) || (github.event_name == 'repository_dispatch' && github.event.action == 'publish_wambridge_pypi' && toJSON(github.event.client_payload.publish) == 'true')) }}
     needs: build
     runs-on: ubuntu-slim
     environment: pypi
