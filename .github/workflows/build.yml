@@ -182,6 +182,7 @@ jobs:
             /m `
             /p:Configuration=Release `
             /p:Platform=x64 `
+            /p:PlatformToolset=v145 `
             "/p:FoobarSdkRoot=$env:FOOBAR_SDK_ROOT"
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE
