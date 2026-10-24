@@ -1,0 +1,59 @@
+name: Publish WAMBridge to PyPI
+
+on: # yamllint disable-line rule:truthy
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: Publish to PyPI (requires matching Trusted Publisher)
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: false
+      - run: uv python install 3.15
+      - name: Build wheel and sdist
+        run: uv build --out-dir dist
+      - name: Smoke test installed wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          wheel="$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
+          test -n "$wheel"
+          uv run --no-project --python 3.15 --with "./$wheel" -- python -c 'import wambridge, wambridge.radio_cli, wambridge.station_packs'
+          uv run --no-project --python 3.15 --with "./$wheel" -- wambridge --help
+      - name: Run repository tests
+        run: uv run --no-project --python 3.15 --with . -- python -m unittest discover -s tests -v
+      - uses: actions/upload-artifact@v7
+        with:
+          name: wambridge-python-distributions
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    if: ${{ inputs.publish == true }}
+    needs: build
+    runs-on: ubuntu-slim
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: wambridge-python-distributions
+          path: dist
+      - run: uv publish dist/*
