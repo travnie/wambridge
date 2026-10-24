@@ -5,7 +5,7 @@
 | Area | Value | Evidence |
 |---|---|---|
 | Core | Python >=3.14 operational and package baseline, stdlib-only production package | `pyproject.toml`, `.github/workflows/build.yml`, `src/wambridge/` |
-| Desktop adapter | C++17 x64 Windows DLL for foobar2000 | `foobar/foo_out_wam.vcxproj` |
+| Desktop adapter | C++20 x64 Windows DLL for foobar2000 | `foobar/foo_out_wam.vcxproj` |
 | Mobile adapter | Android app, Kotlin sources, AGP 9.3.2, Java 17 bytecode target | `mobile/build.gradle.kts`, `mobile/app/build.gradle.kts` |
 | Packaging | setuptools + uv; PyInstaller for Windows helpers | `pyproject.toml`, `.github/workflows/build.yml` |
 
@@ -19,7 +19,7 @@ The Python package declares no third-party runtime dependencies. FFmpeg is an ex
 | uv | locked Python environment | `uv.lock`, `.github/workflows/build.yml` |
 | Ruff | Python lint/format policy | `pyproject.toml` |
 | unittest | Python tests | `tests/`, `.github/workflows/build.yml` |
-| MSBuild/MSVC v142 | C++ component build | `foobar/foo_out_wam.vcxproj` |
+| MSBuild/MSVC v145 (CI, VS2026), v143 (VS2022 local) | C++ component build | `foobar/foo_out_wam.vcxproj` |
 | Gradle/AGP + JUnit 4 | Android build, lint and JVM tests | `mobile/`, `.github/workflows/mobile.yml` |
 
 ## 4) Key Commands
