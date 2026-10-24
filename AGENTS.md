@@ -58,7 +58,7 @@ session-start hook, not from this repo. What runs there:
   Inspect APKs with `androguard`.
 - foobar2000 SDK headers are at `$FOOBAR_SDK_ROOT` for reading only.
 
-Only in GitHub Actions: the fb2k component (MSVC, `build.yml` on windows-latest), PyInstaller
+Only in GitHub Actions: the fb2k component (MSVC, `build.yml` on windows-2025), PyInstaller
 `.exe` helpers, signed APKs. Push a branch, open a PR and read the `build` / `android` job
 logs; treat that as the compiler. No physical M5 there: hardware acceptance (list above)
 stays with a human; say which of those checks a change needs.

@@ -29,7 +29,7 @@ permissions:
 
 jobs:
   build:
-    runs-on: windows-latest
+    runs-on: windows-2025
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -186,7 +186,6 @@ jobs:
             /m `
             /p:Configuration=Release `
             /p:Platform=x64 `
-            /p:PlatformToolset=v145 `
             "/p:FoobarSdkRoot=$env:FOOBAR_SDK_ROOT"
           if ($LASTEXITCODE -ne 0) {
             exit $LASTEXITCODE

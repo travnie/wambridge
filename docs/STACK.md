@@ -19,8 +19,10 @@ The Python package declares no third-party runtime dependencies. FFmpeg is an ex
 | uv | locked Python environment | `uv.lock`, `.github/workflows/build.yml` |
 | Ruff | Python lint/format policy | `pyproject.toml` |
 | unittest | Python tests | `tests/`, `.github/workflows/build.yml` |
-| MSBuild/MSVC v145 (CI, VS2026), v143 (VS2022 local) | C++ component build | `foobar/foo_out_wam.vcxproj` |
+| MSBuild/MSVC v145 (CI on Windows 2025, VS2026), v143 (VS2022 local) | C++ component build | `foobar/foo_out_wam.vcxproj` |
 | Gradle/AGP + JUnit 4 | Android build, lint and JVM tests | `mobile/`, `.github/workflows/mobile.yml` |
+
+The component forwards its selected `PlatformToolset` to all three foobar2000 SDK project references, avoiding mixed-toolset LTCG failures in local VS2022/VS2026 builds. CI uses `windows-2025` with VS2026; it compiles without overriding the toolset so the same project configuration is tested.
 
 ## 4) Key Commands
 `uv sync --locked` · `uv run python -m unittest discover -s tests -v` · `uv run ruff check src tests foobar/wambridge_pcm_entry.py tools` · `cd mobile && ./gradlew :app:lintDebug :app:testDebugUnitTest :app:assembleDebug`
