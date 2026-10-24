@@ -6,7 +6,7 @@ This distribution is the **Python command-line bridge**, not the foobar2000 plug
 
 ## Build/check
 
-Run [Publish WAMBridge to PyPI](.github/workflows/publish-pypi.yml) with **publish = false** for a validated wheel and source distribution.
+Run [Publish WAMBridge to PyPI](../.github/workflows/publish-pypi.yml) with **publish = false** for a validated wheel and source distribution.
 
 ## First release
 

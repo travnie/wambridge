@@ -17,9 +17,23 @@ Primary evidence is preserved in PR #7, PR #21 and `tools/wam-probes/`.
 
 | Path | What confirms or anchors it | Current state |
 | --- | --- | --- |
-| URL/PCM through `SetUrlPlayback` | `AUDIO_STARTED` anchors bounded host flow | Validated on hardware 2026-08-02: full checklist at a median 1.00x |
+| URL/PCM through `SetUrlPlayback` | `AUDIO_STARTED` anchors bounded host flow | 2026-08-02 full checklist passed (median 1.00x); 2026-10-21 unchanged-main full-track recheck stalled (dated observation below) |
 | Share/DLNA through `SetSharePlaybackControl` | `StartPlaybackEvent` | CLI path validated on the M5 (2026-09-13); foobar `Send to WAM (Share)` context-menu helper is built and packaged, but its foobar-to-M5 physical path remains unverified; not a PCM output transport |
 | Generic UPnP AVTransport | none exists on this M5 | Rejected |
+
+**2026-10-21 URL/PCM baseline recheck (instrument-only, volume 3):** Three
+249-second source runs failed the wall-clock acceptance gate (recorded wall durations
+included 305 and 310 seconds). The M5 intermittently stopped pulling the HTTP stream for
+20–50 seconds; host output filled its buffer and the speaker reported
+`MEDIA_BUFFER_ERROR`. The M5 used 2.4 GHz Wi-Fi and idle ping showed 5% loss, but the
+cause of the stalls is not isolated. Nobody listened, so audible glitches and acoustic
+control latency were not measured. The tested component was unchanged `main` (`44cfc8a`),
+not the subsequent SDK or control-latency branches. See the
+[short smoke](https://github.com/travnie/wambridge/pull/234#issuecomment-6320693289)
+and [full-track correction](https://github.com/travnie/wambridge/pull/234#issuecomment-6321793511).
+The August clean run remains historical evidence, not a current reliability guarantee.
+This addendum concerns URL/PCM only; it does not revise Share/DLNA findings or command
+semantics.
 
 `MusicInfo` and `PlayStatus` are not reliable success signals. They have reported `play`
 with no audio and mixed fields from older sessions.

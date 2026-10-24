@@ -27,6 +27,11 @@ a median 1.00x with every sample between 0.9x and 1.1x, seek, pause and resume,
 an unattended transition into the next track, internet radio across a 44.1 to
 48 kHz switch, and a clean shutdown leaving no FFmpeg or helper behind.
 
+A later full-track M5 recheck on 2026-10-21 did **not** reproduce that stability
+on the then-current connection. The older successful run remains historical evidence;
+see the [physical M5 status](foobar/README.md#physical-m5-checklist) for the newer
+failed baseline and what still needs validation.
+
 What works:
 
 - SSDP discovery, saved devices resolved by stable device ID, playback control,
@@ -46,8 +51,8 @@ cut by another two seconds.** On 2026-08-27 the physical M5 stayed stable with
 ear-to-clock total has not been measured yet, so the old 6.7 s figure is historical
 rather than a claim about current stock behavior.
 
-Playback itself is unaffected — the stream runs at wall-clock speed and the
-seekbar is honest. **Pause, stop and skip still carry pipeline latency** because they act
+Earlier clean runs showed a correct host clock and seekbar, but those results do not
+establish uninterrupted speaker playback on the current network link. **Pause, stop and skip still carry pipeline latency** because they act
 through the PCM path; with `hardware_volume=1`, the volume slider is routed to the speaker instead. Lowering
 the bitrate makes the speaker prebuffer worse rather than better, and raising it helped by
 about a second in the older measurements. The remaining latency-sensitive controls belong
@@ -63,7 +68,8 @@ Everything else is documented honestly, including the approaches that failed:
 Current architecture, failed approaches and continuation notes are in
 [`docs/DEVELOPMENT_STATUS.md`](docs/DEVELOPMENT_STATUS.md). Measured protocol
 facts from a physical `SPK-WAM550` are in
-[`docs/WAM_PROTOCOL.md`](docs/WAM_PROTOCOL.md).
+[`docs/WAM_PROTOCOL.md`](docs/WAM_PROTOCOL.md). For the maintained guides,
+checklists and publishing instructions, use the [documentation index](docs/README.md).
 
 ## Foobar2000 output
 
@@ -354,4 +360,4 @@ py -m unittest discover -s tests -v
 
 ## Python package / PyPI
 
-The Python CLI is prepared for public release as `trvny-wambridge`. Build artifacts and Trusted Publishing setup live in [PUBLISHING.md](PUBLISHING.md). After the first upload to PyPI, install with `uv tool install trvny-wambridge`; the foobar2000 plugin remains a separate `.fb2k-component` release.
+The Python CLI is prepared for public release as `trvny-wambridge`. Build artifacts and Trusted Publishing setup live in [PyPI publishing guide](docs/PUBLISHING.md). After the first upload to PyPI, install with `uv tool install trvny-wambridge`; the foobar2000 plugin remains a separate `.fb2k-component` release.
