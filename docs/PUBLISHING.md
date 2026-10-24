@@ -29,3 +29,9 @@ The authoritative version is `version` in `pyproject.toml`. The project intentio
 
 If a publish is interrupted after one distribution reaches PyPI, **rerun the same workflow from the same reviewed commit/version**. `uv publish` ignores already-present identical artifacts and uploads the missing files. Do not rebuild a different wheel with the same immutable version. Verify both the wheel and sdist appear on PyPI before announcing the release.
 
+
+## Authenticated operator dispatch
+
+The publishing workflow also accepts the `publish_wambridge_pypi` GitHub `repository_dispatch` event on `main`. GPTomek can send it from the existing authenticated operator mailbox; no PyPI API token or second publishing implementation is required. The payload must explicitly contain `{"publish":true,"version":"0.0.5"}`. The build rejects a version that differs from the canonical `pyproject.toml`. Other dispatches and pull requests build/test only; they never publish.
+
+The GitHub Actions environment `pypi` remains the release gate. Prefer restricting its deployment branches and requiring approval when supported. A PyPI version is immutable, so increment the canonical version before a subsequent release.
