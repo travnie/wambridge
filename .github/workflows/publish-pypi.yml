@@ -1,6 +1,12 @@
 name: Publish WAMBridge to PyPI
 
 on: # yamllint disable-line rule:truthy
+  pull_request:
+    paths:
+      - 'pyproject.toml'
+      - 'src/**'
+      - 'tests/**'
+      - '.github/workflows/publish-pypi.yml'
   workflow_dispatch:
     inputs:
       publish:
