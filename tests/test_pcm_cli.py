@@ -1254,24 +1254,27 @@ class RecoverAbandonedSpeakersTests(TestCase):
         patcher.start()
         self.addCleanup(patcher.stop)
 
-    def _stale_lease(self, speaker_ip: str, speaker_port: int) -> None:
+    def _stale_lease(
+        self,
+        speaker_ip: str,
+        speaker_port: int,
+        device_id: str | None = None,
+    ) -> None:
         # A real finished subprocess's pid, not a fabricated large number -
         # the same standard test_lease.py holds itself to for "genuinely
         # dead", proven rather than assumed.
         process = subprocess.Popen([sys.executable, "-c", "pass"])
         process.wait()
         path = self.directory / f"{process.pid}.json"
-        path.write_text(
-            json.dumps(
-                {
-                    "version": 1,
-                    "pid": process.pid,
-                    "speaker_ip": speaker_ip,
-                    "speaker_port": speaker_port,
-                }
-            ),
-            encoding="utf-8",
-        )
+        payload = {
+            "version": 1,
+            "pid": process.pid,
+            "speaker_ip": speaker_ip,
+            "speaker_port": speaker_port,
+        }
+        if device_id is not None:
+            payload["device_id"] = device_id
+        path.write_text(json.dumps(payload), encoding="utf-8")
 
     @patch("wambridge.pcm_cli.standby")
     def test_a_lease_for_the_current_target_is_skipped_not_recovered(
@@ -1287,6 +1290,39 @@ class RecoverAbandonedSpeakersTests(TestCase):
         # succeeded - a startup that fails before that must not have lost
         # the only record of the abandoned speaker.
         self.assertEqual(len(find_stale_leases(directory=self.directory)), 1)
+
+    @patch("wambridge.pcm_cli.standby")
+    def test_a_lease_for_the_same_device_at_an_old_address_is_skipped(
+        self, standby_mock
+    ) -> None:
+        # DHCP moved the M5 from .103 to .102: standby at .103 would time out
+        # forever, and the session now holding the speaker supersedes it anyway.
+        self._stale_lease("10.0.0.103", 55001, device_id="BC148548958C")
+
+        _recover_abandoned_speakers(("10.0.0.102", 55001), "BC:14:85:48:95:8C")
+
+        standby_mock.assert_not_called()
+        self.assertEqual(len(find_stale_leases(directory=self.directory)), 1)
+
+    @patch("wambridge.pcm_cli.standby")
+    def test_a_lease_for_another_device_is_still_recovered(self, standby_mock) -> None:
+        self._stale_lease("10.0.0.200", 55001, device_id="AABBCCDDEEFF")
+
+        _recover_abandoned_speakers(("10.0.0.102", 55001), "BC148548958C")
+
+        standby_mock.assert_called_once()
+        (target,), _ = standby_mock.call_args
+        self.assertEqual((target.ip, target.port), ("10.0.0.200", 55001))
+
+    @patch("wambridge.pcm_cli.standby")
+    def test_a_legacy_lease_without_a_device_id_keeps_the_address_match(
+        self, standby_mock
+    ) -> None:
+        self._stale_lease("10.0.0.103", 55001)
+
+        _recover_abandoned_speakers(("10.0.0.102", 55001), "BC148548958C")
+
+        standby_mock.assert_called_once()
 
     @patch("wambridge.pcm_cli.standby")
     def test_a_lease_for_a_different_speaker_is_recovered(self, standby_mock) -> None:

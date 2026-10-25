@@ -32,6 +32,7 @@ from .lease import (
     discard_superseded,
     find_stale_leases,
     has_live_lease,
+    names_speaker,
     remove_lease,
     write_lease,
 )
@@ -282,8 +283,10 @@ class PlaybackWatcher:
         sleep_after_stop: int = 0,
         menu_sleep_timer_active: bool = False,
         clear_sleep_timer: bool = False,
+        device_id: str | None = None,
     ) -> None:
         self._speaker_ip = speaker_ip
+        self._device_id = device_id
         self._client_uuid = client_uuid.casefold()
         self._port = port
         self._sleep_after_stop = sleep_after_stop
@@ -562,7 +565,7 @@ class PlaybackWatcher:
     def arm(self) -> None:
         """Accept playback events only after this attempt sends its command."""
         self._armed.set()
-        self._lease = write_lease(self._speaker_ip, self._port)
+        self._lease = write_lease(self._speaker_ip, self._port, device_id=self._device_id)
 
     def mark_stream_active(self) -> None:
         """Mark that the speaker requested this attempt's local HTTP stream."""
@@ -1115,7 +1118,10 @@ def _stopped_line(
     )
 
 
-def _recover_abandoned_speakers(current_target: tuple[str, int]) -> None:
+def _recover_abandoned_speakers(
+    current_target: tuple[str, int],
+    device_id: str | None = None,
+) -> None:
     """Send ``standby`` for any speaker a crashed prior session left holding.
 
     A PC that loses power, or a helper killed outright, runs no cleanup of
@@ -1127,7 +1133,10 @@ def _recover_abandoned_speakers(current_target: tuple[str, int]) -> None:
     never delay the session actually being started.
 
     ``current_target`` is this session's own ``(speaker_ip, speaker_port)`` -
-    a stale lease naming it is skipped, not sent ``standby``. This session is
+    a stale lease naming it is skipped, not sent ``standby``. "Naming" also
+    covers the same ``device_id`` at another address: DHCP moved the M5 three
+    times in four days, and a lease holding the old address could otherwise
+    never be recovered (the old IP times out forever) nor superseded. This session is
     about to become that speaker's new legitimate owner; its own
     ``SetUrlPlayback`` supersedes whatever the crashed session left behind,
     and racing this background thread's pause/mute against the fresh stream
@@ -1160,12 +1169,16 @@ def _recover_abandoned_speakers(current_target: tuple[str, int]) -> None:
     shared across processes, which nothing here provides.
     """
     for lease in find_stale_leases():
-        if (lease.speaker_ip, lease.speaker_port) == current_target:
+        if names_speaker(lease, *current_target, device_id):
             continue
         claimed = claim_lease(lease)
         if claimed is None:
             continue  # lost the race to another sweep, or already resolved
-        if has_live_lease(claimed.speaker_ip, claimed.speaker_port):
+        if has_live_lease(
+            claimed.speaker_ip,
+            claimed.speaker_port,
+            device_id=claimed.device_id,
+        ):
             # A live session has taken this speaker over since the scan above.
             remove_lease(claimed)
             continue
@@ -1192,6 +1205,20 @@ def _recover_abandoned_speakers(current_target: tuple[str, int]) -> None:
         remove_lease(claimed)
 
 
+def _saved_device_id(args: argparse.Namespace, store: ProfileStore) -> str | None:
+    """Return the saved profile's device ID for ``--device`` runs, else ``None``.
+
+    ``select_speaker`` has just resolved and persisted that profile, so this is
+    a local read. ``--speaker IP`` runs have no profile and keep IP-only leases.
+    """
+    if not getattr(args, "device", None):
+        return None
+    try:
+        return store.get(args.device).device_id
+    except (ProfileError, OSError):
+        return None
+
+
 def run(
     args: argparse.Namespace,
     *,
@@ -1203,6 +1230,7 @@ def run(
     output_stream = protocol_output if protocol_output is not None else sys.stdout
     store = ProfileStore(args.config)
     speaker_ip, speaker_port = select_speaker(args, store)
+    device_id = _saved_device_id(args, store)
     client_uuid = load_client_uuid()
     response = probe(speaker_ip, port=speaker_port)
     # Backgrounded: a stale lease naming an unreachable speaker retries and
@@ -1211,7 +1239,7 @@ def run(
     # actually here to start.
     threading.Thread(
         target=_recover_abandoned_speakers,
-        args=((speaker_ip, speaker_port),),
+        args=((speaker_ip, speaker_port), device_id),
         name="wambridge-abandoned-speaker-sweep",
         daemon=True,
     ).start()
@@ -1276,6 +1304,7 @@ def run(
             sleep_after_stop=args.sleep_after_stop,
             menu_sleep_timer_active=args.menu_sleep_timer_active,
             clear_sleep_timer=args.clear_sleep_timer,
+            device_id=device_id,
         )
         with watcher:
             LOGGER.info("Offering %s to %s", stream_url, speaker_ip)
@@ -1286,7 +1315,12 @@ def run(
             # whatever a crashed prior session left on this speaker - see
             # _recover_abandoned_speakers for why the sweep itself does not
             # delete that old lease.
-            discard_superseded(speaker_ip, speaker_port, keep_pid=os.getpid())
+            discard_superseded(
+                speaker_ip,
+                speaker_port,
+                keep_pid=os.getpid(),
+                device_id=device_id,
+            )
             _raise_if_pcm_input_closed(input_stream)
 
             _wait_for_stream_request(

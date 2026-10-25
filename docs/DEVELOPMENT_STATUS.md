@@ -789,10 +789,20 @@ Use [Android vNext](ANDROID_VNEXT.md) for current Android work.
       session while a new session targets a different one - out of reach with the
       single physical M5 this project has. Unit-tested with mocks only.
 
+      **2026-10-25: leases also carry the speaker's `device_id`** (additive field,
+      from `--device` runs; `--speaker IP` runs and older helpers write none). The M5
+      moved `.104` -> `.103` -> `.102` in four days, and a failed teardown left a
+      `.recovering` claim naming `.103` that every later sweep retried against a dead
+      address and nothing ever superseded. A lease with the same `device_id` as the
+      current session is now treated like a same-address one: skipped by the sweep,
+      removed by `discard_superseded` (claims included).
+
       Known limitations, accepted rather than fixed:
-      - Recovery trusts a lease's `(ip, port)` without re-verifying the speaker's
-        identity, so a DHCP reassignment could in theory point `standby` at a
-        different device that took over the address. Low-probability on this
+      - For a lease *without* a matching `device_id` recovery still trusts the
+        `(ip, port)` without re-verifying the speaker's identity, so a DHCP
+        reassignment could in theory point `standby` at a different device that
+        took over the address, or at an address the speaker has left (it then times
+        out on every sweep). Low-probability on this
         project's single-physical-M5 scope, and the identity check available
         (`samsung.identify`) costs an extra round trip on every session start to
         guard an edge case - a worse trade against this project's documented
