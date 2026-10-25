@@ -1,6 +1,8 @@
 # Development status
 
-Last cross-checked: 2026-10-14 (main branch, PR #213 and 2026-10-10 Build).
+Last full status cross-check: 2026-10-14 (main branch, PR #213 and 2026-10-10 Build).
+Additional physical foobar URL/PCM measurements from 2026-10-21 are recorded below; the
+older dated validation and investigations remain historical evidence.
 
 Historical lab journal. Measurement dates inside entries are retained. The numbered
 investigation log is **not the current task queue**. Read [the documentation index](README.md),
@@ -8,6 +10,17 @@ investigation log is **not the current task queue**. Read [the documentation ind
 
 ## Current status pointers
 
+- **foobar URL/PCM full-track recheck (2026-10-21, unchanged `main`):** Three
+  249-second source runs failed wall-clock acceptance (reported wall durations include
+  305 and 310 seconds). Instrument logs showed 20–50-second gaps with full host buffering
+  while the M5 stopped pulling the HTTP stream, plus `MEDIA_BUFFER_ERROR`. The speaker's
+  2.4 GHz Wi-Fi link showed packet loss, but a network root cause is **not proven**.
+  Nobody listened and acoustic control latency was not measured. The shorter start,
+  pause/resume, next, seek and cleanup smoke succeeded; the full-track gate remains open.
+  See the [short smoke](https://github.com/travnie/wambridge/pull/234#issuecomment-6320693289)
+  and [full-track correction](https://github.com/travnie/wambridge/pull/234#issuecomment-6321793511).
+  The dated 2026-08-02 checklist under “Stable on `main`” below was a valid earlier run,
+  **not proof of current reliability**. The protocol summary links to this latest observation.
 - **Android:** remaining hardware tests live in [Android vNext](ANDROID_VNEXT.md).
   PR #213 records that cold start 0 -> 3, Stop -> Play 3 and audible station-switch
   volume retention passed on the M5 (2026-10-02). Muted/paused switching and
@@ -776,10 +789,22 @@ Use [Android vNext](ANDROID_VNEXT.md) for current Android work.
       session while a new session targets a different one - out of reach with the
       single physical M5 this project has. Unit-tested with mocks only.
 
+      **2026-10-25: leases also carry the speaker's `device_id`** (additive field,
+      from `--device` runs; `--speaker IP` runs and older helpers write none). The M5
+      moved `.104` -> `.103` -> `.102` in four days, and a failed teardown left a
+      `.recovering` claim naming `.103` that every later sweep retried against a dead
+      address and nothing ever superseded. A lease with the same `device_id` as the
+      current session is now treated like a same-address one: skipped by the sweep,
+      removed by `discard_superseded` (claims included). Branch `fix/lease-device-id`;
+      the M5 address moves are physical observations, the `device_id` behaviour is
+      verified by unit tests only, not on hardware.
+
       Known limitations, accepted rather than fixed:
-      - Recovery trusts a lease's `(ip, port)` without re-verifying the speaker's
-        identity, so a DHCP reassignment could in theory point `standby` at a
-        different device that took over the address. Low-probability on this
+      - For a lease *without* a matching `device_id` recovery still trusts the
+        `(ip, port)` without re-verifying the speaker's identity, so a DHCP
+        reassignment could in theory point `standby` at a different device that
+        took over the address, or at an address the speaker has left (it then times
+        out on every sweep). Low-probability on this
         project's single-physical-M5 scope, and the identity check available
         (`samsung.identify`) costs an extra round trip on every session start to
         guard an edge case - a worse trade against this project's documented

@@ -1,6 +1,9 @@
 # foobar2000 component status and design
 
-Current implementation and remaining control-surface work for `foo_out_wam`.
+Implementation details and remaining control-surface work for `foo_out_wam`.
+For installation, settings, updates and the canonical physical test checklist,
+use the [foobar2000 user guide](../foobar/README.md). This file records design
+rationale, not a parallel user manual.
 
 ## Implemented
 
@@ -12,19 +15,13 @@ Current implementation and remaining control-surface work for `foo_out_wam`.
 - Native `Preferences -> Playback -> Output -> WAM Bridge` page editing the same INI,
   with foobar2000 dark-mode theming and a read-only `Check for updates` button.
   The update check opens the release page on request, never installs a DLL.
-- `Playback -> WAM Bridge` submenu containing:
-  - Emergency stop,
-  - Stop & mute,
-  - Start sleep timer,
-  - Cancel sleep timer,
-  - Volume up,
-  - Volume down,
-  - Volume to safe level.
+- Serialized `Playback -> WAM Bridge` control commands. The maintained menu
+  labels and usage are listed in the [user guide](../foobar/README.md#wam-controls).
 - Serialized control-helper queue with output reported in the foobar console.
 - Restart and cleanup paths for format change, seek, stop and helper failure.
 - Track context menu: `Send to WAM (Share)` launches the bundled `wambridge-share.exe`
-  outside the PCM output path. Windows SDK/MSBuild CI passed on 2026-10-10;
-  hardware testing of this *foobar integration* is still unrecorded.
+  outside the PCM output path. Hardware testing of the *foobar context-menu handoff*
+  remains unrecorded: a successful Windows SDK/MSBuild package is not an acoustic test.
 
 ## Not implemented
 
@@ -320,17 +317,10 @@ that emergency stop should request a speaker power cycle.
 
 ## Preferences page
 
-`Preferences -> Playback -> Output -> WAM Bridge` edits the same INI keys the output already
-reads: device, format, startup volume, hardware slider routing, volume ceiling, safe start
-cap, startup silence, extra buffer, sleep-after-stop, diagnostics and the optional PCM helper
-override. The page uses foobar2000's core dark-mode hooks. Runtime and UI share one settings
-parser, so their ranges cannot drift; startup volume is the M5's raw `0..30` scale in both.
-Reset restores component defaults, and default-valued settings are removed rather than
-written redundantly. Invalid known values in an existing INI mark the page changed so Apply
-normalizes them. If any `WAMBRIDGE_*` override is active the page says so, because those
-values continue to win over the INI and are not modified by Apply.
-
-Discovery, a connection test and model/firmware reporting remain future UI work.
+The native page edits the same `foobar.ini` parsed by the output; it does not add
+another configuration store. The [user guide](../foobar/README.md#configure)
+owns the visible settings and instructions, while the [configuration section](#configuration)
+above records the parser behavior and transport-specific caveats.
 
 ## Later UI
 
@@ -340,6 +330,6 @@ bridge. Label that difference clearly.
 
 ## Merge gate
 
-No output transport candidate is release-ready until the physical M5 completes a 3-5 minute
-track at wall-clock speed with stable seekbar, a second track, pause/resume, stop/change and
-clean helper/FFmpeg shutdown.
+The maintained [physical M5 checklist](../foobar/README.md#physical-m5-checklist)
+sets the output release gate. A green build or passing helper markers cannot replace
+complete-track and audible validation.
