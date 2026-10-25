@@ -795,7 +795,9 @@ Use [Android vNext](ANDROID_VNEXT.md) for current Android work.
       `.recovering` claim naming `.103` that every later sweep retried against a dead
       address and nothing ever superseded. A lease with the same `device_id` as the
       current session is now treated like a same-address one: skipped by the sweep,
-      removed by `discard_superseded` (claims included).
+      removed by `discard_superseded` (claims included). Branch `fix/lease-device-id`;
+      the M5 address moves are physical observations, the `device_id` behaviour is
+      verified by unit tests only, not on hardware.
 
       Known limitations, accepted rather than fixed:
       - For a lease *without* a matching `device_id` recovery still trusts the

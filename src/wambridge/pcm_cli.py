@@ -1205,18 +1205,27 @@ def _recover_abandoned_speakers(
         remove_lease(claimed)
 
 
-def _saved_device_id(args: argparse.Namespace, store: ProfileStore) -> str | None:
+def _saved_device_id(
+    args: argparse.Namespace,
+    store: ProfileStore,
+    speaker_ip: str,
+) -> str | None:
     """Return the saved profile's device ID for ``--device`` runs, else ``None``.
 
     ``select_speaker`` has just resolved and persisted that profile, so this is
-    a local read. ``--speaker IP`` runs have no profile and keep IP-only leases.
+    a local read. The ID is only trusted while the profile still names the
+    address this session resolved: a profile rewritten in between (another
+    helper re-resolving) would otherwise stamp the lease with an identity that
+    belongs to a different address. ``--speaker IP`` runs have no profile and
+    keep IP-only leases.
     """
     if not getattr(args, "device", None):
         return None
     try:
-        return store.get(args.device).device_id
+        profile = store.get(args.device)
     except (ProfileError, OSError):
         return None
+    return profile.device_id if profile.last_ip == speaker_ip else None
 
 
 def run(
@@ -1230,7 +1239,7 @@ def run(
     output_stream = protocol_output if protocol_output is not None else sys.stdout
     store = ProfileStore(args.config)
     speaker_ip, speaker_port = select_speaker(args, store)
-    device_id = _saved_device_id(args, store)
+    device_id = _saved_device_id(args, store, speaker_ip)
     client_uuid = load_client_uuid()
     response = probe(speaker_ip, port=speaker_port)
     # Backgrounded: a stale lease naming an unreachable speaker retries and

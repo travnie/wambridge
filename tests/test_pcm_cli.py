@@ -14,6 +14,7 @@ from wambridge.lease import find_stale_leases
 from wambridge.pcm_cli import (
     PlaybackWatcher,
     _recover_abandoned_speakers,
+    _saved_device_id,
     _stopped_line,
     build_parser,
     run,
@@ -1361,3 +1362,30 @@ class RecoverAbandonedSpeakersTests(TestCase):
         # holds this speaker - but that live session's own lease is untouched.
         self.assertEqual(find_stale_leases(directory=self.directory), [])
         self.assertEqual(list(self.directory.glob("*")), [live_path])
+
+
+class SavedDeviceIdTests(TestCase):
+    """The lease only records an identity the resolved address still belongs to."""
+
+    @staticmethod
+    def _store(last_ip: str) -> SimpleNamespace:
+        profile = SimpleNamespace(device_id="BC148548958C", last_ip=last_ip)
+        return SimpleNamespace(get=lambda _alias: profile)
+
+    def test_returns_the_id_while_the_profile_names_the_resolved_address(self) -> None:
+        args = SimpleNamespace(device="M5")
+
+        self.assertEqual(
+            _saved_device_id(args, self._store("10.0.0.102"), "10.0.0.102"),
+            "BC148548958C",
+        )
+
+    def test_drops_the_id_when_the_profile_moved_on_in_between(self) -> None:
+        args = SimpleNamespace(device="M5")
+
+        self.assertIsNone(_saved_device_id(args, self._store("10.0.0.103"), "10.0.0.102"))
+
+    def test_direct_address_runs_have_no_id(self) -> None:
+        args = SimpleNamespace(device=None)
+
+        self.assertIsNone(_saved_device_id(args, self._store("10.0.0.102"), "10.0.0.102"))
