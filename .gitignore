@@ -23,5 +23,6 @@ local.properties
 .env
 .env.*
 *.log
+!tools/wam-probes/capture.log
 node_modules/
 CLAUDE.local.md
