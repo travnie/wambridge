@@ -15,3 +15,13 @@ _scratch/
 .claude.local.md
 # CI-generated component commit ID; not a source-of-truth file.
 foobar/wam_build_sha.h
+
+# Local tooling / agent state
+.gradle/
+.kotlin/
+local.properties
+.env
+.env.*
+*.log
+node_modules/
+CLAUDE.local.md
