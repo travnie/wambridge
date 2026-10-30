@@ -19,6 +19,37 @@ foobar context-menu integration still needs a physical M5 pass.
 Everything here was measured against one physical Shape M5 (`SPK-WAM550`,
 firmware `WAM550WWB-3117.1`). Other models in the family are untested.
 
+## Speaker compatibility
+
+WAM Bridge uses Samsung's local UIC/CPM API on TCP `55001`; URL playback
+uses `SetUrlPlayback` to make the speaker pull an HTTP audio stream.
+Shared API support makes other models plausible candidates, but does not
+establish working audio, timing or controls.
+
+| Model | Evidence and WAM Bridge status |
+| --- | --- |
+| Shape M5 `SPK-WAM550`, firmware `WAM550WWB-3117.1` | Hardware-tested here; see the dated stability results below. |
+| R1 `WAM1500` | Matching API documented in [independent R1 research](https://github.com/bacl/WAM_API_DOC). Candidate; untested here. |
+| Shape M5 `WAM551`, M3 `WAM350/351`, M7 `WAM750/751` | Model entries in an [external WAM integration](https://github.com/balmli/com.samsung.wam/blob/master/lib/input_sources.js). Candidates; untested here. |
+| Selected Multiroom soundbars, e.g. `HW-K650` / `HW-MS650` | API used by [K650](https://github.com/macbury/ha_samsung_multi_room) and [Multiroom](https://github.com/DaveGut/DEPRECATED-SmartThings_Samsung-WiFi-Audio-Unofficial) integrations. Candidates; WAM Bridge playback untested. |
+| Other brands or devices without this Samsung API | Require a separate transport implementation. Wi-Fi or DLNA support alone is insufficient. |
+
+Without owning another model, compare its protocol captures, integration code,
+firmware notes and codec support. Owner-supplied read-only API responses can
+confirm individual commands; they cannot confirm audible playback. External
+integration support is evidence to investigate, not a WAM Bridge support claim.
+
+Model-specific differences may include volume range, standby, events, codecs and
+buffering. The measured M5 uses raw volume steps `0..30`; the K650 integration
+documents `0..100`. Do not assume one model's volume scale applies to another.
+An API `ok` response alone does not prove that audio plays.
+
+To mark a model as tested, record its exact model and firmware, playback path
+(Android radio/renderer, foobar PCM or Share), format and a physical playback
+result: complete track at wall-clock speed, controls, next track and clean
+shutdown. Validate each path separately against the
+[protocol acceptance checklist](docs/WAM_PROTOCOL.md#safety-and-acceptance).
+
 ## Status: working [rolling release](https://github.com/travnie/wambridge/releases/tag/latest)
 
 Both paths play audio on real hardware. The foobar component passed its full
