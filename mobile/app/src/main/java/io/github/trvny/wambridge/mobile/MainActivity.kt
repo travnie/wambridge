@@ -74,6 +74,9 @@ class MainActivity : Activity() {
     private val timerExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "wam-mobile-sleep-timer").apply { isDaemon = true }
     }
+    private val shortcutExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "wam-mobile-shortcuts").apply { isDaemon = true }
+    }
     private val presetWorkRunning = AtomicBoolean(false)
     private val autoDiscoveryRetry = Runnable {
         if (!isFinishing && !isDestroyed) autoDiscoverSpeaker()
@@ -134,7 +137,6 @@ class MainActivity : Activity() {
 
         refreshLauncherButton()
         refreshStatus()
-        LauncherQuickActions.sync(applicationContext)
         handleQuickAction(intent)
         window.decorView.post(autoDiscoveryRetry)
     }
@@ -809,7 +811,8 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        LauncherQuickActions.sync(applicationContext)
+        val appContext = applicationContext
+        shortcutExecutor.execute { LauncherQuickActions.sync(appContext) }
         if (::statusView.isInitialized) refreshStatus()
         if (currentDestination == MainDestination.RADIO) renderRadioStations()
         if (currentDestination == MainDestination.SETTINGS) refreshSleepTimerState()
@@ -822,6 +825,7 @@ class MainActivity : Activity() {
         controlExecutor.shutdownNow()
         presetExecutor.shutdownNow()
         timerExecutor.shutdownNow()
+        shortcutExecutor.shutdownNow()
         super.onDestroy()
     }
 
