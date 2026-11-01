@@ -12,6 +12,7 @@ import android.os.IBinder
 import android.os.SystemClock
 import android.service.quicksettings.TileService
 import android.util.Log
+import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ScheduledFuture
@@ -728,6 +729,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
             )
         }
         startForeground(NOTIFICATION_ID, buildNotification(message))
+        notifyStatusObservers()
     }
 
     /**
@@ -749,6 +751,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
             )
         }
         notifyRendererStateChanged()
+        notifyStatusObservers()
     }
 
     private fun notifyRendererStateChanged() {
@@ -848,6 +851,18 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
             get() = phase != Phase.STOPPED
         @Volatile var lastStatus: String = "Stopped"
             private set
+
+        private val statusObservers = CopyOnWriteArraySet<() -> Unit>()
+
+        fun subscribeStatus(observer: () -> Unit): AutoCloseable {
+            statusObservers += observer
+            observer()
+            return AutoCloseable { statusObservers -= observer }
+        }
+
+        private fun notifyStatusObservers() {
+            statusObservers.forEach { observer -> runCatching { observer() } }
+        }
 
         fun isReasonableIpv4(value: String): Boolean {
             val parts = value.split('.')
