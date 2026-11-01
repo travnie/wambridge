@@ -165,6 +165,20 @@ internal class UpnpRenderer(
         // Announce the renderer as soon as it comes up; old players are much
         // happier when the UPnP lifecycle actually has a beginning.
         repeat(2) { sendAlive(socket) }
+        // The control point's advertisement expires even when the service stays up.
+        // Avoid multicast refresh while the speaker is pulling audio.
+        streamWatchdog.scheduleWithFixedDelay(
+            {
+                if (rendererMulticastNeeded(running.get(), activeStream.get() != null)) {
+                    runCatching { sendAlive(socket) }.onFailure {
+                        if (running.get()) state.lastError = "SSDP refresh failed"
+                    }
+                }
+            },
+            SsdpLifecycle.REFRESH_INTERVAL_SECONDS,
+            SsdpLifecycle.REFRESH_INTERVAL_SECONDS,
+            TimeUnit.SECONDS,
+        )
     }
 
     private fun ssdpLoop(socket: MulticastSocket) {
@@ -196,7 +210,7 @@ internal class UpnpRenderer(
     private fun sendSearchResponse(socket: MulticastSocket, request: DatagramPacket, target: String) {
         val bytes = buildString {
             append("HTTP/1.1 200 OK\r\n")
-            append("CACHE-CONTROL: max-age=1800\r\n")
+            append("CACHE-CONTROL: max-age=${SsdpLifecycle.MAX_AGE_SECONDS}\r\n")
             append("EXT:\r\n")
             append("LOCATION: http://${localAddress.hostAddress}:$port/description.xml\r\n")
             append("SERVER: $SERVER_HEADER\r\n")
@@ -377,7 +391,8 @@ internal class UpnpRenderer(
                 action,
                 "<PlayMode>NORMAL</PlayMode><RecQualityMode>NOT_IMPLEMENTED</RecQualityMode>",
             )
-            "Seek", "SetPlayMode" -> soapOk(out, AV_TRANSPORT, action)
+            "Seek" -> soapError(out, 710, "Seek mode not supported")
+            "SetPlayMode" -> soapOk(out, AV_TRANSPORT, action)
             else -> soapError(out, 401, "Invalid Action")
         }
     }

@@ -29,6 +29,8 @@ class SsdpLifecycleTest {
             ),
         )
         assertTrue("NTS: ssdp:alive\r\n" in message)
+        assertTrue("CACHE-CONTROL: max-age=${SsdpLifecycle.MAX_AGE_SECONDS}\r\n" in message)
+        assertTrue(SsdpLifecycle.REFRESH_INTERVAL_SECONDS < SsdpLifecycle.MAX_AGE_SECONDS)
         assertTrue("LOCATION: http://10.0.0.5:49152/description.xml\r\n" in message)
         assertTrue("NT: $renderer\r\n" in message)
         assertTrue("USN: uuid:$udn::$renderer\r\n" in message)
