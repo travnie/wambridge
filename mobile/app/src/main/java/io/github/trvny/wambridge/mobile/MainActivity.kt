@@ -56,6 +56,7 @@ class MainActivity : Activity() {
     private lateinit var settingsNavButton: Button
     private var currentDestination = MainDestination.HOME
     private var speakerStateSubscription: AutoCloseable? = null
+    private var rendererStatusSubscription: AutoCloseable? = null
     private var physicalPresetSubscription: AutoCloseable? = null
     private val speakerControlButtons = mutableListOf<Button>()
     private var speakerControlRunning = false
@@ -78,6 +79,7 @@ class MainActivity : Activity() {
         Thread(runnable, "wam-mobile-shortcuts").apply { isDaemon = true }
     }
     private val presetWorkRunning = AtomicBoolean(false)
+    private var discoveryOwnsStatus = false
     private val autoDiscoveryRetry = Runnable {
         if (!isFinishing && !isDestroyed) autoDiscoverSpeaker()
     }
@@ -776,10 +778,16 @@ class MainActivity : Activity() {
     override fun onStart() {
         super.onStart()
         speakerStateSubscription?.close()
+        rendererStatusSubscription?.close()
         physicalPresetSubscription?.close()
         speakerStateSubscription = SpeakerStateStore.subscribe { snapshot ->
             runOnUiThread {
                 if (!isFinishing && !isDestroyed) renderHomeState(snapshot)
+            }
+        }
+        rendererStatusSubscription = RendererService.subscribeStatus {
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) refreshStatus()
             }
         }
         physicalPresetSubscription = PhysicalPresetStore.subscribe { snapshot ->
@@ -795,6 +803,8 @@ class MainActivity : Activity() {
     override fun onStop() {
         speakerStateSubscription?.close()
         speakerStateSubscription = null
+        rendererStatusSubscription?.close()
+        rendererStatusSubscription = null
         physicalPresetSubscription?.close()
         physicalPresetSubscription = null
         super.onStop()
@@ -859,6 +869,7 @@ class MainActivity : Activity() {
         val inputRevision = speakerInputRevision.get()
         val generation = autoDiscoveryGeneration.incrementAndGet()
 
+        discoveryOwnsStatus = true
         MobileUi.setEnabled(discoverButton, false)
         MobileUi.setStatus(
             statusView,
@@ -1168,6 +1179,7 @@ class MainActivity : Activity() {
     }
 
     private fun toggleRenderer() {
+        discoveryOwnsStatus = false
         if (RendererService.busy) {
             startService(
                 Intent(this, RendererService::class.java).apply {
@@ -1175,7 +1187,7 @@ class MainActivity : Activity() {
                 },
             )
             MobileUi.setStatus(homeStatusView, "Stopping DLNA renderer…")
-            refreshUntilSettled()
+            refreshStatus()
         } else {
             startRenderer()
             MobileUi.setStatus(homeStatusView, "Starting DLNA renderer…")
@@ -1183,40 +1195,35 @@ class MainActivity : Activity() {
     }
 
     private fun startRenderer() {
+        discoveryOwnsStatus = false
         cancelAutoDiscovery()
         val intent = Intent(this, RendererService::class.java).apply {
             action = RendererService.ACTION_START
         }
         startForegroundService(intent)
         MobileUi.setStatus(statusView, "Finding M5 and starting renderer…")
-        refreshUntilSettled()
-    }
-
-    private fun refreshUntilSettled(minimumPolls: Int = 2) {
         refreshStatus()
-        if (minimumPolls > 0 || RendererService.transitioning) {
-            window.decorView.postDelayed(
-                { refreshUntilSettled((minimumPolls - 1).coerceAtLeast(0)) },
-                250,
-            )
-        }
     }
 
     private fun refreshStatus() {
+        // External tile/widget starts also take over status from manual discovery.
+        if (RendererService.busy) discoveryOwnsStatus = false
         val marker = when (RendererService.phase) {
             RendererService.Phase.RUNNING -> "●"
             RendererService.Phase.STARTING, RendererService.Phase.STOPPING -> "◐"
             RendererService.Phase.STOPPED -> "○"
         }
-        MobileUi.setStatus(
-            statusView,
-            "$marker ${RendererService.lastStatus}",
-            if (RendererService.phase == RendererService.Phase.RUNNING) {
-                MobileUi.StatusKind.SUCCESS
-            } else {
-                MobileUi.StatusKind.INFO
-            },
-        )
+        if (!discoveryOwnsStatus) {
+            MobileUi.setStatus(
+                statusView,
+                "$marker ${RendererService.lastStatus}",
+                if (RendererService.phase == RendererService.Phase.RUNNING) {
+                    MobileUi.StatusKind.SUCCESS
+                } else {
+                    MobileUi.StatusKind.INFO
+                },
+            )
+        }
         if (::homeDlnaButton.isInitialized) {
             homeDlnaButton.text = when (RendererService.phase) {
                 RendererService.Phase.RUNNING -> "DLNA ● On"
