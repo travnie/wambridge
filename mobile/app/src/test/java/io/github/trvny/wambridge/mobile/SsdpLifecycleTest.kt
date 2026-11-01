@@ -48,7 +48,8 @@ class SsdpLifecycleTest {
         assertTrue(
             rendererSource.contains(
                 "SsdpLifecycle.REFRESH_INTERVAL_SECONDS,\n" +
-                    "            SsdpLifecycle.REFRESH_INTERVAL_SECONDS,",
+                    "            SsdpLifecycle.REFRESH_INTERVAL_SECONDS,\n" +
+                    "            TimeUnit.SECONDS,",
             ),
         )
     }
