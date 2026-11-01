@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets
 
 internal object SsdpLifecycle {
     const val MAX_AGE_SECONDS = 1800L
-    const val REFRESH_INTERVAL_SECONDS = MAX_AGE_SECONDS / 2
+    const val REFRESH_INTERVAL_SECONDS = MAX_AGE_SECONDS / 3
 
     fun advertisedTargets(udn: String, targets: List<String>): List<String> =
         listOf("uuid:$udn") + targets

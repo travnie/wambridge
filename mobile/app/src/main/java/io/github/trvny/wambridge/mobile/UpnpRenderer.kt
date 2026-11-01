@@ -79,6 +79,7 @@ internal class UpnpRenderer(
     private val streamWatchdog = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, "wam-upnp-stream-watchdog").apply { isDaemon = true }
     }
+    private val ssdpAnnouncementLock = Any()
     private val running = AtomicBoolean(false)
     private val clientSockets = ConcurrentHashMap.newKeySet<Socket>()
     private val streamSources = ConcurrentHashMap<Socket, HttpURLConnection>()
@@ -165,14 +166,12 @@ internal class UpnpRenderer(
         // Announce the renderer as soon as it comes up; old players are much
         // happier when the UPnP lifecycle actually has a beginning.
         repeat(2) { sendAlive(socket) }
-        // The control point's advertisement expires even when the service stays up.
-        // Avoid multicast refresh while the speaker is pulling audio.
+        // SSDP leases expire during long streams too. Outgoing announcements
+        // do not reacquire Android's incoming-multicast lock during playback.
         streamWatchdog.scheduleWithFixedDelay(
             {
-                if (rendererMulticastNeeded(running.get(), activeStream.get() != null)) {
-                    runCatching { sendAlive(socket) }.onFailure {
-                        if (running.get()) state.lastError = "SSDP refresh failed"
-                    }
+                runCatching { sendAlive(socket) }.onFailure {
+                    if (running.get()) state.lastError = "SSDP refresh failed"
                 }
             },
             SsdpLifecycle.REFRESH_INTERVAL_SECONDS,
@@ -223,7 +222,8 @@ internal class UpnpRenderer(
     private fun advertisedTargets(): List<String> =
         SsdpLifecycle.advertisedTargets(state.udn, SSDP_TARGETS)
 
-    private fun sendAlive(socket: MulticastSocket) {
+    private fun sendAlive(socket: MulticastSocket) = synchronized(ssdpAnnouncementLock) {
+        if (!running.get()) return@synchronized
         val location = "http://${localAddress.hostAddress}:$port/description.xml"
         for (target in advertisedTargets()) {
             val bytes = SsdpLifecycle.alive(SSDP_HOST, location, SERVER_HEADER, state.udn, target)
@@ -247,8 +247,8 @@ internal class UpnpRenderer(
         }
     }
 
-    private fun sendByebye() {
-        val socket = ssdpSocket ?: return
+    private fun sendByebye() = synchronized(ssdpAnnouncementLock) {
+        val socket = ssdpSocket ?: return@synchronized
         for (target in advertisedTargets()) {
             runCatching {
                 val bytes = SsdpLifecycle.byebye(SSDP_HOST, state.udn, target)
