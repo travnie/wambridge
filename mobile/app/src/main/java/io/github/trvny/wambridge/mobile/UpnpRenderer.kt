@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.net.wifi.WifiManager
 import android.os.SystemClock
+import android.util.Log
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
@@ -170,8 +171,11 @@ internal class UpnpRenderer(
         // do not reacquire Android's incoming-multicast lock during playback.
         streamWatchdog.scheduleWithFixedDelay(
             {
-                runCatching { sendAlive(socket) }.onFailure {
-                    if (running.get()) state.lastError = "SSDP refresh failed"
+                runCatching { sendAlive(socket) }.onFailure { error ->
+                    if (running.get()) {
+                        state.lastError = "SSDP refresh failed"
+                        Log.w("WAMBridgeUPnP", "SSDP periodic announcement failed", error)
+                    }
                 }
             },
             SsdpLifecycle.REFRESH_INTERVAL_SECONDS,

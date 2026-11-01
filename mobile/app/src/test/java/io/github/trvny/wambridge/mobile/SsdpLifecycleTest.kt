@@ -1,5 +1,6 @@
 package io.github.trvny.wambridge.mobile
 
+import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -34,6 +35,22 @@ class SsdpLifecycleTest {
         assertTrue("LOCATION: http://10.0.0.5:49152/description.xml\r\n" in message)
         assertTrue("NT: $renderer\r\n" in message)
         assertTrue("USN: uuid:$udn::$renderer\r\n" in message)
+    }
+
+    @Test
+    fun refreshScheduleMatchesTheAdvertisedLease() {
+        assertEquals(1800L, SsdpLifecycle.MAX_AGE_SECONDS)
+        assertEquals(600L, SsdpLifecycle.REFRESH_INTERVAL_SECONDS)
+        val rendererSource = File(
+            "src/main/java/io/github/trvny/wambridge/mobile/UpnpRenderer.kt",
+        ).readText()
+        assertTrue(rendererSource.contains("streamWatchdog.scheduleWithFixedDelay("))
+        assertTrue(
+            rendererSource.contains(
+                "SsdpLifecycle.REFRESH_INTERVAL_SECONDS,\n" +
+                    "            SsdpLifecycle.REFRESH_INTERVAL_SECONDS,",
+            ),
+        )
     }
 
     @Test
