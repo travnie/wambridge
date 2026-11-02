@@ -89,6 +89,7 @@ internal class UpnpRenderer(
     private val clientSockets = ConcurrentHashMap.newKeySet<Socket>()
     private val streamSources = ConcurrentHashMap<Socket, HttpURLConnection>()
     private val activeStream = AtomicReference<Socket?>(null)
+    private val streamLifecycleLock = Any()
     private val stopRelayReport = AtomicReference<(() -> Unit)?>(null)
     private val streamPath = "/stream/${UUID.randomUUID().toString().replace("-", "")}"
     private var httpServer: ServerSocket? = null
@@ -473,12 +474,6 @@ internal class UpnpRenderer(
     }
 
     private fun proxyStream(client: Socket, out: BufferedOutputStream) {
-        val previous = activeStream.getAndSet(client)
-        if (previous != null && previous !== client) {
-            streamSources.remove(previous)?.disconnect()
-            try { previous.close() } catch (_: Exception) { }
-        }
-
         var watchdog: ScheduledFuture<*>? = null
         val startedMs = SystemClock.elapsedRealtime()
         val lastProgressMs = AtomicLong(startedMs)
@@ -500,7 +495,16 @@ internal class UpnpRenderer(
             }
         }
         val reportStopped = { report("Relay closed (renderer stopped) · ${describe()}", true) }
-        stopRelayReport.set(reportStopped)
+        val previous = synchronized(streamLifecycleLock) {
+            if (!running.get()) return
+            val replaced = activeStream.getAndSet(client)
+            stopRelayReport.set(reportStopped)
+            replaced
+        }
+        if (previous != null && previous !== client) {
+            streamSources.remove(previous)?.disconnect()
+            try { previous.close() } catch (_: Exception) { }
+        }
         report("Relay active · ${describe()}", false)
         try {
             callbacks.onStreamOpened()
@@ -1003,8 +1007,11 @@ internal class UpnpRenderer(
         try { httpServer?.close() } catch (_: Exception) { }
         ssdpSocket = null
         httpServer = null
-        stopRelayReport.getAndSet(null)?.invoke()
-        activeStream.getAndSet(null)?.let { socket ->
+        val closingStream = synchronized(streamLifecycleLock) {
+            stopRelayReport.getAndSet(null)?.invoke()
+            activeStream.getAndSet(null)
+        }
+        closingStream?.let { socket ->
             streamSources.remove(socket)?.disconnect()
             try { socket.close() } catch (_: Exception) { }
         }
