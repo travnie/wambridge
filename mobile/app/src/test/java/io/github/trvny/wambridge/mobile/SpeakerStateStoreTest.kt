@@ -12,6 +12,22 @@ class SpeakerStateStoreTest {
     }
 
     @Test
+    fun manualAddressRequiresVerification() {
+        assertEquals(
+            "Manual M5 address needs verification",
+            discoveryStatus(SpeakerDiscoveryStage.NEEDS_VERIFICATION),
+        )
+    }
+
+    @Test
+    fun ambiguousDiscoveryHasActionableStatus() {
+        assertEquals(
+            "Multiple M5 speakers found. Tap Discover to choose one.",
+            discoveryStatus(SpeakerDiscoveryStage.AMBIGUOUS),
+        )
+    }
+
+    @Test
     fun subscriptionImmediatelyReceivesCurrentSnapshotAndThenChanges() {
         val seen = mutableListOf<SpeakerSnapshot>()
         val subscription = SpeakerStateStore.subscribe(seen::add)

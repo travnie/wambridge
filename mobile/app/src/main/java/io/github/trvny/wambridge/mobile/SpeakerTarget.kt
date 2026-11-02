@@ -285,6 +285,17 @@ internal object SpeakerTarget {
         val editor = preferences.edit().putString(RendererService.KEY_SPEAKER_IP, ip)
         if (previous != ip) editor.remove(KEY_SPEAKER_DEVICE_ID)
         editor.apply()
+        if (previous != ip) {
+            SpeakerStateStore.update {
+                it.copy(
+                    speakerIp = ip,
+                    deviceId = null,
+                    discovery = SpeakerDiscoveryStage.NEEDS_VERIFICATION,
+                    status = discoveryStatus(SpeakerDiscoveryStage.NEEDS_VERIFICATION),
+                    lastError = null,
+                )
+            }
+        }
     }
 
     private fun savedSpeakerIp(context: Context): String =
