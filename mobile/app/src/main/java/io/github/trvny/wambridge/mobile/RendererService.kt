@@ -25,6 +25,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     enum class Phase { STOPPED, STARTING, RUNNING, STOPPING }
 
     @Volatile private var renderer: UpnpRenderer? = null
+    private val diagnosticSourceLock = Any()
     private var wamChannel: SamsungWamChannel? = null
     private var rendererState: RendererState? = null
     private var speakerIp: String = ""
@@ -280,7 +281,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
 
             val startedRenderer = activeRenderer ?: error("Renderer did not start")
             rendererState = state
-            renderer = startedRenderer
+            synchronized(diagnosticSourceLock) { renderer = startedRenderer }
             activeRenderer = null
 
             ownsPlayback = false
@@ -558,7 +559,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         } catch (_: Exception) {
             // Best effort.
         }
-        renderer = null
+        synchronized(diagnosticSourceLock) { renderer = null }
         rendererState = null
         if (updatePhase) {
             lastStatus = "Stopped"
@@ -632,8 +633,10 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     }
 
     override fun onStreamDiagnostic(source: Any, message: String) {
-        if (renderer !== source) return
-        diagnosticHistory.recordRelay((source as UpnpRenderer).speakerIp, message)
+        synchronized(diagnosticSourceLock) {
+            if (renderer !== source) return@synchronized
+            diagnosticHistory.recordRelay((source as UpnpRenderer).speakerIp, message)
+        }
     }
 
     override fun onStreamClosed() {
@@ -700,12 +703,13 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         publish("Streaming player → M5 · confirmed")
     }
 
-    override fun onReportedError(method: String?, code: String) = dispatchWamEvent {
-        val source = method?.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()
-        rendererState?.lastError = "M5 error $code$source"
-        diagnosticHistory.recordSpeakerError(speakerIp, "M5 error $code$source")
+    override fun onReportedError(source: Any, method: String?, code: String) = dispatchWamEvent {
+        if (source !== wamChannel) return@dispatchWamEvent
+        val suffix = method?.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()
+        rendererState?.lastError = "M5 error $code$suffix"
+        diagnosticHistory.recordSpeakerError(speakerIp, "M5 error $code$suffix")
         Log.w(TAG, lastSpeakerError)
-        publish("M5 reported error $code$source")
+        publish("M5 reported error $code$suffix")
         SpeakerStateStore.update { it.copy(lastError = lastSpeakerError) }
     }
 
@@ -861,6 +865,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         @Volatile var lastStatus: String = "Stopped"
             private set
         private val diagnosticHistory = RendererDiagnosticHistory()
+        val diagnosticSnapshot: RendererDiagnosticSnapshot get() = diagnosticHistory.snapshot()
         val lastStreamDiagnostic: String get() = diagnosticHistory.relayStatus
         val lastStreamSpeakerIp: String get() = diagnosticHistory.relaySpeakerIp
         val lastRelayFailure: String get() = diagnosticHistory.lastFailure

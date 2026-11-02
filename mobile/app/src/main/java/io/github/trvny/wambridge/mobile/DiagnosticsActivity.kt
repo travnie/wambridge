@@ -79,6 +79,7 @@ class DiagnosticsActivity : Activity() {
         val version = runCatching {
             packageManager.getPackageInfo(packageName, 0).versionName
         }.getOrNull().orEmpty().ifBlank { "Unknown" }
+        val rendererDiagnostics = RendererService.diagnosticSnapshot
         return diagnosticsReport(
             snapshot = SpeakerStateStore.current(),
             wifiEndpoint = WifiLan.preferredTarget(applicationContext)?.endpoint,
@@ -87,13 +88,13 @@ class DiagnosticsActivity : Activity() {
             rendererStatus = RendererService.lastStatus,
             radioStatus = RadioService.lastStatus,
             rendererRelay = diagnosticWithSpeaker(
-                RendererService.lastStreamSpeakerIp, RendererService.lastStreamDiagnostic,
+                rendererDiagnostics.relay.speakerIp, rendererDiagnostics.relay.message,
             ),
             rendererRelayFailure = diagnosticWithSpeaker(
-                RendererService.lastRelayFailureSpeakerIp, RendererService.lastRelayFailure,
+                rendererDiagnostics.failure.speakerIp, rendererDiagnostics.failure.message,
             ),
             rendererSpeakerError = diagnosticWithSpeaker(
-                RendererService.lastSpeakerErrorSpeakerIp, RendererService.lastSpeakerError,
+                rendererDiagnostics.speakerError.speakerIp, rendererDiagnostics.speakerError.message,
             ),
         )
     }

@@ -74,7 +74,7 @@ internal class SamsungWamChannel(
 ) : AutoCloseable {
     interface Listener {
         fun onPlaybackStarted()
-        fun onReportedError(method: String?, code: String)
+        fun onReportedError(source: Any, method: String?, code: String)
         fun onVolumeChanged(source: Any, raw: Int) {}
         fun onSleepTimerChanged(source: Any, state: SleepTimerState) {}
     }
@@ -236,7 +236,7 @@ internal class SamsungWamChannel(
             ?: ERROR_ELEMENT_REGEX.find(body)?.groupValues?.getOrNull(1)?.trim()
 
         if (!errorCode.isNullOrBlank() && errorCode !in SUCCESS_ERROR_CODES) {
-            listener?.onReportedError(method, errorCode)
+            listener?.onReportedError(this, method, errorCode)
         }
         if (method.equals("StartPlaybackEvent", ignoreCase = true)) {
             listener?.onPlaybackStarted()

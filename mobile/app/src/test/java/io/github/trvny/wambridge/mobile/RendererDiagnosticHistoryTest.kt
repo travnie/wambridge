@@ -21,9 +21,9 @@ class RendererDiagnosticHistoryTest {
             "src/main/java/io/github/trvny/wambridge/mobile/DiagnosticsActivity.kt",
         ).readText()
 
-        assertTrue(source.contains("RendererService.lastStreamDiagnostic"))
-        assertTrue(source.contains("RendererService.lastRelayFailure"))
-        assertTrue(source.contains("RendererService.lastSpeakerError"))
+        assertTrue(source.contains("RendererService.diagnosticSnapshot"))
+        assertTrue(source.contains("rendererDiagnostics.failure"))
+        assertTrue(source.contains("rendererDiagnostics.speakerError"))
     }
 
     @Test
@@ -42,6 +42,18 @@ class RendererDiagnosticHistoryTest {
         assertEquals(SPEAKER_A, history.failureSpeakerIp)
         assertEquals(SPEAKER_ERROR, history.lastSpeakerError)
         assertEquals(SPEAKER_A, history.errorSpeakerIp)
+    }
+
+    @Test
+    fun snapshotKeepsSpeakerAndMessageTogether() {
+        val history = RendererDiagnosticHistory()
+        history.recordRelay(SPEAKER_A, TIMEOUT_FAILURE)
+        history.recordSpeakerError(SPEAKER_B, SPEAKER_ERROR)
+        val snapshot = history.snapshot()
+        assertEquals(SPEAKER_A, snapshot.failure.speakerIp)
+        assertEquals(TIMEOUT_FAILURE, snapshot.failure.message)
+        assertEquals(SPEAKER_B, snapshot.speakerError.speakerIp)
+        assertEquals(SPEAKER_ERROR, snapshot.speakerError.message)
     }
 
     @Test
