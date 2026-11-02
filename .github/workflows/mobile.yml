@@ -63,13 +63,24 @@ jobs:
         working-directory: mobile
         run: |
           set -euo pipefail
-          ./gradlew :app:lintDebug :app:testDebugUnitTest :app:assembleDebug
+          ./gradlew :app:lintDebug :app:testDebugUnitTest :app:assembleDebug :app:lintRelease :app:assembleRelease :app:assembleR8Test
+          test -s app/build/outputs/mapping/release/mapping.txt
+          test -s app/build/outputs/mapping/r8Test/mapping.txt
 
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ !inputs.signed }}
         with:
           name: wambridge-mobile-debug
           path: mobile/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: ${{ !inputs.signed }}
+        with:
+          name: wambridge-mobile-r8-test
+          path: |
+            mobile/app/build/outputs/apk/r8Test/app-r8Test.apk
+            mobile/app/build/outputs/mapping/r8Test/mapping.txt
           if-no-files-found: error
 
       - name: Prepare signing
@@ -124,4 +135,11 @@ jobs:
         with:
           name: wambridge-apk
           path: mobile/dist/wambridge-*.apk
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: ${{ inputs.signed }}
+        with:
+          name: wambridge-r8-mapping
+          path: mobile/app/build/outputs/mapping/release/mapping.txt
           if-no-files-found: error
