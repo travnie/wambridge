@@ -86,14 +86,19 @@ android {
             // src/main/res and fail the build on a duplicate resource.
         }
         release {
-            isMinifyEnabled = false
+            optimization {
+                enable = true
+            }
             if (releaseSigningReady) {
                 signingConfig = signingConfigs.getByName("release")
             }
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-            )
+            proguardFiles("proguard-rules.pro")
+        }
+        create("r8Test") {
+            initWith(getByName("release"))
+            applicationIdSuffix = ".r8test"
+            versionNameSuffix = "-r8test"
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 

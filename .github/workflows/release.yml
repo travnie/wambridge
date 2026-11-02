@@ -129,6 +129,11 @@ jobs:
           name: wambridge-apk
           path: apk
 
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: wambridge-r8-mapping
+          path: mapping
+
       - name: Publish the component and the APK together
         shell: bash
         env:
@@ -140,10 +145,17 @@ jobs:
           ROLLING: ${{ needs.version.outputs.rolling }}
         run: |
           set -euo pipefail
+          apk_file="apk/wambridge-${VERSION}.apk"
+          test -s "$apk_file"
+          apk_sha256="$(sha256sum "$apk_file" | cut -d' ' -f1)"
+          # One immutable mapping per exact APK. Retain old mappings for crash retracing.
+          mapping_name="wambridge-${VERSION}-${apk_sha256}-r8-mapping.txt"
+          cp mapping/mapping.txt "mapping/$mapping_name"
           assets=(
             "component/foo_out_wam.fb2k-component"
             "component/wambridge-source.zip"
-            "apk/wambridge-${VERSION}.apk"
+            "$apk_file"
+            "mapping/$mapping_name"
           )
           for asset in "${assets[@]}"; do
             test -f "$asset"
@@ -153,11 +165,16 @@ jobs:
             {
               echo "Rolling release rebuilt from main at ${GITHUB_SHA:0:7}. Version ${VERSION}."
               echo
-              echo "The foobar2000 component and the Android APK always come from the same commit. The latest tag is replaced in place, so these download links keep working."
+              echo "The foobar2000 component and Android APK are built from the same commit. The rolling APK download link stays unchanged."
             } > release-notes.md
           else
             echo "foobar2000 component and signed Android APK for ${VERSION}." > release-notes.md
           fi
+          {
+            echo
+            echo "Android APK SHA-256: ${apk_sha256}"
+            echo "R8 mapping for this exact APK: ${mapping_name}"
+          } >> release-notes.md
 
           if [[ "$ROLLING" != "true" ]]; then
             existing_tag="$(gh api "repos/${GH_REPO}/git/refs/tags/${TAG}" --jq '.object.sha' 2>/dev/null || true)"
@@ -168,8 +185,12 @@ jobs:
           fi
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            # Preserve the old advertised SHA until every replacement asset uploaded.
-            gh release upload "$TAG" "${assets[@]}" --clobber
+            # Upload the new mapping before replacing the rolling APK, without
+            # overwriting or deleting older mappings if publication fails.
+            if ! gh release view "$TAG" --json assets --jq '.assets[].name' | grep -Fxq "$mapping_name"; then
+              gh release upload "$TAG" "mapping/$mapping_name"
+            fi
+            gh release upload "$TAG" "${assets[0]}" "${assets[1]}" "${assets[2]}" --clobber
             gh release edit "$TAG" --title "$TITLE" --notes-file release-notes.md --latest --target "$GITHUB_SHA"
           else
             gh release create "$TAG" "${assets[@]}" --target "$GITHUB_SHA" --title "$TITLE" --latest --notes-file release-notes.md
