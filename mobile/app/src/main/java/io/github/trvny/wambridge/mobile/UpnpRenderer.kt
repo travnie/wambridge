@@ -77,7 +77,7 @@ internal class UpnpRenderer(
     private val context: Context,
     private val state: RendererState,
     private val callbacks: RendererCallbacks,
-    private val speakerIp: String,
+    val speakerIp: String,
     val wifiTarget: WifiLan.Target,
 ) : AutoCloseable {
     private val executor = Executors.newCachedThreadPool()
@@ -1031,8 +1031,6 @@ internal class UpnpRenderer(
         private const val CLIENT_TIMEOUT_MS = 15_000
         private const val SOURCE_CONNECT_TIMEOUT_MS = 5_000
         private const val SOURCE_READ_TIMEOUT_MS = 15_000
-        private const val PHASE_WAITING_FOR_NEUTRON = "waiting for Neutron"
-        private const val PHASE_SENDING_TO_M5 = "sending to M5"
         private const val STREAM_WATCHDOG_INTERVAL_MS = 5_000L
         private const val STREAM_STALL_TIMEOUT_MS = 30_000L
         private const val AV_TRANSPORT = "urn:schemas-upnp-org:service:AVTransport:1"

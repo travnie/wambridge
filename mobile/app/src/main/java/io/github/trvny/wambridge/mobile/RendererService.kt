@@ -597,8 +597,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     }
 
     override fun onPlay(rendererStreamUrl: String) = runOnWorker {
-        lastStreamDiagnostic = "Waiting for Neutron stream"
-        lastStreamSpeakerIp = speakerIp
+        diagnosticHistory.begin(speakerIp)
         cancelIdleRelease()
         val channel = ensureChannel()
 
@@ -634,12 +633,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
 
     override fun onStreamDiagnostic(source: UpnpRenderer, message: String) {
         if (renderer !== source) return
-        lastStreamDiagnostic = message
-        lastStreamSpeakerIp = speakerIp
-        if (message.startsWith("Relay failed") || message.startsWith("Relay watchdog timeout")) {
-            lastRelayFailure = message
-            lastRelayFailureSpeakerIp = speakerIp
-        }
+        diagnosticHistory.recordRelay(source.speakerIp, message)
     }
 
     override fun onStreamClosed() {
@@ -709,8 +703,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     override fun onReportedError(method: String?, code: String) = dispatchWamEvent {
         val source = method?.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()
         rendererState?.lastError = "M5 error $code$source"
-        lastSpeakerError = "M5 error $code$source"
-        lastSpeakerErrorSpeakerIp = speakerIp
+        diagnosticHistory.recordSpeakerError(speakerIp, "M5 error $code$source")
         Log.w(TAG, lastSpeakerError)
         publish("M5 reported error $code$source")
         SpeakerStateStore.update { it.copy(lastError = lastSpeakerError) }
@@ -867,18 +860,13 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
             get() = phase != Phase.STOPPED
         @Volatile var lastStatus: String = "Stopped"
             private set
-        @Volatile var lastStreamDiagnostic: String = "No renderer relay recorded"
-            private set
-        @Volatile var lastStreamSpeakerIp: String = ""
-            private set
-        @Volatile var lastRelayFailure: String = "None"
-            private set
-        @Volatile var lastRelayFailureSpeakerIp: String = ""
-            private set
-        @Volatile var lastSpeakerError: String = "None"
-            private set
-        @Volatile var lastSpeakerErrorSpeakerIp: String = ""
-            private set
+        private val diagnosticHistory = RendererDiagnosticHistory()
+        val lastStreamDiagnostic: String get() = diagnosticHistory.relayStatus
+        val lastStreamSpeakerIp: String get() = diagnosticHistory.relaySpeakerIp
+        val lastRelayFailure: String get() = diagnosticHistory.lastFailure
+        val lastRelayFailureSpeakerIp: String get() = diagnosticHistory.failureSpeakerIp
+        val lastSpeakerError: String get() = diagnosticHistory.lastSpeakerError
+        val lastSpeakerErrorSpeakerIp: String get() = diagnosticHistory.errorSpeakerIp
 
         private val statusObservers = CopyOnWriteArraySet<() -> Unit>()
 
