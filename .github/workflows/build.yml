@@ -153,7 +153,8 @@ jobs:
               Invoke-WebRequest `
                 -Uri "https://www.foobar2000.org/downloads/SDK-$sdkVersion.7z" `
                 -OutFile external/foobar-sdk.7z `
-                -TimeoutSec 35
+                -TimeoutSec 35 `
+                -OperationTimeoutSeconds 35
               7z x external/foobar-sdk.7z -oexternal/foobar-sdk -y
               if ($LASTEXITCODE -ne 0) { throw "Official SDK archive extraction failed" }
               $downloaded = $true
@@ -175,7 +176,8 @@ jobs:
             Invoke-WebRequest `
               -Uri "https://codeload.github.com/reupen/foobar2000-sdk-unmodified/zip/$mirrorSha" `
               -OutFile external/foobar-sdk-mirror.zip `
-              -TimeoutSec 60
+              -TimeoutSec 60 `
+              -OperationTimeoutSeconds 35
             Expand-Archive `
               -LiteralPath external/foobar-sdk-mirror.zip `
               -DestinationPath external/foobar-sdk -Force
@@ -197,6 +199,8 @@ jobs:
             (Split-Path (Split-Path $sdkProject.FullName -Parent) -Parent) -Parent
           "FOOBAR_SDK_ROOT=$sdkRoot" | Out-File `
             -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          # A handled 7z failure must not become the pwsh step's exit code.
+          $global:LASTEXITCODE = 0
 
       - name: Build x64 component
         shell: pwsh
