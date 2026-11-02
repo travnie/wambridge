@@ -146,12 +146,47 @@ jobs:
           if ($sdkVersion -notmatch '^\d{4}-\d{2}-\d{2}$') {
             throw "Invalid foobar2000 SDK version"
           }
-          New-Item -ItemType Directory -Force external/foobar-sdk | Out-Null
-          Invoke-WebRequest `
-            -Uri "https://www.foobar2000.org/downloads/SDK-$sdkVersion.7z" `
-            -OutFile external/foobar-sdk.7z
-          7z x external/foobar-sdk.7z -oexternal/foobar-sdk -y
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $downloaded = $false
+          for ($attempt = 1; $attempt -le 2; $attempt++) {
+            try {
+              New-Item -ItemType Directory -Force external/foobar-sdk | Out-Null
+              Invoke-WebRequest `
+                -Uri "https://www.foobar2000.org/downloads/SDK-$sdkVersion.7z" `
+                -OutFile external/foobar-sdk.7z `
+                -TimeoutSec 35
+              7z x external/foobar-sdk.7z -oexternal/foobar-sdk -y
+              if ($LASTEXITCODE -ne 0) { throw "Official SDK archive extraction failed" }
+              $downloaded = $true
+              break
+            } catch {
+              Write-Warning "Official SDK download attempt $attempt failed: $_"
+              Remove-Item external/foobar-sdk.7z -ErrorAction SilentlyContinue
+              Remove-Item external/foobar-sdk -Recurse -Force -ErrorAction SilentlyContinue
+              if ($attempt -lt 2) { Start-Sleep -Seconds 3 }
+            }
+          }
+          if (-not $downloaded) {
+            # Unmodified SDK mirror, pinned to the SDK-2026-10-01 commit.
+            if ($sdkVersion -ne "2026-10-01") {
+              throw "No verified SDK mirror for version $sdkVersion"
+            }
+            $mirrorSha = "9e4823ee802dfb704de1ce42401b48b407a54180"
+            New-Item -ItemType Directory -Force external/foobar-sdk | Out-Null
+            Invoke-WebRequest `
+              -Uri "https://codeload.github.com/reupen/foobar2000-sdk-unmodified/zip/$mirrorSha" `
+              -OutFile external/foobar-sdk-mirror.zip `
+              -TimeoutSec 60
+            Expand-Archive `
+              -LiteralPath external/foobar-sdk-mirror.zip `
+              -DestinationPath external/foobar-sdk -Force
+            $readme = Get-ChildItem external/foobar-sdk -Recurse `
+              -Filter sdk-readme.html | Select-Object -First 1
+            if (-not $readme -or
+                (Get-Content $readme.FullName -Raw) -notmatch "version $sdkVersion") {
+              throw "Pinned SDK mirror does not match version $sdkVersion"
+            }
+            Write-Host "Using verified SDK mirror commit $mirrorSha"
+          }
 
           $sdkProject = Get-ChildItem external/foobar-sdk `
             -Recurse -Filter foobar2000_SDK.vcxproj | Select-Object -First 1
