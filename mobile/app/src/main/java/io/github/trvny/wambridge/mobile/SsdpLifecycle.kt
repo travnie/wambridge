@@ -3,6 +3,9 @@ package io.github.trvny.wambridge.mobile
 import java.nio.charset.StandardCharsets
 
 internal object SsdpLifecycle {
+    const val MAX_AGE_SECONDS = 1800L
+    const val REFRESH_INTERVAL_SECONDS = MAX_AGE_SECONDS / 3
+
     fun advertisedTargets(udn: String, targets: List<String>): List<String> =
         listOf("uuid:$udn") + targets
 
@@ -22,7 +25,7 @@ internal object SsdpLifecycle {
     ): ByteArray = buildString {
         append("NOTIFY * HTTP/1.1\r\n")
         append("HOST: $host\r\n")
-        append("CACHE-CONTROL: max-age=1800\r\n")
+        append("CACHE-CONTROL: max-age=$MAX_AGE_SECONDS\r\n")
         append("LOCATION: $location\r\n")
         append("NT: $target\r\n")
         append("NTS: ssdp:alive\r\n")
