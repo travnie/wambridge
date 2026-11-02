@@ -1,9 +1,22 @@
 package io.github.trvny.wambridge.mobile
 
+import java.io.File
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RendererDiagnosticHistoryTest {
+    @Test
+    fun diagnosticsScreenReadsRetainedServiceHistory() {
+        val source = File(
+            "src/main/java/io/github/trvny/wambridge/mobile/DiagnosticsActivity.kt",
+        ).readText()
+
+        assertTrue(source.contains("RendererService.lastStreamDiagnostic"))
+        assertTrue(source.contains("RendererService.lastRelayFailure"))
+        assertTrue(source.contains("RendererService.lastSpeakerError"))
+    }
+
     @Test
     fun retryDoesNotErasePreviousFailureOrSpeakerError() {
         val history = RendererDiagnosticHistory()

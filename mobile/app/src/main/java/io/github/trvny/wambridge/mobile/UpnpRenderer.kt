@@ -620,10 +620,10 @@ internal class UpnpRenderer(
     ) {
         val buffer = ByteArray(64 * 1024)
         while (true) {
-            onStage("waiting for Neutron")
+            onStage(PHASE_WAITING_FOR_NEUTRON)
             val count = input.read(buffer)
             if (count < 0) return
-            onStage("sending to M5")
+            onStage(PHASE_SENDING_TO_M5)
             out.write(buffer, 0, count)
             onProgress(count)
         }
@@ -638,14 +638,14 @@ internal class UpnpRenderer(
         val buffer = ByteArray(64 * 1024)
         var carry: Byte? = null
         while (true) {
-            onStage("waiting for Neutron")
+            onStage(PHASE_WAITING_FOR_NEUTRON)
             val count = input.read(buffer)
             if (count < 0) return
             var start = 0
 
             carry?.let { high ->
                 if (count > 0) {
-                    onStage("sending to M5")
+                    onStage(PHASE_SENDING_TO_M5)
                     out.write(byteArrayOf(buffer[0], high))
                     onProgress(2)
                     carry = null
@@ -661,7 +661,7 @@ internal class UpnpRenderer(
                 index += 2
             }
             if (index > start) {
-                onStage("sending to M5")
+                onStage(PHASE_SENDING_TO_M5)
                 out.write(buffer, start, index - start)
                 onProgress(index - start)
             }
@@ -1031,6 +1031,8 @@ internal class UpnpRenderer(
         private const val CLIENT_TIMEOUT_MS = 15_000
         private const val SOURCE_CONNECT_TIMEOUT_MS = 5_000
         private const val SOURCE_READ_TIMEOUT_MS = 15_000
+        private const val PHASE_WAITING_FOR_NEUTRON = "waiting for Neutron"
+        private const val PHASE_SENDING_TO_M5 = "sending to M5"
         private const val STREAM_WATCHDOG_INTERVAL_MS = 5_000L
         private const val STREAM_STALL_TIMEOUT_MS = 30_000L
         private const val AV_TRANSPORT = "urn:schemas-upnp-org:service:AVTransport:1"

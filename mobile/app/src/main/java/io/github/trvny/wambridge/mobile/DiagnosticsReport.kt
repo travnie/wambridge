@@ -13,8 +13,8 @@ internal data class DiagnosticsReport(
     }.trimEnd()
 }
 
-internal fun diagnosticWithSpeaker(ip: String, message: String): String =
-    if (ip.isBlank()) message else "M5 $ip · $message"
+internal fun diagnosticWithSpeaker(ip: String?, message: String): String =
+    if (ip.isNullOrBlank()) message else "M5 $ip · $message"
 
 internal fun diagnosticsReport(
     snapshot: SpeakerSnapshot,
