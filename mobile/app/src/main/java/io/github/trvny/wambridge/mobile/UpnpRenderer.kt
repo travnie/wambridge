@@ -48,7 +48,7 @@ internal interface RendererCallbacks {
     fun onPlay(rendererStreamUrl: String)
     fun onStreamOpened()
     fun onStreamClosed()
-    fun onStreamDiagnostic(source: UpnpRenderer, message: String) {}
+    fun onStreamDiagnostic(source: Any, message: String) {}
     fun onPause()
     fun onStop()
     fun onVolume(percent: Int)

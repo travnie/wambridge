@@ -631,9 +631,9 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         }
     }
 
-    override fun onStreamDiagnostic(source: UpnpRenderer, message: String) {
+    override fun onStreamDiagnostic(source: Any, message: String) {
         if (renderer !== source) return
-        diagnosticHistory.recordRelay(source.speakerIp, message)
+        diagnosticHistory.recordRelay((source as UpnpRenderer).speakerIp, message)
     }
 
     override fun onStreamClosed() {
