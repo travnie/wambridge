@@ -865,7 +865,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         @Volatile var lastStatus: String = "Stopped"
             private set
         private val diagnosticHistory = RendererDiagnosticHistory()
-        val diagnosticSnapshot: RendererDiagnosticSnapshot get() = diagnosticHistory.snapshot()
+        internal val diagnosticSnapshot: RendererDiagnosticSnapshot get() = diagnosticHistory.snapshot()
         val lastStreamDiagnostic: String get() = diagnosticHistory.relayStatus
         val lastStreamSpeakerIp: String get() = diagnosticHistory.relaySpeakerIp
         val lastRelayFailure: String get() = diagnosticHistory.lastFailure
