@@ -25,6 +25,24 @@ class DiagnosticsReportTest {
     }
 
     @Test
+    fun relayFailureRemainsVisibleAfterPlaybackStops() {
+        val report = diagnosticsReport(
+            snapshot = SpeakerSnapshot(playback = SpeakerPlaybackState.STOPPED),
+            wifiEndpoint = null,
+            appVersion = "0.0.5",
+            rendererPhase = "RUNNING",
+            rendererStatus = "M5 reported error MEDIA_BUFFER_ERROR · ErrorEvent",
+            radioStatus = "Stopped",
+            rendererRelay = "Relay failed (SocketTimeoutException: Read timed out) · phase=waiting for Neutron",
+            rendererSpeakerError = "M5 error MEDIA_BUFFER_ERROR · ErrorEvent",
+        )
+
+        assertTrue(report.toPlainText().contains("Renderer relay: Relay failed"))
+        assertTrue(report.toPlainText().contains("phase=waiting for Neutron"))
+        assertEquals("M5 error MEDIA_BUFFER_ERROR · ErrorEvent", report.rows["Last M5 event error"])
+    }
+
+    @Test
     fun activeRadioIncludesSourceFallbackAndLastErrorInStableOrder() {
         val report = diagnosticsReport(
             snapshot = SpeakerSnapshot(

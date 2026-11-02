@@ -20,6 +20,8 @@ internal fun diagnosticsReport(
     rendererPhase: String,
     rendererStatus: String,
     radioStatus: String,
+    rendererRelay: String = "No renderer relay recorded",
+    rendererSpeakerError: String = "None",
 ): DiagnosticsReport {
     val rows = linkedMapOf<String, String>()
     rows["Speaker IP"] = snapshot.speakerIp ?: "Not connected"
@@ -34,6 +36,8 @@ internal fun diagnosticsReport(
     rows["Now playing"] = snapshot.metadata ?: "None"
     rows["Fallback"] = snapshot.fallback ?: "None"
     rows["Renderer"] = rendererPhase + " · " + rendererStatus
+    rows["Renderer relay"] = rendererRelay
+    rows["Last M5 event error"] = rendererSpeakerError
     rows["Radio"] = radioStatus
     rows["Last error"] = snapshot.lastError ?: "None"
     rows["App version"] = appVersion

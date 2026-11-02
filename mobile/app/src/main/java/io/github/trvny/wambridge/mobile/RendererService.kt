@@ -597,6 +597,8 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     }
 
     override fun onPlay(rendererStreamUrl: String) = runOnWorker {
+        lastStreamDiagnostic = "Waiting for Neutron stream"
+        lastSpeakerError = "None"
         cancelIdleRelease()
         val channel = ensureChannel()
 
@@ -628,6 +630,10 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
             rendererState?.transportState = "PLAYING"
             publish("Streaming player → M5")
         }
+    }
+
+    override fun onStreamDiagnostic(message: String) {
+        lastStreamDiagnostic = message
     }
 
     override fun onStreamClosed() {
@@ -697,7 +703,10 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     override fun onReportedError(method: String?, code: String) = dispatchWamEvent {
         val source = method?.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()
         rendererState?.lastError = "M5 error $code$source"
+        lastSpeakerError = "M5 error $code$source"
+        Log.w(TAG, lastSpeakerError)
         publish("M5 reported error $code$source")
+        SpeakerStateStore.update { it.copy(lastError = lastSpeakerError) }
     }
 
     override fun onSleepTimerChanged(source: Any, state: SleepTimerState) = dispatchWamEvent {
@@ -850,6 +859,10 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         val busy: Boolean
             get() = phase != Phase.STOPPED
         @Volatile var lastStatus: String = "Stopped"
+            private set
+        @Volatile var lastStreamDiagnostic: String = "No renderer relay recorded"
+            private set
+        @Volatile var lastSpeakerError: String = "None"
             private set
 
         private val statusObservers = CopyOnWriteArraySet<() -> Unit>()
