@@ -14,7 +14,7 @@ internal data class DiagnosticsReport(
 }
 
 internal fun diagnosticWithSpeaker(ip: String?, message: String): String =
-    if (ip.isNullOrBlank()) message else "M5 $ip · $message"
+    ip?.takeIf { it.isNotBlank() }?.let { "M5 $it · $message" } ?: message
 
 internal fun diagnosticsReport(
     snapshot: SpeakerSnapshot,

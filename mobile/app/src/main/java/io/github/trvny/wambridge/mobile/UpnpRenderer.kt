@@ -568,7 +568,7 @@ internal class UpnpRenderer(
                     if (l16) {
                         val rate = parameter(contentType, "rate")?.toIntOrNull() ?: 44_100
                         val channels = parameter(contentType, "channels")?.toIntOrNull() ?: 2
-                        stage.set("sending to M5")
+                        stage.set(PHASE_SENDING_TO_M5)
                         out.write(wavHeader(rate, channels, 16))
                         lastProgressMs.set(SystemClock.elapsedRealtime())
                         copyL16(input, out, onProgress, onStage)
@@ -585,7 +585,7 @@ internal class UpnpRenderer(
                 connection.disconnect()
             }
             report("Relay source ended · ${describe()}", true)
-        } catch (error: Exception) {
+        } catch (error: Exception) { // skipcq
             // Source and speaker sockets can throw different exception types.
             val cause = if (watchdogExpired.get()) "watchdog timeout" else
                 "${error.javaClass.simpleName}: ${error.message.orEmpty().take(100)}"

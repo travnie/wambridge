@@ -6,6 +6,15 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class RendererDiagnosticHistoryTest {
+    private companion object {
+        const val SPEAKER_A = "10.0.0.102"
+        const val SPEAKER_B = "10.0.0.103"
+        const val TIMEOUT_FAILURE = "Relay failed (SocketTimeoutException)"
+        const val SPEAKER_ERROR = "M5 error MEDIA_BUFFER_ERROR"
+        const val RELAY_ACTIVE = "Relay active"
+        const val IO_FAILURE = "Relay failed (IOException)"
+    }
+
     @Test
     fun diagnosticsScreenReadsRetainedServiceHistory() {
         val source = File(
@@ -20,28 +29,28 @@ class RendererDiagnosticHistoryTest {
     @Test
     fun retryDoesNotErasePreviousFailureOrSpeakerError() {
         val history = RendererDiagnosticHistory()
-        history.begin("10.0.0.102")
-        history.recordRelay("10.0.0.102", "Relay failed (SocketTimeoutException)")
-        history.recordSpeakerError("10.0.0.102", "M5 error MEDIA_BUFFER_ERROR")
+        history.begin(SPEAKER_A)
+        history.recordRelay(SPEAKER_A, TIMEOUT_FAILURE)
+        history.recordSpeakerError(SPEAKER_A, SPEAKER_ERROR)
 
-        history.begin("10.0.0.103")
-        history.recordRelay("10.0.0.103", "Relay active")
+        history.begin(SPEAKER_B)
+        history.recordRelay(SPEAKER_B, RELAY_ACTIVE)
 
-        assertEquals("Relay active", history.relayStatus)
-        assertEquals("10.0.0.103", history.relaySpeakerIp)
-        assertEquals("Relay failed (SocketTimeoutException)", history.lastFailure)
-        assertEquals("10.0.0.102", history.failureSpeakerIp)
-        assertEquals("M5 error MEDIA_BUFFER_ERROR", history.lastSpeakerError)
-        assertEquals("10.0.0.102", history.errorSpeakerIp)
+        assertEquals(RELAY_ACTIVE, history.relayStatus)
+        assertEquals(SPEAKER_B, history.relaySpeakerIp)
+        assertEquals(TIMEOUT_FAILURE, history.lastFailure)
+        assertEquals(SPEAKER_A, history.failureSpeakerIp)
+        assertEquals(SPEAKER_ERROR, history.lastSpeakerError)
+        assertEquals(SPEAKER_A, history.errorSpeakerIp)
     }
 
     @Test
     fun newerFailureReplacesPreviousFailure() {
         val history = RendererDiagnosticHistory()
-        history.recordRelay("10.0.0.102", "Relay watchdog timeout")
-        history.recordRelay("10.0.0.103", "Relay failed (IOException)")
+        history.recordRelay(SPEAKER_A, "Relay watchdog timeout")
+        history.recordRelay(SPEAKER_B, IO_FAILURE)
 
-        assertEquals("Relay failed (IOException)", history.lastFailure)
-        assertEquals("10.0.0.103", history.failureSpeakerIp)
+        assertEquals(IO_FAILURE, history.lastFailure)
+        assertEquals(SPEAKER_B, history.failureSpeakerIp)
     }
 }
