@@ -703,14 +703,21 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         publish("Streaming player → M5 · confirmed")
     }
 
-    override fun onReportedError(source: Any, method: String?, code: String) = dispatchWamEvent {
-        if (source !== wamChannel) return@dispatchWamEvent
+    override fun onReportedError(source: Any, method: String?, code: String) {
         val suffix = method?.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()
-        rendererState?.lastError = "M5 error $code$suffix"
-        diagnosticHistory.recordSpeakerError(speakerIp, "M5 error $code$suffix")
-        Log.w(TAG, lastSpeakerError)
-        publish("M5 reported error $code$suffix")
-        SpeakerStateStore.update { it.copy(lastError = lastSpeakerError) }
+        val message = "M5 error $code$suffix"
+        // Keep accepted errors even if teardown wins before the UI worker runs.
+        synchronized(channelLock) {
+            if (source !== wamChannel) return
+            diagnosticHistory.recordSpeakerError(speakerIp, message)
+        }
+        dispatchWamEvent {
+            if (source !== wamChannel) return@dispatchWamEvent
+            rendererState?.lastError = message
+            Log.w(TAG, message)
+            publish("M5 reported error $code$suffix")
+            SpeakerStateStore.update { it.copy(lastError = message) }
+        }
     }
 
     override fun onSleepTimerChanged(source: Any, state: SleepTimerState) = dispatchWamEvent {
