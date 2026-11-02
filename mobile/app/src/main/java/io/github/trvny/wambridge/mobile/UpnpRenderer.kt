@@ -89,6 +89,7 @@ internal class UpnpRenderer(
     private val clientSockets = ConcurrentHashMap.newKeySet<Socket>()
     private val streamSources = ConcurrentHashMap<Socket, HttpURLConnection>()
     private val activeStream = AtomicReference<Socket?>(null)
+    private val stopRelayReport = AtomicReference<(() -> Unit)?>(null)
     private val streamPath = "/stream/${UUID.randomUUID().toString().replace("-", "")}"
     private var httpServer: ServerSocket? = null
     private var ssdpSocket: MulticastSocket? = null
@@ -498,6 +499,8 @@ internal class UpnpRenderer(
                 }
             }
         }
+        val reportStopped = { report("Relay closed (renderer stopped) · ${describe()}", true) }
+        stopRelayReport.set(reportStopped)
         report("Relay active · ${describe()}", false)
         try {
             callbacks.onStreamOpened()
@@ -598,6 +601,7 @@ internal class UpnpRenderer(
             if (running.get() && !watchdogExpired.get()) Log.w("WAMBridgeRelay", message, error)
             throw error
         } finally {
+            stopRelayReport.compareAndSet(reportStopped, null)
             watchdog?.cancel(false)
             if (activeStream.compareAndSet(client, null)) {
                 resumeDiscoveryAfterStream()
@@ -999,6 +1003,7 @@ internal class UpnpRenderer(
         try { httpServer?.close() } catch (_: Exception) { }
         ssdpSocket = null
         httpServer = null
+        stopRelayReport.getAndSet(null)?.invoke()
         activeStream.getAndSet(null)?.let { socket ->
             streamSources.remove(socket)?.disconnect()
             try { socket.close() } catch (_: Exception) { }
