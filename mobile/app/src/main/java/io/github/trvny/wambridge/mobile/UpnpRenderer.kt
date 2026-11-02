@@ -6,6 +6,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.net.wifi.WifiManager
 import android.os.SystemClock
+import android.util.Log
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
 import java.io.ByteArrayOutputStream
@@ -79,6 +80,7 @@ internal class UpnpRenderer(
     private val streamWatchdog = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, "wam-upnp-stream-watchdog").apply { isDaemon = true }
     }
+    private val ssdpAnnouncementLock = Any()
     private val running = AtomicBoolean(false)
     private val clientSockets = ConcurrentHashMap.newKeySet<Socket>()
     private val streamSources = ConcurrentHashMap<Socket, HttpURLConnection>()
@@ -165,6 +167,21 @@ internal class UpnpRenderer(
         // Announce the renderer as soon as it comes up; old players are much
         // happier when the UPnP lifecycle actually has a beginning.
         repeat(2) { sendAlive(socket) }
+        // SSDP leases expire during long streams too. Outgoing announcements
+        // do not reacquire Android's incoming-multicast lock during playback.
+        streamWatchdog.scheduleWithFixedDelay(
+            {
+                runCatching { sendAlive(socket) }.onFailure { error ->
+                    if (running.get()) {
+                        state.lastError = "SSDP refresh failed"
+                        Log.w("WAMBridgeUPnP", "SSDP periodic announcement failed", error)
+                    }
+                }
+            },
+            SsdpLifecycle.REFRESH_INTERVAL_SECONDS,
+            SsdpLifecycle.REFRESH_INTERVAL_SECONDS,
+            TimeUnit.SECONDS,
+        )
     }
 
     private fun ssdpLoop(socket: MulticastSocket) {
@@ -196,7 +213,7 @@ internal class UpnpRenderer(
     private fun sendSearchResponse(socket: MulticastSocket, request: DatagramPacket, target: String) {
         val bytes = buildString {
             append("HTTP/1.1 200 OK\r\n")
-            append("CACHE-CONTROL: max-age=1800\r\n")
+            append("CACHE-CONTROL: max-age=${SsdpLifecycle.MAX_AGE_SECONDS}\r\n")
             append("EXT:\r\n")
             append("LOCATION: http://${localAddress.hostAddress}:$port/description.xml\r\n")
             append("SERVER: $SERVER_HEADER\r\n")
@@ -209,7 +226,8 @@ internal class UpnpRenderer(
     private fun advertisedTargets(): List<String> =
         SsdpLifecycle.advertisedTargets(state.udn, SSDP_TARGETS)
 
-    private fun sendAlive(socket: MulticastSocket) {
+    private fun sendAlive(socket: MulticastSocket) = synchronized(ssdpAnnouncementLock) {
+        if (!running.get()) return@synchronized
         val location = "http://${localAddress.hostAddress}:$port/description.xml"
         for (target in advertisedTargets()) {
             val bytes = SsdpLifecycle.alive(SSDP_HOST, location, SERVER_HEADER, state.udn, target)
@@ -233,8 +251,8 @@ internal class UpnpRenderer(
         }
     }
 
-    private fun sendByebye() {
-        val socket = ssdpSocket ?: return
+    private fun sendByebye() = synchronized(ssdpAnnouncementLock) {
+        val socket = ssdpSocket ?: return@synchronized
         for (target in advertisedTargets()) {
             runCatching {
                 val bytes = SsdpLifecycle.byebye(SSDP_HOST, state.udn, target)
@@ -377,7 +395,8 @@ internal class UpnpRenderer(
                 action,
                 "<PlayMode>NORMAL</PlayMode><RecQualityMode>NOT_IMPLEMENTED</RecQualityMode>",
             )
-            "Seek", "SetPlayMode" -> soapOk(out, AV_TRANSPORT, action)
+            "Seek" -> soapError(out, 710, "Seek mode not supported")
+            "SetPlayMode" -> soapOk(out, AV_TRANSPORT, action)
             else -> soapError(out, 401, "Invalid Action")
         }
     }
