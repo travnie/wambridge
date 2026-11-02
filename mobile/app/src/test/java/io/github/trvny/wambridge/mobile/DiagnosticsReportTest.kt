@@ -25,6 +25,12 @@ class DiagnosticsReportTest {
     }
 
     @Test
+    fun retainedDiagnosticsShowOriginalSpeakerIdentity() {
+        assertEquals("M5 10.0.0.102 · Relay failed", diagnosticWithSpeaker("10.0.0.102", "Relay failed"))
+        assertEquals("None", diagnosticWithSpeaker("", "None"))
+    }
+
+    @Test
     fun relayFailureRemainsVisibleAfterPlaybackStops() {
         val report = diagnosticsReport(
             snapshot = SpeakerSnapshot(playback = SpeakerPlaybackState.STOPPED),
@@ -38,6 +44,7 @@ class DiagnosticsReportTest {
         )
 
         assertTrue(report.toPlainText().contains("Renderer relay: Relay failed"))
+        assertTrue(report.toPlainText().contains("Last relay failure: None"))
         assertTrue(report.toPlainText().contains("phase=waiting for Neutron"))
         assertEquals("M5 error MEDIA_BUFFER_ERROR · ErrorEvent", report.rows["Last M5 event error"])
     }

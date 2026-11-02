@@ -48,7 +48,7 @@ internal interface RendererCallbacks {
     fun onPlay(rendererStreamUrl: String)
     fun onStreamOpened()
     fun onStreamClosed()
-    fun onStreamDiagnostic(message: String) {}
+    fun onStreamDiagnostic(source: UpnpRenderer, message: String) {}
     fun onPause()
     fun onStop()
     fun onVolume(percent: Int)
@@ -484,11 +484,21 @@ internal class UpnpRenderer(
         val forwarded = AtomicLong()
         val stage = AtomicReference("opening")
         val watchdogExpired = AtomicBoolean(false)
+        val terminal = AtomicBoolean(false)
+        val reportLock = Any()
         val describe = {
             val now = SystemClock.elapsedRealtime()
             relayDiagnosticSummary(stage.get(), forwarded.get(), now - startedMs, now - lastProgressMs.get())
         }
-        callbacks.onStreamDiagnostic("Relay active · ${describe()}")
+        val report: (String, Boolean) -> Unit = { message, finish ->
+            synchronized(reportLock) {
+                if (activeStream.get() === client && !terminal.get()) {
+                    if (finish) terminal.set(true)
+                    callbacks.onStreamDiagnostic(this, message)
+                }
+            }
+        }
+        report("Relay active · ${describe()}", false)
         try {
             callbacks.onStreamOpened()
             // The controller has already found us and the M5 is pulling audio.
@@ -497,8 +507,7 @@ internal class UpnpRenderer(
             suspendDiscoveryForStream()
             watchdog = streamWatchdog.scheduleWithFixedDelay(
                 {
-                    if (activeStream.get() === client) {
-                        callbacks.onStreamDiagnostic("Relay active · ${describe()}")
+                    if (activeStream.get() === client && !terminal.get()) {
                         if (streamRelayStalled(
                                 lastProgressMs = lastProgressMs.get(),
                                 nowMs = SystemClock.elapsedRealtime(),
@@ -507,10 +516,12 @@ internal class UpnpRenderer(
                         ) {
                             val message = "Relay watchdog timeout · ${describe()}"
                             state.lastError = message
-                            callbacks.onStreamDiagnostic(message)
+                            report(message, true)
                             Log.w("WAMBridgeRelay", message)
                             streamSources.remove(client)?.disconnect()
                             try { client.close() } catch (_: Exception) { }
+                        } else {
+                            report("Relay active · ${describe()}", false)
                         }
                     }
                 },
@@ -573,13 +584,18 @@ internal class UpnpRenderer(
                 streamSources.remove(client)
                 connection.disconnect()
             }
-            callbacks.onStreamDiagnostic("Relay source ended · ${describe()}")
+            report("Relay source ended · ${describe()}", true)
         } catch (error: Exception) {
+            // Source and speaker sockets can throw different exception types.
             val cause = if (watchdogExpired.get()) "watchdog timeout" else
                 "${error.javaClass.simpleName}: ${error.message.orEmpty().take(100)}"
-            val message = "Relay failed ($cause) · ${describe()}"
-            callbacks.onStreamDiagnostic(message)
-            Log.w("WAMBridgeRelay", message, error)
+            val message = if (!running.get()) {
+                "Relay closed (renderer stopped) · ${describe()}"
+            } else {
+                "Relay failed ($cause) · ${describe()}"
+            }
+            if (!watchdogExpired.get()) report(message, true)
+            if (running.get() && !watchdogExpired.get()) Log.w("WAMBridgeRelay", message, error)
             throw error
         } finally {
             watchdog?.cancel(false)
@@ -1015,6 +1031,8 @@ internal class UpnpRenderer(
         private const val CLIENT_TIMEOUT_MS = 15_000
         private const val SOURCE_CONNECT_TIMEOUT_MS = 5_000
         private const val SOURCE_READ_TIMEOUT_MS = 15_000
+        private const val PHASE_WAITING_FOR_NEUTRON = "waiting for Neutron"
+        private const val PHASE_SENDING_TO_M5 = "sending to M5"
         private const val STREAM_WATCHDOG_INTERVAL_MS = 5_000L
         private const val STREAM_STALL_TIMEOUT_MS = 30_000L
         private const val AV_TRANSPORT = "urn:schemas-upnp-org:service:AVTransport:1"

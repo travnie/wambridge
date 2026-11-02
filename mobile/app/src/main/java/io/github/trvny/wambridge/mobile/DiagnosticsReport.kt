@@ -13,6 +13,9 @@ internal data class DiagnosticsReport(
     }.trimEnd()
 }
 
+internal fun diagnosticWithSpeaker(ip: String, message: String): String =
+    if (ip.isBlank()) message else "M5 $ip · $message"
+
 internal fun diagnosticsReport(
     snapshot: SpeakerSnapshot,
     wifiEndpoint: WifiLan.Endpoint?,
@@ -21,6 +24,7 @@ internal fun diagnosticsReport(
     rendererStatus: String,
     radioStatus: String,
     rendererRelay: String = "No renderer relay recorded",
+    rendererRelayFailure: String = "None",
     rendererSpeakerError: String = "None",
 ): DiagnosticsReport {
     val rows = linkedMapOf<String, String>()
@@ -37,6 +41,7 @@ internal fun diagnosticsReport(
     rows["Fallback"] = snapshot.fallback ?: "None"
     rows["Renderer"] = rendererPhase + " · " + rendererStatus
     rows["Renderer relay"] = rendererRelay
+    rows["Last relay failure"] = rendererRelayFailure
     rows["Last M5 event error"] = rendererSpeakerError
     rows["Radio"] = radioStatus
     rows["Last error"] = snapshot.lastError ?: "None"

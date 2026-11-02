@@ -86,8 +86,15 @@ class DiagnosticsActivity : Activity() {
             rendererPhase = RendererService.phase.name,
             rendererStatus = RendererService.lastStatus,
             radioStatus = RadioService.lastStatus,
-            rendererRelay = RendererService.lastStreamDiagnostic,
-            rendererSpeakerError = RendererService.lastSpeakerError,
+            rendererRelay = diagnosticWithSpeaker(
+                RendererService.lastStreamSpeakerIp, RendererService.lastStreamDiagnostic,
+            ),
+            rendererRelayFailure = diagnosticWithSpeaker(
+                RendererService.lastRelayFailureSpeakerIp, RendererService.lastRelayFailure,
+            ),
+            rendererSpeakerError = diagnosticWithSpeaker(
+                RendererService.lastSpeakerErrorSpeakerIp, RendererService.lastSpeakerError,
+            ),
         )
     }
 
