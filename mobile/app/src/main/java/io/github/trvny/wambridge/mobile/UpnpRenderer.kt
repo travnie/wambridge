@@ -41,10 +41,14 @@ internal fun streamRelayStalled(
 internal fun rendererMulticastNeeded(running: Boolean, streamActive: Boolean): Boolean =
     running && !streamActive
 
+internal fun relayDiagnosticSummary(stage: String, bytesSent: Long, elapsedMs: Long, idleMs: Long): String =
+    "phase=$stage · sentKiB=${bytesSent / 1024} · elapsedSec=${elapsedMs / 1000} · idleSec=${idleMs / 1000}"
+
 internal interface RendererCallbacks {
     fun onPlay(rendererStreamUrl: String)
     fun onStreamOpened()
     fun onStreamClosed()
+    fun onStreamDiagnostic(source: Any, message: String) {}
     fun onPause()
     fun onStop()
     fun onVolume(percent: Int)
@@ -73,7 +77,7 @@ internal class UpnpRenderer(
     private val context: Context,
     private val state: RendererState,
     private val callbacks: RendererCallbacks,
-    private val speakerIp: String,
+    val speakerIp: String,
     val wifiTarget: WifiLan.Target,
 ) : AutoCloseable {
     private val executor = Executors.newCachedThreadPool()
@@ -85,6 +89,8 @@ internal class UpnpRenderer(
     private val clientSockets = ConcurrentHashMap.newKeySet<Socket>()
     private val streamSources = ConcurrentHashMap<Socket, HttpURLConnection>()
     private val activeStream = AtomicReference<Socket?>(null)
+    private val streamLifecycleLock = Any()
+    private val stopRelayReport = AtomicReference<(() -> Unit)?>(null)
     private val streamPath = "/stream/${UUID.randomUUID().toString().replace("-", "")}"
     private var httpServer: ServerSocket? = null
     private var ssdpSocket: MulticastSocket? = null
@@ -468,33 +474,62 @@ internal class UpnpRenderer(
     }
 
     private fun proxyStream(client: Socket, out: BufferedOutputStream) {
-        val previous = activeStream.getAndSet(client)
+        var watchdog: ScheduledFuture<*>? = null
+        val startedMs = SystemClock.elapsedRealtime()
+        val lastProgressMs = AtomicLong(startedMs)
+        val forwarded = AtomicLong()
+        val stage = AtomicReference("opening")
+        val watchdogExpired = AtomicBoolean(false)
+        val terminal = AtomicBoolean(false)
+        val reportLock = Any()
+        val describe = {
+            val now = SystemClock.elapsedRealtime()
+            relayDiagnosticSummary(stage.get(), forwarded.get(), now - startedMs, now - lastProgressMs.get())
+        }
+        val report: (String, Boolean) -> Unit = { message, finish ->
+            synchronized(reportLock) {
+                if (activeStream.get() === client && !terminal.get()) {
+                    if (finish) terminal.set(true)
+                    callbacks.onStreamDiagnostic(this, message)
+                }
+            }
+        }
+        val reportStopped = { report("Relay closed (renderer stopped) · ${describe()}", true) }
+        val previous = synchronized(streamLifecycleLock) {
+            if (!running.get()) return
+            val replaced = activeStream.getAndSet(client)
+            stopRelayReport.set(reportStopped)
+            replaced
+        }
         if (previous != null && previous !== client) {
             streamSources.remove(previous)?.disconnect()
             try { previous.close() } catch (_: Exception) { }
         }
-
-        var watchdog: ScheduledFuture<*>? = null
+        report("Relay active · ${describe()}", false)
         try {
             callbacks.onStreamOpened()
             // The controller has already found us and the M5 is pulling audio.
             // Stop forcing Wi-Fi multicast delivery while the stream is active;
             // reacquire it after playback so SSDP discovery works again.
             suspendDiscoveryForStream()
-            val lastProgressMs = AtomicLong(SystemClock.elapsedRealtime())
             watchdog = streamWatchdog.scheduleWithFixedDelay(
                 {
-                    if (
-                        activeStream.get() === client &&
-                        streamRelayStalled(
-                            lastProgressMs = lastProgressMs.get(),
-                            nowMs = SystemClock.elapsedRealtime(),
-                            timeoutMs = STREAM_STALL_TIMEOUT_MS,
-                        )
-                    ) {
-                        state.lastError = "Speaker stream stalled; releasing relay"
-                        streamSources.remove(client)?.disconnect()
-                        try { client.close() } catch (_: Exception) { }
+                    if (activeStream.get() === client && !terminal.get()) {
+                        if (streamRelayStalled(
+                                lastProgressMs = lastProgressMs.get(),
+                                nowMs = SystemClock.elapsedRealtime(),
+                                timeoutMs = STREAM_STALL_TIMEOUT_MS,
+                            ) && watchdogExpired.compareAndSet(false, true)
+                        ) {
+                            val message = "Relay watchdog timeout · ${describe()}"
+                            state.lastError = message
+                            report(message, true)
+                            Log.w("WAMBridgeRelay", message)
+                            streamSources.remove(client)?.disconnect()
+                            try { client.close() } catch (_: Exception) { }
+                        } else {
+                            report("Relay active · ${describe()}", false)
+                        }
                     }
                 },
                 STREAM_WATCHDOG_INTERVAL_MS,
@@ -502,6 +537,7 @@ internal class UpnpRenderer(
                 TimeUnit.MILLISECONDS,
             )
 
+            stage.set("connecting to Neutron")
             val source = state.currentUri
             require(isLocalPlayerUri(source)) { "Only this phone's HTTP sources are accepted" }
             val connection = (URI(source).toURL().openConnection() as HttpURLConnection).apply {
@@ -531,27 +567,45 @@ internal class UpnpRenderer(
                 lastProgressMs.set(SystemClock.elapsedRealtime())
                 connection.inputStream.use { raw ->
                     val input = BufferedInputStream(raw, 64 * 1024)
+                    val onProgress: (Int) -> Unit = { count ->
+                        forwarded.addAndGet(count.toLong())
+                        lastProgressMs.set(SystemClock.elapsedRealtime())
+                    }
+                    val onStage: (String) -> Unit = { stage.set(it) }
                     if (l16) {
                         val rate = parameter(contentType, "rate")?.toIntOrNull() ?: 44_100
                         val channels = parameter(contentType, "channels")?.toIntOrNull() ?: 2
+                        stage.set(PHASE_SENDING_TO_M5)
                         out.write(wavHeader(rate, channels, 16))
                         lastProgressMs.set(SystemClock.elapsedRealtime())
-                        copyL16(input, out) {
-                            lastProgressMs.set(SystemClock.elapsedRealtime())
-                        }
+                        copyL16(input, out, onProgress, onStage)
                     } else {
-                        copyStream(input, out) {
-                            lastProgressMs.set(SystemClock.elapsedRealtime())
-                        }
+                        copyStream(input, out, onProgress, onStage)
                     }
+                    stage.set("flushing to M5")
                     out.flush()
                     lastProgressMs.set(SystemClock.elapsedRealtime())
+                    stage.set("source ended")
                 }
             } finally {
                 streamSources.remove(client)
                 connection.disconnect()
             }
+            report("Relay source ended · ${describe()}", true)
+        } catch (error: Exception) { // skipcq
+            // Source and speaker sockets can throw different exception types.
+            val cause = if (watchdogExpired.get()) "watchdog timeout" else
+                "${error.javaClass.simpleName}: ${error.message.orEmpty().take(100)}"
+            val message = if (!running.get()) {
+                "Relay closed (renderer stopped) · ${describe()}"
+            } else {
+                "Relay failed ($cause) · ${describe()}"
+            }
+            if (!watchdogExpired.get()) report(message, true)
+            if (running.get() && !watchdogExpired.get()) Log.w("WAMBridgeRelay", message, error)
+            throw error
         } finally {
+            stopRelayReport.compareAndSet(reportStopped, null)
             watchdog?.cancel(false)
             if (activeStream.compareAndSet(client, null)) {
                 resumeDiscoveryAfterStream()
@@ -569,33 +623,39 @@ internal class UpnpRenderer(
     private fun copyStream(
         input: BufferedInputStream,
         out: BufferedOutputStream,
-        onProgress: () -> Unit,
+        onProgress: (Int) -> Unit,
+        onStage: (String) -> Unit,
     ) {
         val buffer = ByteArray(64 * 1024)
         while (true) {
+            onStage(PHASE_WAITING_FOR_NEUTRON)
             val count = input.read(buffer)
             if (count < 0) return
+            onStage(PHASE_SENDING_TO_M5)
             out.write(buffer, 0, count)
-            onProgress()
+            onProgress(count)
         }
     }
 
     private fun copyL16(
         input: BufferedInputStream,
         out: BufferedOutputStream,
-        onProgress: () -> Unit,
+        onProgress: (Int) -> Unit,
+        onStage: (String) -> Unit,
     ) {
         val buffer = ByteArray(64 * 1024)
         var carry: Byte? = null
         while (true) {
+            onStage(PHASE_WAITING_FOR_NEUTRON)
             val count = input.read(buffer)
             if (count < 0) return
             var start = 0
 
             carry?.let { high ->
                 if (count > 0) {
+                    onStage(PHASE_SENDING_TO_M5)
                     out.write(byteArrayOf(buffer[0], high))
-                    onProgress()
+                    onProgress(2)
                     carry = null
                     start = 1
                 }
@@ -609,8 +669,9 @@ internal class UpnpRenderer(
                 index += 2
             }
             if (index > start) {
+                onStage(PHASE_SENDING_TO_M5)
                 out.write(buffer, start, index - start)
-                onProgress()
+                onProgress(index - start)
             }
             if (index < count) carry = buffer[index]
         }
@@ -946,7 +1007,11 @@ internal class UpnpRenderer(
         try { httpServer?.close() } catch (_: Exception) { }
         ssdpSocket = null
         httpServer = null
-        activeStream.getAndSet(null)?.let { socket ->
+        val closingStream = synchronized(streamLifecycleLock) {
+            stopRelayReport.getAndSet(null)?.invoke()
+            activeStream.getAndSet(null)
+        }
+        closingStream?.let { socket ->
             streamSources.remove(socket)?.disconnect()
             try { socket.close() } catch (_: Exception) { }
         }
@@ -978,6 +1043,8 @@ internal class UpnpRenderer(
         private const val CLIENT_TIMEOUT_MS = 15_000
         private const val SOURCE_CONNECT_TIMEOUT_MS = 5_000
         private const val SOURCE_READ_TIMEOUT_MS = 15_000
+        private const val PHASE_WAITING_FOR_NEUTRON = "waiting for Neutron"
+        private const val PHASE_SENDING_TO_M5 = "sending to M5"
         private const val STREAM_WATCHDOG_INTERVAL_MS = 5_000L
         private const val STREAM_STALL_TIMEOUT_MS = 30_000L
         private const val AV_TRANSPORT = "urn:schemas-upnp-org:service:AVTransport:1"

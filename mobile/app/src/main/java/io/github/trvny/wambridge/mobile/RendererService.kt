@@ -24,7 +24,8 @@ import kotlin.math.roundToInt
 class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener {
     enum class Phase { STOPPED, STARTING, RUNNING, STOPPING }
 
-    private var renderer: UpnpRenderer? = null
+    @Volatile private var renderer: UpnpRenderer? = null
+    private val diagnosticSourceLock = Any()
     private var wamChannel: SamsungWamChannel? = null
     private var rendererState: RendererState? = null
     private var speakerIp: String = ""
@@ -280,7 +281,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
 
             val startedRenderer = activeRenderer ?: error("Renderer did not start")
             rendererState = state
-            renderer = startedRenderer
+            synchronized(diagnosticSourceLock) { renderer = startedRenderer }
             activeRenderer = null
 
             ownsPlayback = false
@@ -558,7 +559,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         } catch (_: Exception) {
             // Best effort.
         }
-        renderer = null
+        synchronized(diagnosticSourceLock) { renderer = null }
         rendererState = null
         if (updatePhase) {
             lastStatus = "Stopped"
@@ -597,6 +598,7 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
     }
 
     override fun onPlay(rendererStreamUrl: String) = runOnWorker {
+        diagnosticHistory.begin(speakerIp)
         cancelIdleRelease()
         val channel = ensureChannel()
 
@@ -627,6 +629,13 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         if (ownsPlayback) {
             rendererState?.transportState = "PLAYING"
             publish("Streaming player → M5")
+        }
+    }
+
+    override fun onStreamDiagnostic(source: Any, message: String) {
+        synchronized(diagnosticSourceLock) {
+            if (renderer !== source) return@synchronized
+            diagnosticHistory.recordRelay((source as UpnpRenderer).speakerIp, message)
         }
     }
 
@@ -694,10 +703,21 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         publish("Streaming player → M5 · confirmed")
     }
 
-    override fun onReportedError(method: String?, code: String) = dispatchWamEvent {
-        val source = method?.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()
-        rendererState?.lastError = "M5 error $code$source"
-        publish("M5 reported error $code$source")
+    override fun onReportedError(source: Any, method: String?, code: String) {
+        val suffix = method?.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()
+        val message = "M5 error $code$suffix"
+        // Keep accepted errors even if teardown wins before the UI worker runs.
+        synchronized(channelLock) {
+            if (source !== wamChannel) return
+            diagnosticHistory.recordSpeakerError(speakerIp, message)
+        }
+        dispatchWamEvent {
+            if (source !== wamChannel) return@dispatchWamEvent
+            rendererState?.lastError = message
+            Log.w(TAG, message)
+            publish("M5 reported error $code$suffix")
+            SpeakerStateStore.update { it.copy(lastError = message) }
+        }
     }
 
     override fun onSleepTimerChanged(source: Any, state: SleepTimerState) = dispatchWamEvent {
@@ -851,6 +871,14 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
             get() = phase != Phase.STOPPED
         @Volatile var lastStatus: String = "Stopped"
             private set
+        private val diagnosticHistory = RendererDiagnosticHistory()
+        internal val diagnosticSnapshot: RendererDiagnosticSnapshot get() = diagnosticHistory.snapshot()
+        val lastStreamDiagnostic: String get() = diagnosticHistory.relayStatus
+        val lastStreamSpeakerIp: String get() = diagnosticHistory.relaySpeakerIp
+        val lastRelayFailure: String get() = diagnosticHistory.lastFailure
+        val lastRelayFailureSpeakerIp: String get() = diagnosticHistory.failureSpeakerIp
+        val lastSpeakerError: String get() = diagnosticHistory.lastSpeakerError
+        val lastSpeakerErrorSpeakerIp: String get() = diagnosticHistory.errorSpeakerIp
 
         private val statusObservers = CopyOnWriteArraySet<() -> Unit>()
 

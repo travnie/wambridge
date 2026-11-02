@@ -582,7 +582,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         publish(lastStatus)
     }
 
-    override fun onReportedError(method: String?, code: String) = execute {
+    override fun onReportedError(source: Any, method: String?, code: String) = execute {
         if (destroyed || !running) return@execute
         val suffix = method?.takeIf(String::isNotBlank)?.let { " · $it" }.orEmpty()
         lastStatus = "M5 error $code$suffix"
