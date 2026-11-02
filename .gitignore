@@ -26,3 +26,10 @@ local.properties
 !tools/wam-probes/capture.log
 node_modules/
 CLAUDE.local.md
+
+# Android mobile-specific editor state and signing files
+/mobile/**/.idea/
+/mobile/**/*.jks
+/mobile/**/*.keystore
+!/mobile/app/debug.keystore
+/mobile/**/keystore.properties
