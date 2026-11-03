@@ -159,10 +159,22 @@ jobs:
           # Frozen five-mapping snapshot; verify server-side content digest.
           expected_legacy_digest="sha256:185f0109885c300a8b11ea5f13fb8919d3e5127e7a12adfbee6183fa1e55023a"
           verify_legacy_archive() {
-            local observed
-            observed="$(gh api "repos/${GH_REPO}/releases/tags/${TAG}" --jq '[.assets[] | select(.name == "wambridge-r8-legacy-20261103.zip") | .digest] | first // ""')"
+            local release_json prepolicy_mappings observed
+            release_json="$(gh api "repos/${GH_REPO}/releases/tags/${TAG}")" || return 1
+            # Only maps uploaded before the frozen 2026-11-03 snapshot need
+            # that backup. Recreated releases start fresh, with no legacy maps.
+            prepolicy_mappings="$(jq -r --arg current "$mapping_name" --arg cutoff "2026-11-03T15:00:00Z" '
+              .assets[]
+              | select(.name | test("^wambridge-.*-r8-mapping[.]txt$"))
+              | select(.name != $current and .created_at < $cutoff)
+              | .name
+            ' <<< "$release_json")" || return 1
+            if [[ -z "$prepolicy_mappings" ]]; then
+              return 0
+            fi
+            observed="$(jq -r '[.assets[] | select(.name == "wambridge-r8-legacy-20261103.zip") | .digest] | first // ""' <<< "$release_json")" || return 1
             if [[ "$observed" != "$expected_legacy_digest" ]]; then
-              echo "Missing or modified legacy R8 archive; refusing mapping cleanup" >&2
+              echo "Pre-policy R8 mappings still present, but verified archive missing" >&2
               return 1
             fi
           }
