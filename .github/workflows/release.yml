@@ -156,10 +156,32 @@ jobs:
           ROLLING: ${{ needs.version.outputs.rolling }}
         run: |
           set -euo pipefail
+          # Frozen five-mapping snapshot; verify server-side content digest.
+          expected_legacy_digest="sha256:185f0109885c300a8b11ea5f13fb8919d3e5127e7a12adfbee6183fa1e55023a"
+          verify_legacy_archive() {
+            local release_json prepolicy_mappings observed
+            release_json="$(gh api "repos/${GH_REPO}/releases/tags/${TAG}")" || return 1
+            # Only maps uploaded before the frozen 2026-11-03 snapshot need
+            # that backup. Recreated releases start fresh, with no legacy maps.
+            prepolicy_mappings="$(jq -r --arg current "$mapping_name" --arg cutoff "2026-11-03T15:00:00Z" '
+              .assets[]
+              | select(.name | test("^wambridge-.*-r8-mapping[.]txt$"))
+              | select(.name != $current and .created_at < $cutoff)
+              | .name
+            ' <<< "$release_json")" || return 1
+            if [[ -z "$prepolicy_mappings" ]]; then
+              return 0
+            fi
+            observed="$(jq -r '[.assets[] | select(.name == "wambridge-r8-legacy-20261103.zip") | .digest] | first // ""' <<< "$release_json")" || return 1
+            if [[ "$observed" != "$expected_legacy_digest" ]]; then
+              echo "Pre-policy R8 mappings still present, but verified archive missing" >&2
+              return 1
+            fi
+          }
           apk_file="apk/wambridge-${VERSION}.apk"
           test -s "$apk_file"
           apk_sha256="$(sha256sum "$apk_file" | cut -d' ' -f1)"
-          # One immutable mapping per exact APK. Retain old mappings for crash retracing.
+          # Mapping identity follows exact APK bytes. Keep historic maps only on fixed releases.
           mapping_name="wambridge-${VERSION}-${apk_sha256}-r8-mapping.txt"
           cp mapping/mapping.txt "mapping/$mapping_name"
           assets=(
@@ -196,6 +218,14 @@ jobs:
           fi
 
           if gh release view "$TAG" >/dev/null 2>&1; then
+            # Reject missing historical backup before changing any published assets.
+            if [[ "$ROLLING" == "true" ]]; then
+              gh release view "$TAG" --json assets --jq '.assets[].name' > previous-assets.txt
+              if grep -E '^wambridge-.*-r8-mapping[.]txt$' previous-assets.txt |
+                   grep -Fxv "$mapping_name" >/dev/null; then
+                verify_legacy_archive
+              fi
+            fi
             # Upload the new mapping before replacing the rolling APK, without
             # overwriting or deleting older mappings if publication fails.
             if ! gh release view "$TAG" --json assets --jq '.assets[].name' | grep -Fxq "$mapping_name"; then
@@ -214,12 +244,23 @@ jobs:
               gh api --method POST "repos/${GH_REPO}/git/refs" -f ref="refs/tags/${TAG}" -f sha="$GITHUB_SHA" >/dev/null
             fi
 
-            # A rolling release keeps one APK, not a growing pile of them.
+            # Rolling releases retain only the current APK and its R8 mapping.
+            # Historical maps live in a one-time legacy ZIP or fixed versioned releases.
+            # Cleanup happens only after the replacement assets and release metadata succeed.
             gh release view "$TAG" --json assets --jq '.assets[].name' > release-assets.txt
+            if grep -E '^wambridge-.*-r8-mapping[.]txt$' release-assets.txt |
+                 grep -Fxv "$mapping_name" >/dev/null; then
+              verify_legacy_archive
+            fi
             while IFS= read -r asset; do
               case "$asset" in
                 wambridge-*.apk)
                   if [[ "$asset" != "wambridge-${VERSION}.apk" ]]; then
+                    gh release delete-asset "$TAG" "$asset" --yes
+                  fi
+                  ;;
+                wambridge-*-r8-mapping.txt)
+                  if [[ "$asset" != "$mapping_name" ]]; then
                     gh release delete-asset "$TAG" "$asset" --yes
                   fi
                   ;;
