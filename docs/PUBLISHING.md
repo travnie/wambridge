@@ -47,4 +47,6 @@ R8 mappings for **fixed versioned releases** are retained with their correspondi
 Rolling `latest` retains only the current APK's mapping; superseded rolling-only mappings
 are discarded, not archived on every push. The pre-policy historical mappings are
 preserved once in `wambridge-r8-legacy-20261103.zip` on `latest`, with a checksum
-manifest. Never remove that archive without migrating its contents first.
+manifest. If the rolling release is recreated, restore this snapshot separately;
+the workflow never generates new legacy archives. Never remove that archive
+without migrating its contents first.
