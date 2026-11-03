@@ -10,7 +10,8 @@
 | TuneIn | HTTP API/playlist resolution | presets, catalogue IDs, current stream URLs | no app secret for `Tune.ashx`; speaker catalogue may expose partner data | medium | `tunein.py`, `catalogue.py` |
 | foobar2000 | SDK/runtime host | desktop playback source and UI | local host API | high | `foobar/` |
 | UPnP/DLNA control points | LAN HTTP/SSDP | feed Android MediaRenderer | local network routing rules | medium | `mobile/README.md`, `UpnpRenderer.kt` |
-| GitHub | CI/releases | build and publish component/APK | Actions token + release signing secrets | delivery | `.github/workflows/release.yml` |
+| GitHub | CI/releases | build component/APK and fixed-version Python dists | Actions token + release signing secrets | delivery | `.github/workflows/release.yml` |
+| PyPI | Python distribution index | publish `wambridge` on fixed releases | Trusted Publisher OIDC (`release.yml`, `pypi` environment) | delivery | `docs/PUBLISHING.md` |
 
 ## 2) Data Stores
 There is no database. Python persists versioned JSON device profiles, radio stations and a client UUID under per-user config paths. Alias-backed profile/station stores use temp-file + `os.replace`; client UUID persistence writes its JSON file directly. Android uses private `SharedPreferences`, including its renderer/radio state and serialized station list. Bundled station data has one maintained source, `src/wambridge/station_packs.json`, copied into Android assets during build.

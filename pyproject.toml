@@ -3,7 +3,7 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "trvny-wambridge"
+name = "wambridge"
 version = "0.0.5"
 description = "Local Wi-Fi audio bridge for Samsung Wireless Audio Multiroom speakers"
 readme = "README.md"

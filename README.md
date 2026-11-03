@@ -116,6 +116,7 @@ Each rolling release contains:
 - `foo_out_wam.fb2k-component` - the foobar2000 output
 - `wambridge-<version>.apk` - the signed Android adapter
 - a source archive
+- R8 mapping files for translating obfuscated Android crash traces; the APK SHA-256 in each name identifies its matching build (not for installation)
 
 Open the `.fb2k-component` file with foobar2000 2.x x64, then select:
 
@@ -391,4 +392,4 @@ py -m unittest discover -s tests -v
 
 ## Python package / PyPI
 
-The Python CLI is prepared for public release as `trvny-wambridge`. Build artifacts and Trusted Publishing setup live in [PyPI publishing guide](docs/PUBLISHING.md). After the first upload to PyPI, install with `uv tool install trvny-wambridge`; the foobar2000 plugin remains a separate `.fb2k-component` release.
+The Python CLI distribution is `wambridge` (the import and command names stay unchanged). The existing [Release workflow](.github/workflows/release.yml) builds and publishes it to PyPI **only for fixed versioned releases**, not the continuously refreshed `latest` APK/foobar release. After its first PyPI upload: `uv tool install wambridge`. See the [publishing guide](docs/PUBLISHING.md) for Trusted Publishing setup.
