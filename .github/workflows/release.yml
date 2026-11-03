@@ -119,13 +119,13 @@ jobs:
 
   publish:
     needs: [version, component, apk, python]
-    # Rolling: Python skipped. Fixed: Python must pass before any release.
+    # Rolling: Python skipped. Fixed: Python required. Never publish on cancel.
     if: >-
-      always() &&
-      needs.version.result == 'success' &&
-      needs.component.result == 'success' &&
-      needs.apk.result == 'success' &&
-      (needs.version.outputs.rolling == 'true' || needs.python.result == 'success')
+      ${{ !cancelled() &&
+        needs.version.result == 'success' &&
+        needs.component.result == 'success' &&
+        needs.apk.result == 'success' &&
+        (needs.version.outputs.rolling == 'true' || needs.python.result == 'success') }}
     runs-on: ubuntu-slim
     permissions:
       contents: write
