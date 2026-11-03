@@ -77,6 +77,8 @@ jobs:
           # hour, comfortably inside Android's limit and already far above every
           # code shipped by hand before this.
           code=$(( $(date -u +%s) / 3600 ))
+          base="$(grep -m1 '^version' pyproject.toml | cut -d'"' -f2)"
+          test -n "$base"
 
           if [[ -n "${REQUESTED:-}" ]]; then
             name="${REQUESTED#v}"
@@ -85,13 +87,15 @@ jobs:
               echo "Version $REQUESTED is not major.minor.patch" >&2
               exit 1
             fi
+            if [[ "$name" != "$base" ]]; then
+              echo "Fixed release $name must match pyproject.toml version $base" >&2
+              exit 1
+            fi
             echo "tag=v${name}" >> "$GITHUB_OUTPUT"
             echo "name=$name" >> "$GITHUB_OUTPUT"
             echo "title=WAMbridge ${name}" >> "$GITHUB_OUTPUT"
             echo "rolling=false" >> "$GITHUB_OUTPUT"
           else
-            base="$(grep -m1 '^version' pyproject.toml | cut -d'"' -f2)"
-            test -n "$base"
             name="$base"
             echo "tag=latest" >> "$GITHUB_OUTPUT"
             echo "name=$name" >> "$GITHUB_OUTPUT"
@@ -219,3 +223,60 @@ jobs:
             gh release delete beta --yes >/dev/null 2>&1 || true
             gh api --method DELETE "repos/${GH_REPO}/git/refs/tags/beta" >/dev/null 2>&1 || true
           fi
+
+  python:
+    needs: version
+    if: needs.version.outputs.rolling == 'false'
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10
+        with:
+          enable-cache: false
+      - run: uv python install 3.15
+      - name: Validate Python package metadata
+        env:
+          RELEASE_VERSION: ${{ needs.version.outputs.name }}
+        run: |
+          uv run --no-project --python 3.15 -- python -c 'import os, pathlib, tomllib; p=tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]; assert p["name"] == "wambridge"; assert p["version"] == os.environ["RELEASE_VERSION"]'
+      - name: Build wheel and sdist
+        run: |
+          uv build --no-sources --out-dir dist
+          test "$(find dist -maxdepth 1 -name '*.whl' | wc -l)" -eq 1
+          test "$(find dist -maxdepth 1 -name '*.tar.gz' | wc -l)" -eq 1
+      - name: Smoke test wheel and Python package
+        shell: bash
+        run: |
+          set -euo pipefail
+          wheel="$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
+          uv run --no-project --python 3.15 --with "./$wheel" -- python -c 'import wambridge, wambridge.radio_cli, wambridge.station_packs'
+          uv run --no-project --python 3.15 --with "./$wheel" -- wambridge --help
+          uv run --no-project --python 3.15 --with . -- python -m unittest discover -s tests -v
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: wambridge-python-distributions
+          path: dist/*
+          if-no-files-found: error
+
+  pypi:
+    needs: [version, python, publish]
+    if: needs.version.outputs.rolling == 'false'
+    runs-on: ubuntu-slim
+    environment:
+      name: pypi
+      url: https://pypi.org/project/wambridge/
+    permissions:
+      id-token: write
+    steps:
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10
+        with:
+          enable-cache: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: wambridge-python-distributions
+          path: dist
+      - run: uv publish --check-url https://pypi.org/simple/ dist/*

@@ -5,7 +5,7 @@
 - [Project README](../README.md): CLI quick start, supported hardware, known limitations and rolling downloads.
 - [foobar2000 user guide](../foobar/README.md): install, settings, controls, updates and the **physical M5 acceptance checklist**.
 - [Android adapter](../mobile/README.md): mobile setup, renderer behavior and released features.
-- [PyPI publishing](PUBLISHING.md): Python CLI distribution, Trusted Publishing and release recovery. The foobar component and APK use their separate GitHub release workflow.
+- [PyPI publishing](PUBLISHING.md): Python CLI distribution, Trusted Publishing and release recovery. Python, foobar and Android share one release workflow; PyPI runs only for fixed versioned releases.
 
 ## Development and maintenance
 

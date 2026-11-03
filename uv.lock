@@ -125,7 +125,7 @@ wheels = [
 ]
 
 [[package]]
-name = "trvny-wambridge"
+name = "wambridge"
 version = "0.0.5"
 source = { editable = "." }
 
