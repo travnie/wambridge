@@ -159,7 +159,7 @@ jobs:
           apk_file="apk/wambridge-${VERSION}.apk"
           test -s "$apk_file"
           apk_sha256="$(sha256sum "$apk_file" | cut -d' ' -f1)"
-          # One immutable mapping per exact APK. Retain old mappings for crash retracing.
+          # Mapping identity follows exact APK bytes. Keep historic maps only on fixed releases.
           mapping_name="wambridge-${VERSION}-${apk_sha256}-r8-mapping.txt"
           cp mapping/mapping.txt "mapping/$mapping_name"
           assets=(
@@ -214,12 +214,19 @@ jobs:
               gh api --method POST "repos/${GH_REPO}/git/refs" -f ref="refs/tags/${TAG}" -f sha="$GITHUB_SHA" >/dev/null
             fi
 
-            # A rolling release keeps one APK, not a growing pile of them.
+            # Rolling releases retain only the current APK and its R8 mapping.
+            # Historical maps live in a one-time legacy ZIP or fixed versioned releases.
+            # Cleanup happens only after the replacement assets and release metadata succeed.
             gh release view "$TAG" --json assets --jq '.assets[].name' > release-assets.txt
             while IFS= read -r asset; do
               case "$asset" in
                 wambridge-*.apk)
                   if [[ "$asset" != "wambridge-${VERSION}.apk" ]]; then
+                    gh release delete-asset "$TAG" "$asset" --yes
+                  fi
+                  ;;
+                wambridge-*-r8-mapping.txt)
+                  if [[ "$asset" != "$mapping_name" ]]; then
                     gh release delete-asset "$TAG" "$asset" --yes
                   fi
                   ;;

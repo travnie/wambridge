@@ -116,7 +116,13 @@ Each rolling release contains:
 - `foo_out_wam.fb2k-component` - the foobar2000 output
 - `wambridge-<version>.apk` - the signed Android adapter
 - a source archive
-- R8 mapping files for translating obfuscated Android crash traces; the APK SHA-256 in each name identifies its matching build (not for installation)
+- one R8 mapping for the current APK, useful for deobfuscating crash traces; its filename includes the APK SHA-256 (not for installation)
+- a one-time legacy ZIP containing mappings from before the retention change (not updated on every rolling build)
+
+Rolling updates replace the active mapping and **discard the previous rolling-only mapping**.
+Only fixed, versioned releases keep their APK mapping indefinitely; the existing
+pre-policy mapping history is preserved in the legacy ZIP. This keeps `latest`
+bounded without creating a fresh archive on every commit.
 
 Open the `.fb2k-component` file with foobar2000 2.x x64, then select:
 
