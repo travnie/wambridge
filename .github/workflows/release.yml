@@ -118,7 +118,14 @@ jobs:
     secrets: inherit
 
   publish:
-    needs: [version, component, apk]
+    needs: [version, component, apk, python]
+    # Rolling: Python skipped. Fixed: Python must pass before any release.
+    if: >-
+      always() &&
+      needs.version.result == 'success' &&
+      needs.component.result == 'success' &&
+      needs.apk.result == 'success' &&
+      (needs.version.outputs.rolling == 'true' || needs.python.result == 'success')
     runs-on: ubuntu-slim
     permissions:
       contents: write
