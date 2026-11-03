@@ -227,6 +227,10 @@ jobs:
                   ;;
                 wambridge-*-r8-mapping.txt)
                   if [[ "$asset" != "$mapping_name" ]]; then
+                    if ! grep -Fxq "wambridge-r8-legacy-20261103.zip" release-assets.txt; then
+                      echo "Legacy R8 archive missing; refusing to delete $asset" >&2
+                      exit 1
+                    fi
                     gh release delete-asset "$TAG" "$asset" --yes
                   fi
                   ;;

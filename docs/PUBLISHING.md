@@ -43,4 +43,8 @@ wambridge --help
 - Incomplete upload: retry the same job; `uv publish --check-url` skips existing identical files. Never rebuild a different artifact for an already-published version.
 - New version: change `pyproject.toml` and its version mirrors before triggering a new fixed release.
 
-Android `*-r8-mapping.txt` assets remain in GitHub Releases. Each file matches one APK hash and must be retained to reconstruct old obfuscated crash traces.
+R8 mappings for **fixed versioned releases** are retained with their corresponding APK.
+Rolling `latest` retains only the current APK's mapping; superseded rolling-only mappings
+are discarded, not archived on every push. The pre-policy historical mappings are
+preserved once in `wambridge-r8-legacy-20261103.zip` on `latest`, with a checksum
+manifest. Never remove that archive without migrating its contents first.
