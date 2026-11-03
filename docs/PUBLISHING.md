@@ -8,8 +8,8 @@ The distribution contains the Python CLI, not the Android APK or foobar2000 comp
 
 [Release](../.github/workflows/release.yml) owns delivery:
 
-- Push to `main`: refresh rolling GitHub Release `latest` (APK, foobar component, source, Android R8 mappings). Do not republish the same Python version to PyPI.
-- `workflow_dispatch` on `main` with **version** matching `pyproject.toml` (e.g. `0.0.5`): create a fixed `vX.Y.Z` GitHub Release, build and smoke-test the Python wheel and sdist, then publish those exact files to PyPI after GitHub Release succeeds.
+- Push to `main` touching the configured release workflow paths: refresh rolling GitHub Release `latest` (APK, foobar component, source, Android R8 mappings). Do not republish the same Python version to PyPI.
+- `workflow_dispatch` on `main` with **version** matching `pyproject.toml` (e.g. `0.0.5`): create a fixed `vX.Y.Z` GitHub Release, build the Python wheel and sdist, smoke-test the wheel, then publish both files to PyPI after GitHub Release succeeds.
 - `pyproject.toml` provides the canonical version. Fixed releases with mismatched versions fail before publication. `tests/test_component_version.py` verifies version mirrors. Change mirrors together before the next fixed release.
 
 The PyPI job uses GitHub OIDC and `uv publish --check-url`; no stored API token. The existing GitHub Actions `pypi` environment gates the job. Retrying the **same job with its original artifacts** skips already-published identical files.
