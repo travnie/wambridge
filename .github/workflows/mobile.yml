@@ -5,12 +5,6 @@ on:
     paths:
       - ".github/workflows/mobile.yml"
       - "mobile/**"
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/mobile.yml"
-      - "mobile/**"
   workflow_dispatch:
   workflow_call:
     inputs:

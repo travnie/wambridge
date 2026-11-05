@@ -10,17 +10,6 @@ on:
       - "src/**"
       - "tests/**"
       - "tools/**"
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/build.yml"
-      - "foobar/**"
-      - "pyproject.toml"
-      - "uv.lock"
-      - "src/**"
-      - "tests/**"
-      - "tools/**"
   workflow_dispatch:
   workflow_call:
 
