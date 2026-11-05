@@ -10,6 +10,11 @@ on:
       - "src/**"
       - "tests/**"
       - "tools/**"
+  # Main source builds run through release.yml; keep post-merge tests-only coverage.
+  push:
+    branches: [main]
+    paths:
+      - "tests/**"
   workflow_dispatch:
   workflow_call:
 
