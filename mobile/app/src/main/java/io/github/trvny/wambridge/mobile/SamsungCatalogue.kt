@@ -359,8 +359,8 @@ internal object SamsungCatalogue {
             harden("http://xml.org/sax/features/external-general-entities", false)
             harden("http://xml.org/sax/features/external-parameter-entities", false)
             harden("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
-            hardenAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "")
-            hardenAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "")
+            hardenAttribute("http://javax.xml.XMLConstants/property/accessExternalDTD", "")
+            hardenAttribute("http://javax.xml.XMLConstants/property/accessExternalSchema", "")
             isXIncludeAware = false
             isExpandEntityReferences = false
             isNamespaceAware = false
