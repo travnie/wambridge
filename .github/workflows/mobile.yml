@@ -22,7 +22,7 @@ on:
         default: ""
 
 concurrency:
-  group: wambridge-mobile-${{ github.ref }}
+  group: wambridge-mobile-${{ github.event_name }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
