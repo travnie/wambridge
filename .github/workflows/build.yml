@@ -18,6 +18,10 @@ on:
   workflow_dispatch:
   workflow_call:
 
+concurrency:
+  group: wambridge-build-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
 
