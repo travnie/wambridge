@@ -77,6 +77,8 @@ jobs:
           # hour, comfortably inside Android's limit and already far above every
           # code shipped by hand before this.
           code=$(( $(date -u +%s) / 3600 ))
+          base="$(grep -m1 '^version' pyproject.toml | cut -d'"' -f2)"
+          test -n "$base"
 
           if [[ -n "${REQUESTED:-}" ]]; then
             name="${REQUESTED#v}"
@@ -85,13 +87,15 @@ jobs:
               echo "Version $REQUESTED is not major.minor.patch" >&2
               exit 1
             fi
+            if [[ "$name" != "$base" ]]; then
+              echo "Fixed release $name must match pyproject.toml version $base" >&2
+              exit 1
+            fi
             echo "tag=v${name}" >> "$GITHUB_OUTPUT"
             echo "name=$name" >> "$GITHUB_OUTPUT"
             echo "title=WAMbridge ${name}" >> "$GITHUB_OUTPUT"
             echo "rolling=false" >> "$GITHUB_OUTPUT"
           else
-            base="$(grep -m1 '^version' pyproject.toml | cut -d'"' -f2)"
-            test -n "$base"
             name="$base"
             echo "tag=latest" >> "$GITHUB_OUTPUT"
             echo "name=$name" >> "$GITHUB_OUTPUT"
@@ -114,7 +118,14 @@ jobs:
     secrets: inherit
 
   publish:
-    needs: [version, component, apk]
+    needs: [version, component, apk, python]
+    # Rolling: Python skipped. Fixed: Python required. Never publish on cancel.
+    if: >-
+      ${{ !cancelled() &&
+        needs.version.result == 'success' &&
+        needs.component.result == 'success' &&
+        needs.apk.result == 'success' &&
+        (needs.version.outputs.rolling == 'true' || needs.python.result == 'success') }}
     runs-on: ubuntu-slim
     permissions:
       contents: write
@@ -129,6 +140,11 @@ jobs:
           name: wambridge-apk
           path: apk
 
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: wambridge-r8-mapping
+          path: mapping
+
       - name: Publish the component and the APK together
         shell: bash
         env:
@@ -140,10 +156,39 @@ jobs:
           ROLLING: ${{ needs.version.outputs.rolling }}
         run: |
           set -euo pipefail
+          # Frozen five-mapping snapshot; verify server-side content digest.
+          expected_legacy_digest="sha256:185f0109885c300a8b11ea5f13fb8919d3e5127e7a12adfbee6183fa1e55023a"
+          verify_legacy_archive() {
+            local release_json prepolicy_mappings observed
+            release_json="$(gh api "repos/${GH_REPO}/releases/tags/${TAG}")" || return 1
+            # Only maps uploaded before the frozen 2026-11-03 snapshot need
+            # that backup. Recreated releases start fresh, with no legacy maps.
+            prepolicy_mappings="$(jq -r --arg current "$mapping_name" --arg cutoff "2026-11-03T15:00:00Z" '
+              .assets[]
+              | select(.name | test("^wambridge-.*-r8-mapping[.]txt$"))
+              | select(.name != $current and .created_at < $cutoff)
+              | .name
+            ' <<< "$release_json")" || return 1
+            if [[ -z "$prepolicy_mappings" ]]; then
+              return 0
+            fi
+            observed="$(jq -r '[.assets[] | select(.name == "wambridge-r8-legacy-20261103.zip") | .digest] | first // ""' <<< "$release_json")" || return 1
+            if [[ "$observed" != "$expected_legacy_digest" ]]; then
+              echo "Pre-policy R8 mappings still present, but verified archive missing" >&2
+              return 1
+            fi
+          }
+          apk_file="apk/wambridge-${VERSION}.apk"
+          test -s "$apk_file"
+          apk_sha256="$(sha256sum "$apk_file" | cut -d' ' -f1)"
+          # Mapping identity follows exact APK bytes. Keep historic maps only on fixed releases.
+          mapping_name="wambridge-${VERSION}-${apk_sha256}-r8-mapping.txt"
+          cp mapping/mapping.txt "mapping/$mapping_name"
           assets=(
             "component/foo_out_wam.fb2k-component"
             "component/wambridge-source.zip"
-            "apk/wambridge-${VERSION}.apk"
+            "$apk_file"
+            "mapping/$mapping_name"
           )
           for asset in "${assets[@]}"; do
             test -f "$asset"
@@ -153,11 +198,16 @@ jobs:
             {
               echo "Rolling release rebuilt from main at ${GITHUB_SHA:0:7}. Version ${VERSION}."
               echo
-              echo "The foobar2000 component and the Android APK always come from the same commit. The latest tag is replaced in place, so these download links keep working."
+              echo "The foobar2000 component and Android APK are built from the same commit. The rolling APK download link stays unchanged."
             } > release-notes.md
           else
             echo "foobar2000 component and signed Android APK for ${VERSION}." > release-notes.md
           fi
+          {
+            echo
+            echo "Android APK SHA-256: ${apk_sha256}"
+            echo "R8 mapping for this exact APK: ${mapping_name}"
+          } >> release-notes.md
 
           if [[ "$ROLLING" != "true" ]]; then
             existing_tag="$(gh api "repos/${GH_REPO}/git/refs/tags/${TAG}" --jq '.object.sha' 2>/dev/null || true)"
@@ -168,8 +218,20 @@ jobs:
           fi
 
           if gh release view "$TAG" >/dev/null 2>&1; then
-            # Preserve the old advertised SHA until every replacement asset uploaded.
-            gh release upload "$TAG" "${assets[@]}" --clobber
+            # Reject missing historical backup before changing any published assets.
+            if [[ "$ROLLING" == "true" ]]; then
+              gh release view "$TAG" --json assets --jq '.assets[].name' > previous-assets.txt
+              if grep -E '^wambridge-.*-r8-mapping[.]txt$' previous-assets.txt |
+                   grep -Fxv "$mapping_name" >/dev/null; then
+                verify_legacy_archive
+              fi
+            fi
+            # Upload the new mapping before replacing the rolling APK, without
+            # overwriting or deleting older mappings if publication fails.
+            if ! gh release view "$TAG" --json assets --jq '.assets[].name' | grep -Fxq "$mapping_name"; then
+              gh release upload "$TAG" "mapping/$mapping_name"
+            fi
+            gh release upload "$TAG" "${assets[0]}" "${assets[1]}" "${assets[2]}" --clobber
             gh release edit "$TAG" --title "$TITLE" --notes-file release-notes.md --latest --target "$GITHUB_SHA"
           else
             gh release create "$TAG" "${assets[@]}" --target "$GITHUB_SHA" --title "$TITLE" --latest --notes-file release-notes.md
@@ -182,12 +244,23 @@ jobs:
               gh api --method POST "repos/${GH_REPO}/git/refs" -f ref="refs/tags/${TAG}" -f sha="$GITHUB_SHA" >/dev/null
             fi
 
-            # A rolling release keeps one APK, not a growing pile of them.
+            # Rolling releases retain only the current APK and its R8 mapping.
+            # Historical maps live in a one-time legacy ZIP or fixed versioned releases.
+            # Cleanup happens only after the replacement assets and release metadata succeed.
             gh release view "$TAG" --json assets --jq '.assets[].name' > release-assets.txt
+            if grep -E '^wambridge-.*-r8-mapping[.]txt$' release-assets.txt |
+                 grep -Fxv "$mapping_name" >/dev/null; then
+              verify_legacy_archive
+            fi
             while IFS= read -r asset; do
               case "$asset" in
                 wambridge-*.apk)
                   if [[ "$asset" != "wambridge-${VERSION}.apk" ]]; then
+                    gh release delete-asset "$TAG" "$asset" --yes
+                  fi
+                  ;;
+                wambridge-*-r8-mapping.txt)
+                  if [[ "$asset" != "$mapping_name" ]]; then
                     gh release delete-asset "$TAG" "$asset" --yes
                   fi
                   ;;
@@ -198,3 +271,60 @@ jobs:
             gh release delete beta --yes >/dev/null 2>&1 || true
             gh api --method DELETE "repos/${GH_REPO}/git/refs/tags/beta" >/dev/null 2>&1 || true
           fi
+
+  python:
+    needs: version
+    if: needs.version.outputs.rolling == 'false'
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10
+        with:
+          enable-cache: false
+      - run: uv python install 3.15
+      - name: Validate Python package metadata
+        env:
+          RELEASE_VERSION: ${{ needs.version.outputs.name }}
+        run: |
+          uv run --no-project --python 3.15 -- python -c 'import os, pathlib, tomllib; p=tomllib.loads(pathlib.Path("pyproject.toml").read_text())["project"]; assert p["name"] == "wambridge"; assert p["version"] == os.environ["RELEASE_VERSION"]'
+      - name: Build wheel and sdist
+        run: |
+          uv build --no-sources --out-dir dist
+          test "$(find dist -maxdepth 1 -name '*.whl' | wc -l)" -eq 1
+          test "$(find dist -maxdepth 1 -name '*.tar.gz' | wc -l)" -eq 1
+      - name: Smoke test wheel and Python package
+        shell: bash
+        run: |
+          set -euo pipefail
+          wheel="$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
+          uv run --no-project --python 3.15 --with "./$wheel" -- python -c 'import wambridge, wambridge.radio_cli, wambridge.station_packs'
+          uv run --no-project --python 3.15 --with "./$wheel" -- wambridge --help
+          uv run --no-project --python 3.15 --with . -- python -m unittest discover -s tests -v
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: wambridge-python-distributions
+          path: dist/*
+          if-no-files-found: error
+
+  pypi:
+    needs: [version, python, publish]
+    if: needs.version.outputs.rolling == 'false'
+    runs-on: ubuntu-slim
+    environment:
+      name: pypi
+      url: https://pypi.org/project/wambridge/
+    permissions:
+      id-token: write
+    steps:
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10
+        with:
+          enable-cache: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          name: wambridge-python-distributions
+          path: dist
+      - run: uv publish --check-url https://pypi.org/simple/ dist/*

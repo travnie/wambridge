@@ -16,11 +16,13 @@ internal enum class SpeakerPlaybackState {
 
 internal enum class SpeakerDiscoveryStage {
     IDLE,
+    NEEDS_VERIFICATION,
     WAITING_FOR_WIFI,
     CHECKING_SAVED,
     SSDP,
     LAN_SCAN,
     READY,
+    AMBIGUOUS,
     FAILED,
 }
 
@@ -193,11 +195,13 @@ internal fun speakerSnapshotForRadio(
     }
 
 internal fun discoveryStatus(stage: SpeakerDiscoveryStage): String = when (stage) {
+    SpeakerDiscoveryStage.NEEDS_VERIFICATION -> "Manual M5 address needs verification"
     SpeakerDiscoveryStage.WAITING_FOR_WIFI -> "Waiting for Wi-Fi…"
     SpeakerDiscoveryStage.CHECKING_SAVED -> "Checking M5…"
     SpeakerDiscoveryStage.SSDP -> "Finding M5…"
     SpeakerDiscoveryStage.LAN_SCAN -> "Scanning Wi-Fi…"
     SpeakerDiscoveryStage.READY -> "M5 ready"
+    SpeakerDiscoveryStage.AMBIGUOUS -> "Multiple M5 speakers found. Tap Discover to choose one."
     SpeakerDiscoveryStage.FAILED -> "M5 not found"
     SpeakerDiscoveryStage.IDLE -> "Starting…"
 }

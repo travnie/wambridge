@@ -28,6 +28,8 @@ import time
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from .samsung import normalize_device_id
+
 LOGGER = logging.getLogger(__name__)
 
 LEASE_VERSION = 1
@@ -52,6 +54,32 @@ class Lease:
     pid: int
     speaker_ip: str
     speaker_port: int
+    device_id: str | None = None
+    """Normalized speaker ID, when the session knew it. DHCP moves the IP, not this."""
+
+
+def _normalized_id(device_id: str | None) -> str | None:
+    return normalize_device_id(device_id) or None if device_id else None
+
+
+def names_speaker(
+    lease: Lease,
+    speaker_ip: str,
+    speaker_port: int,
+    device_id: str | None = None,
+) -> bool:
+    """Return whether ``lease`` holds the speaker at this address or with this ID.
+
+    The IP alone is not an identity: the M5 moved ``.104`` -> ``.103`` -> ``.102``
+    within four days, and a lease naming the old address then never matched the
+    session that had since taken the same speaker over. The ID wins when both
+    sides have one; legacy leases without it keep the address match.
+    """
+
+    if (lease.speaker_ip, lease.speaker_port) == (speaker_ip, speaker_port):
+        return True
+    wanted = _normalized_id(device_id)
+    return wanted is not None and wanted == _normalized_id(lease.device_id)
 
 
 def write_lease(
@@ -59,6 +87,7 @@ def write_lease(
     speaker_port: int,
     *,
     directory: Path | None = None,
+    device_id: str | None = None,
 ) -> Lease:
     """Record that this process holds a playback session with this speaker.
 
@@ -77,6 +106,7 @@ def write_lease(
     pid = os.getpid()
     path = target_dir / f"{pid}.json"
     tmp_path = target_dir / f".tmp-{pid}-{secrets.token_hex(4)}"
+    normalized_id = _normalized_id(device_id)
     tmp_path.write_text(
         json.dumps(
             {
@@ -84,6 +114,7 @@ def write_lease(
                 "pid": pid,
                 "speaker_ip": speaker_ip,
                 "speaker_port": speaker_port,
+                "device_id": normalized_id,
                 "started_at": time.time(),
             },
             indent=2,
@@ -91,7 +122,13 @@ def write_lease(
         encoding="utf-8",
     )
     os.replace(tmp_path, path)
-    return Lease(path=path, pid=pid, speaker_ip=speaker_ip, speaker_port=speaker_port)
+    return Lease(
+        path=path,
+        pid=pid,
+        speaker_ip=speaker_ip,
+        speaker_port=speaker_port,
+        device_id=normalized_id,
+    )
 
 
 def remove_lease(lease: Lease) -> None:
@@ -157,8 +194,12 @@ def discard_superseded(
     *,
     keep_pid: int,
     directory: Path | None = None,
+    device_id: str | None = None,
 ) -> None:
     """Remove any other lease naming this speaker, now that ``keep_pid`` holds it.
+
+    "Naming" is by address or, when both sides know it, by device ID - also for
+    ``.recovering`` claims, which is what a failed recovery leaves behind.
 
     Called once this session's own stream has actually superseded whatever a
     crashed prior session left behind - never from the background sweep
@@ -180,7 +221,7 @@ def discard_superseded(
         lease = _parse_lease(entry)
         if lease is None or lease.pid == keep_pid:
             continue
-        if (lease.speaker_ip, lease.speaker_port) == (speaker_ip, speaker_port):
+        if names_speaker(lease, speaker_ip, speaker_port, device_id):
             remove_lease(lease)
 
 
@@ -189,6 +230,7 @@ def has_live_lease(
     speaker_port: int,
     *,
     directory: Path | None = None,
+    device_id: str | None = None,
 ) -> bool:
     """Return whether some live process currently holds this speaker.
 
@@ -210,7 +252,7 @@ def has_live_lease(
         lease = _parse_lease(entry)
         if (
             lease is not None
-            and (lease.speaker_ip, lease.speaker_port) == (speaker_ip, speaker_port)
+            and names_speaker(lease, speaker_ip, speaker_port, device_id)
             and is_pid_alive(lease.pid)
         ):
             return True
@@ -267,12 +309,20 @@ def _parse_lease(entry: Path) -> Lease | None:
         pid = int(payload["pid"])
         speaker_ip = str(payload["speaker_ip"])
         speaker_port = int(payload["speaker_port"])
-    except (OSError, ValueError, KeyError, TypeError) as error:
+        raw_id = payload.get("device_id")  # absent in leases from older helpers
+        device_id = _normalized_id(str(raw_id)) if raw_id else None
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as error:
         LOGGER.warning("Removing unreadable lease %s: %s", entry, error)
         with contextlib.suppress(OSError):
             entry.unlink()
         return None
-    return Lease(path=entry, pid=pid, speaker_ip=speaker_ip, speaker_port=speaker_port)
+    return Lease(
+        path=entry,
+        pid=pid,
+        speaker_ip=speaker_ip,
+        speaker_port=speaker_port,
+        device_id=device_id,
+    )
 
 
 def find_stale_leases(*, directory: Path | None = None) -> list[Lease]:

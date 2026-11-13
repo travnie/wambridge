@@ -102,6 +102,10 @@ class AdvancedSettingsActivity : Activity() {
 
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
+                if (preferences.getString(RendererService.KEY_SPEAKER_IP, "").orEmpty().trim() != value) {
+                    return@runOnUiThread
+                }
+                if (reachable) SpeakerStateStore.publishSpeaker(value, null)
                 MobileUi.setStatus(
                     statusView,
                     if (reachable) "M5 answered at " + value + "."

@@ -1,6 +1,7 @@
-![Samsung](https://img.shields.io/badge/Samsung-1428A0?logo=samsung&logoColor=fff&style=for-the-badge) ![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=fff&style=for-the-badge)
+[![Samsung](https://img.shields.io/badge/Samsung-1428A0?logo=samsung&logoColor=fff&style=for-the-badge)](https://www.samsung.com/) [![Python](https://img.shields.io/badge/Python-3776AB?logo=python&logoColor=fff&style=for-the-badge)](https://www.python.org/)
 
 [![Release](https://github.com/travnie/wambridge/actions/workflows/release.yml/badge.svg)](https://github.com/travnie/wambridge/actions/workflows/release.yml) [![code license](https://img.shields.io/github/license/travnie/wambridge?label=OSI&logo=opensourceinitiative&logoColor=white&color=6f42c1&style=flat-square)](https://spdx.org/licenses/ISC) <a href="https://deepwiki.com/travnie/wambridge"><img src="https://img.shields.io/badge/DeepWiki-wambridge-blue.svg?logo=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAACwAAAAyCAYAAAAnWDnqAAAAAXNSR0IArs4c6QAAA05JREFUaEPtmUtyEzEQhtWTQyQLHNak2AB7ZnyXZMEjXMGeK/AIi+QuHrMnbChYY7MIh8g01fJoopFb0uhhEqqcbWTp06/uv1saEDv4O3n3dV60RfP947Mm9/SQc0ICFQgzfc4CYZoTPAswgSJCCUJUnAAoRHOAUOcATwbmVLWdGoH//PB8mnKqScAhsD0kYP3j/Yt5LPQe2KvcXmGvRHcDnpxfL2zOYJ1mFwrryWTz0advv1Ut4CJgf5uhDuDj5eUcAUoahrdY/56ebRWeraTjMt/00Sh3UDtjgHtQNHwcRGOC98BJEAEymycmYcWwOprTgcB6VZ5JK5TAJ+fXGLBm3FDAmn6oPPjR4rKCAoJCal2eAiQp2x0vxTPB3ALO2CRkwmDy5WohzBDwSEFKRwPbknEggCPB/imwrycgxX2NzoMCHhPkDwqYMr9tRcP5qNrMZHkVnOjRMWwLCcr8ohBVb1OMjxLwGCvjTikrsBOiA6fNyCrm8V1rP93iVPpwaE+gO0SsWmPiXB+jikdf6SizrT5qKasx5j8ABbHpFTx+vFXp9EnYQmLx02h1QTTrl6eDqxLnGjporxl3NL3agEvXdT0WmEost648sQOYAeJS9Q7bfUVoMGnjo4AZdUMQku50McDcMWcBPvr0SzbTAFDfvJqwLzgxwATnCgnp4wDl6Aa+Ax283gghmj+vj7feE2KBBRMW3FzOpLOADl0Isb5587h/U4gGvkt5v60Z1VLG8BhYjbzRwyQZemwAd6cCR5/XFWLYZRIMpX39AR0tjaGGiGzLVyhse5C9RKC6ai42ppWPKiBagOvaYk8lO7DajerabOZP46Lby5wKjw1HCRx7p9sVMOWGzb/vA1hwiWc6jm3MvQDTogQkiqIhJV0nBQBTU+3okKCFDy9WwferkHjtxib7t3xIUQtHxnIwtx4mpg26/HfwVNVDb4oI9RHmx5WGelRVlrtiw43zboCLaxv46AZeB3IlTkwouebTr1y2NjSpHz68WNFjHvupy3q8TFn3Hos2IAk4Ju5dCo8B3wP7VPr/FGaKiG+T+v+TQqIrOqMTL1VdWV1DdmcbO8KXBz6esmYWYKPwDL5b5FA1a0hwapHiom0r/cKaoqr+27/XcrS5UwSMbQAAAABJRU5ErkJggg==" alt="DeepWiki"></a>
+<a href="https://app.codacy.com/gh/travnie/wambridge/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade"><img src="https://app.codacy.com/project/badge/Grade/b4855a8f25534fe9be72f998de224d4e"/></a>
 
 # WAM Bridge
 
@@ -19,6 +20,37 @@ foobar context-menu integration still needs a physical M5 pass.
 Everything here was measured against one physical Shape M5 (`SPK-WAM550`,
 firmware `WAM550WWB-3117.1`). Other models in the family are untested.
 
+## Speaker compatibility
+
+WAM Bridge uses Samsung's local UIC/CPM API on TCP `55001`; URL playback
+uses `SetUrlPlayback` to make the speaker pull an HTTP audio stream.
+Shared API support makes other models plausible candidates, but does not
+establish working audio, timing or controls.
+
+| Model | Evidence and WAM Bridge status |
+| --- | --- |
+| Shape M5 `SPK-WAM550`, firmware `WAM550WWB-3117.1` | Hardware-tested here; see the dated stability results below. |
+| R1 `WAM1500` | Matching API documented in [independent R1 research](https://github.com/bacl/WAM_API_DOC). Candidate; untested here. |
+| Shape M5 `WAM551`, M3 `WAM350/351`, M7 `WAM750/751` | Model entries in an [external WAM integration](https://github.com/balmli/com.samsung.wam/blob/master/lib/input_sources.js). Candidates; untested here. |
+| Selected Multiroom soundbars, e.g. `HW-K650` / `HW-MS650` | API used by [K650](https://github.com/macbury/ha_samsung_multi_room) and [Multiroom](https://github.com/DaveGut/DEPRECATED-SmartThings_Samsung-WiFi-Audio-Unofficial) integrations. Candidates; WAM Bridge playback untested. |
+| Other brands or devices without this Samsung API | Require a separate transport implementation. Wi-Fi or DLNA support alone is insufficient. |
+
+Without owning another model, compare its protocol captures, integration code,
+firmware notes and codec support. Owner-supplied read-only API responses can
+confirm individual commands; they cannot confirm audible playback. External
+integration support is evidence to investigate, not a WAM Bridge support claim.
+
+Model-specific differences may include volume range, standby, events, codecs and
+buffering. The measured M5 uses raw volume steps `0..30`; the K650 integration
+documents `0..100`. Do not assume one model's volume scale applies to another.
+An API `ok` response alone does not prove that audio plays.
+
+To mark a model as tested, record its exact model and firmware, playback path
+(Android radio/renderer, foobar PCM or Share), format and a physical playback
+result: complete track at wall-clock speed, controls, next track and clean
+shutdown. Validate each path separately against the
+[protocol acceptance checklist](docs/WAM_PROTOCOL.md#safety-and-acceptance).
+
 ## Status: working [rolling release](https://github.com/travnie/wambridge/releases/tag/latest)
 
 Both paths play audio on real hardware. The foobar component passed its full
@@ -26,6 +58,11 @@ physical checklist on 2026-08-02: a complete 213-second track start to finish at
 a median 1.00x with every sample between 0.9x and 1.1x, seek, pause and resume,
 an unattended transition into the next track, internet radio across a 44.1 to
 48 kHz switch, and a clean shutdown leaving no FFmpeg or helper behind.
+
+A later full-track M5 recheck on 2026-10-21 did **not** reproduce that stability
+on the then-current connection. The older successful run remains historical evidence;
+see the [physical M5 status](foobar/README.md#physical-m5-checklist) for the newer
+failed baseline and what still needs validation.
 
 What works:
 
@@ -55,6 +92,13 @@ M5 validation before changing the release/handover protocol. Lowering the
 bitrate worsened prebuffering in older measurements; it is not a safe latency fix.
 Callback timing instrumentation and a before/after report are described in
 [`tools/wam-probes/README.md`](tools/wam-probes/README.md).
+Earlier clean runs showed a correct host clock and seekbar, but those results do not
+establish uninterrupted speaker playback on the current network link. **Pause, stop and skip still carry pipeline latency** because they act
+through the PCM path; with `hardware_volume=1`, the volume slider is routed to the speaker instead. Lowering
+the bitrate makes the speaker prebuffer worse rather than better, and raising it helped by
+about a second in the older measurements. The remaining latency-sensitive controls belong
+on the speaker's own `55001` command path, which answers in about a second, rather
+than to keep shortening the audio path; that work is in progress.
 
 Everything else is documented honestly, including the approaches that failed:
 
@@ -65,7 +109,8 @@ Everything else is documented honestly, including the approaches that failed:
 Current architecture, failed approaches and continuation notes are in
 [`docs/DEVELOPMENT_STATUS.md`](docs/DEVELOPMENT_STATUS.md). Measured protocol
 facts from a physical `SPK-WAM550` are in
-[`docs/WAM_PROTOCOL.md`](docs/WAM_PROTOCOL.md).
+[`docs/WAM_PROTOCOL.md`](docs/WAM_PROTOCOL.md). For the maintained guides,
+checklists and publishing instructions, use the [documentation index](docs/README.md).
 
 ## Foobar2000 output
 
@@ -81,6 +126,14 @@ Each rolling release contains:
 - `foo_out_wam.fb2k-component` - the foobar2000 output
 - `wambridge-<version>.apk` - the signed Android adapter
 - a source archive
+- one R8 mapping for the current APK, useful for deobfuscating crash traces; its filename includes the APK SHA-256 (not for installation)
+
+The existing `latest` release also carries the frozen, one-time
+`wambridge-r8-legacy-20261103.zip` backup of all five mappings from before this
+policy. This historical asset is **not regenerated** for a newly created release.
+Rolling updates replace the active mapping and discard superseded rolling-only
+mappings. Fixed, versioned releases retain their matching mapping permanently.
+This avoids creating an archive on every commit.
 
 Open the `.fb2k-component` file with foobar2000 2.x x64, then select:
 
@@ -338,22 +391,22 @@ py -m unittest discover -s tests -v
 ## 📰 Mininewsy
 
 <!--README_FEED:START-->
-- [Star History Monthly October 2026 | Execution](https://www.star-history.com/blog/execution)
-- [Time for Saudi Clarity on Normalization with Israel](https://carnegieendowment.org/research/2026/10/time-for-saudi-clarity-on-normalization-with-israel)
-- [mergify unlabeled PR #343 in travnie/twojstar](https://github.com/travnie/twojstar#feedseek-event-18066715698)
-- [trvny merged PR #343 in travnie/twojstar](https://github.com/travnie/twojstar#feedseek-event-18066712177)
-- [mergify labeled PR #343 in travnie/twojstar](https://github.com/travnie/twojstar#feedseek-event-18066706567)
-- [Russia, Ukraine agree on ceasefire in embattled town, to hold peace talks next month](https://www.reuters.com/world/europe/russia-ukraine-agree-ceasefire-embattled-town-hold-peace-talks-next-month-2026-10-23/)
+- [Trust but Verify: Implementing Frontier AI Policy in California and Beyond](https://carnegieendowment.org/research/2026/11/trust-but-verify-implementing-frontier-ai-policy-in-california-and-beyond)
+- [Promises Made, Promises Unmet: The NPP’s Struggle to Reform Sri Lanka](https://carnegieendowment.org/research/2026/11/promises-made-promises-unmet-the-npps-struggle-to-reform-sri-lanka)
+- [W Filipowicach zagrają cztery kapele - zakliczyninfo.pl](https://news.google.com/atom/articles/CBMijAFBVV95cUxPOXdxVjVMdHc0YUw2akRlZlJZREw0WUVmeHdvbDNqNUo5cnNRM1ZWUm9aSEJzSUlKNU1hSkF2anlwUm5sTGpzTHN1NG9wZXhhSGJYbHB6RWhUaUxlQ3FOTnlwNmloNnJLNnJnbjVmYzJ6RWFqMGdvZ3VzVjJNQUZ4SU9qUzFINjBIQ25BSQ?oc=5)
+- [Product of the Day — A Magical Bag Of Holding Except The Only Thing It Can Hold Is Infinite Fedoras](https://anycrap.shop/product/a-magical-bag-of-holding-except-the-only-thing-it-can-hold-is-infinite-fedoras)
+- [Cat Fact of the Day](https://catfact.ninja/)
+- [Joke of the Day](https://djtech.net/humor/things_to_think_about.htm)
 <!--README_FEED:END-->
 
 ## 💬 Cytat z szuflady
 
 <!-- markdownlint-disable MD033 -->
 <!--STARTS_HERE_QUOTE_README-->
-<i>❝E-Mail was invented before Internet. Shocked!!!! ” I also got shocked after hearing this.”❞</i>
+<i>❝More than 80% of the emails sent daily are spams.❞</i>
 <!--ENDS_HERE_QUOTE_README-->
 <!-- markdownlint-enable MD033 -->
 
 ## Python package / PyPI
 
-The Python CLI is prepared for public release as `trvny-wambridge`. Build artifacts and Trusted Publishing setup live in [PUBLISHING.md](PUBLISHING.md). After the first upload to PyPI, install with `uv tool install trvny-wambridge`; the foobar2000 plugin remains a separate `.fb2k-component` release.
+The Python CLI distribution is `wambridge` (the import and command names stay unchanged). The existing [Release workflow](.github/workflows/release.yml) builds and publishes it to PyPI **only for fixed versioned releases**, not the continuously refreshed `latest` APK/foobar release. After its first PyPI upload: `uv tool install wambridge`. See the [publishing guide](docs/PUBLISHING.md) for Trusted Publishing setup.

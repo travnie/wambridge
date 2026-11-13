@@ -4,7 +4,7 @@
 Python uses stdlib `unittest` plus `unittest.mock`; Android local tests use JUnit 4. CI runs `uv run python -m unittest discover -s tests -v` and, separately, `./gradlew :app:lintDebug :app:testDebugUnitTest :app:assembleDebug`. C++ has no native unit-test runner in the repo; it is compiled in CI and many invariants are pinned by Python source-shape tests.
 
 ## 2) Test Layout
-There are 36 Python `tests/test_*.py` files and 11 Android JVM test files under `mobile/app/src/test/java/...`. Tests are mostly feature-oriented (`test_samsung.py`, `test_pcm_stream.py`, `RendererRoutingTest.kt`). No shared global test setup file is required.
+Python tests live under `tests/test_*.py`; Android JVM tests live under `mobile/app/src/test/java/`. Both collections grow as failures are pinned with new regressions, so file counts are not maintained here. Tests are mostly feature-oriented (`test_samsung.py`, `test_pcm_stream.py`, `RendererRoutingTest.kt`). No shared global test setup file is required.
 
 ## 3) Test Scope Matrix
 
@@ -17,7 +17,7 @@ There are 36 Python `tests/test_*.py` files and 11 Android JVM test files under 
 | Full automated E2E | no | real foobar/phone → physical speaker | hardware/state makes it unsuitable for ordinary CI |
 
 ## 4) Mocking and Isolation Strategy
-Python uses `patch`, in-memory streams and fake process/socket objects so protocol and timing logic can be asserted without touching the M5. Android tests isolate pure routing/parsing/network-planning helpers and use local `ServerSocket` only where reachability itself is the behavior. Hardware probes are deliberately outside the supported test suite.
+Python uses `patch`, in-memory streams and fake process/socket objects so protocol and timing logic can be asserted without touching the M5. Android tests isolate pure routing/parsing/network-planning helpers and use local `ServerSocket` only where reachability itself is the behavior. Hardware probes are deliberately outside the supported test suite. The [foobar physical checklist](../foobar/README.md#physical-m5-checklist) and [Android vNext](ANDROID_VNEXT.md) own the current manual acceptance steps; do not duplicate their checklists here.
 
 ## 5) Coverage and Quality Signals
 No coverage percentage or threshold is configured. Quality signals are green unit/build/lint jobs plus explicit regression tests derived from observed failures. High-value examples include XML/request-injection validation, bounded startup reads, single-owner PCM encoding, dead-stream refusal, LAN route restrictions, and docs/code drift tests.

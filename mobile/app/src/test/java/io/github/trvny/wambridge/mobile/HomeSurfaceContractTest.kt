@@ -22,6 +22,19 @@ class HomeSurfaceContractTest {
     }
 
     @Test
+    fun rendererStatusUsesServiceEventsWithoutPollingLoop() {
+        val renderer = File(
+            "src/main/java/io/github/trvny/wambridge/mobile/RendererService.kt",
+        ).readText()
+        assertTrue(main.contains("RendererService.subscribeStatus"))
+        assertTrue(main.contains("rendererStatusSubscription?.close()"))
+        assertTrue(main.contains("if (!discoveryOwnsStatus)"))
+        assertTrue(main.contains("if (RendererService.busy) discoveryOwnsStatus = false"))
+        assertTrue(renderer.contains("notifyStatusObservers()"))
+        assertFalse(main.contains("refreshUntilSettled"))
+    }
+
+    @Test
     fun homeKeepsPhysicalPresetsOutAndExposesDlnaToggle() {
         val homeStart = main.indexOf("private fun buildHomePane")
         val radioStart = main.indexOf("private fun buildRadioPane")

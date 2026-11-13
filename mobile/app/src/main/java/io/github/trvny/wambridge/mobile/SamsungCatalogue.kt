@@ -4,6 +4,7 @@ import android.content.Context
 import java.io.IOException
 import java.io.StringReader
 import java.io.StringWriter
+import javax.xml.XMLConstants
 import javax.xml.parsers.DocumentBuilderFactory
 import javax.xml.parsers.ParserConfigurationException
 import org.w3c.dom.Element
@@ -353,9 +354,14 @@ internal object SamsungCatalogue {
             throw IOException("Samsung WAM returned invalid $what XML: DOCTYPE is not allowed")
         }
         val factory = DocumentBuilderFactory.newInstance().apply {
+            harden(XMLConstants.FEATURE_SECURE_PROCESSING)
             harden("http://apache.org/xml/features/disallow-doctype-decl")
             harden("http://xml.org/sax/features/external-general-entities", false)
             harden("http://xml.org/sax/features/external-parameter-entities", false)
+            harden("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
+            hardenAttribute("http://javax.xml.XMLConstants/property/accessExternalDTD", "")
+            hardenAttribute("http://javax.xml.XMLConstants/property/accessExternalSchema", "")
+            isXIncludeAware = false
             isExpandEntityReferences = false
             isNamespaceAware = false
         }
@@ -378,6 +384,15 @@ internal object SamsungCatalogue {
         } catch (_: ParserConfigurationException) {
             // Android's parser refuses several of these by name. Nothing to do:
             // the parse itself is what matters, and the remaining settings hold.
+        }
+    }
+
+    /** Ask for one hardening attribute, and carry on where the parser has never heard of it. */
+    private fun DocumentBuilderFactory.hardenAttribute(attribute: String, value: String) {
+        try {
+            setAttribute(attribute, value)
+        } catch (_: IllegalArgumentException) {
+            // Some Android XML providers do not expose these attributes.
         }
     }
 

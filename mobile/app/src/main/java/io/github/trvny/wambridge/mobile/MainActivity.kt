@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.Bundle
+import android.util.Log
 import android.view.View
 import android.widget.Button
 import android.widget.FrameLayout
@@ -56,6 +57,7 @@ class MainActivity : Activity() {
     private lateinit var settingsNavButton: Button
     private var currentDestination = MainDestination.HOME
     private var speakerStateSubscription: AutoCloseable? = null
+    private var rendererStatusSubscription: AutoCloseable? = null
     private var physicalPresetSubscription: AutoCloseable? = null
     private val speakerControlButtons = mutableListOf<Button>()
     private var speakerControlRunning = false
@@ -74,9 +76,35 @@ class MainActivity : Activity() {
     private val timerExecutor = Executors.newSingleThreadExecutor { runnable ->
         Thread(runnable, "wam-mobile-sleep-timer").apply { isDaemon = true }
     }
+    private val shortcutExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "wam-mobile-shortcuts").apply { isDaemon = true }
+    }
     private val presetWorkRunning = AtomicBoolean(false)
+    private var discoveryOwnsStatus = false
+    private var autoDiscoveryRetriesRemaining = 1
+    private var wifiDiscoveryWatcher: AutoCloseable? = null
+    @Volatile private var wifiDiscoveryEndpoints: Set<WifiLan.Endpoint> = emptySet()
+    private var wifiDiscoveryInitialized = false
+    private var manualDiscoveryActive = false
+    private var activityStarted = false
+    private var autoDiscoveryRetryPending = false
     private val autoDiscoveryRetry = Runnable {
-        if (!isFinishing && !isDestroyed) autoDiscoverSpeaker()
+        if (activityStarted && !isFinishing && !isDestroyed) {
+            if (!RendererService.busy && !RadioService.active && !manualDiscoveryActive) {
+                autoDiscoveryRetryPending = false
+                autoDiscoverSpeaker()
+            } else {
+                autoDiscoveryRetryPending = true
+            }
+        }
+    }
+
+    private fun scheduleAutoDiscoveryRetry(delayMs: Long = 500L) {
+        autoDiscoveryRetryPending = true
+        if (activityStarted && !RendererService.busy && !RadioService.active && !manualDiscoveryActive) {
+            window.decorView.removeCallbacks(autoDiscoveryRetry)
+            window.decorView.postDelayed(autoDiscoveryRetry, delayMs)
+        }
     }
 
     private val preferences by lazy {
@@ -134,7 +162,6 @@ class MainActivity : Activity() {
 
         refreshLauncherButton()
         refreshStatus()
-        LauncherQuickActions.sync(applicationContext)
         handleQuickAction(intent)
         window.decorView.post(autoDiscoveryRetry)
     }
@@ -515,7 +542,10 @@ class MainActivity : Activity() {
             }
             renderRadioStations()
         }
-        if (visibility.settings) refreshSleepTimerState()
+        if (visibility.settings) {
+            refreshStatus()
+            refreshSleepTimerState()
+        }
     }
 
     private fun renderHomeState(snapshot: SpeakerSnapshot) {
@@ -773,11 +803,50 @@ class MainActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        activityStarted = true
         speakerStateSubscription?.close()
+        rendererStatusSubscription?.close()
         physicalPresetSubscription?.close()
+        val currentEndpoints = WifiLan.endpoints(applicationContext)
+        if (wifiDiscoveryInitialized && currentEndpoints != wifiDiscoveryEndpoints &&
+            !manualDiscoveryActive
+        ) {
+            autoDiscoveryRetriesRemaining = 1
+            scheduleAutoDiscoveryRetry()
+        }
+        wifiDiscoveryInitialized = true
+        wifiDiscoveryEndpoints = currentEndpoints
+        wifiDiscoveryWatcher = runCatching {
+            WifiLan.watch(applicationContext) {
+                val endpoints = WifiLan.endpoints(applicationContext)
+                if (endpoints != wifiDiscoveryEndpoints) {
+                    wifiDiscoveryEndpoints = endpoints
+                    if (!manualDiscoveryActive) {
+                        autoDiscoveryRetriesRemaining = 1
+                        scheduleAutoDiscoveryRetry()
+                    }
+                }
+            }
+        }.onFailure { error ->
+            Log.w("WamBridgeDiscovery", "Wi-Fi callback unavailable; discovery will retry on resume", error)
+        }.getOrNull()
         speakerStateSubscription = SpeakerStateStore.subscribe { snapshot ->
             runOnUiThread {
-                if (!isFinishing && !isDestroyed) renderHomeState(snapshot)
+                if (!isFinishing && !isDestroyed) {
+                    renderHomeState(snapshot)
+                    if (currentDestination == MainDestination.SETTINGS && !discoveryOwnsStatus) {
+                        refreshStatus()
+                    }
+                    if (autoDiscoveryRetryPending) scheduleAutoDiscoveryRetry(0L)
+                }
+            }
+        }
+        rendererStatusSubscription = RendererService.subscribeStatus {
+            runOnUiThread {
+                if (!isFinishing && !isDestroyed) {
+                    refreshStatus()
+                    if (autoDiscoveryRetryPending) scheduleAutoDiscoveryRetry(0L)
+                }
             }
         }
         physicalPresetSubscription = PhysicalPresetStore.subscribe { snapshot ->
@@ -788,11 +857,18 @@ class MainActivity : Activity() {
                 }
             }
         }
+        if (autoDiscoveryRetryPending) scheduleAutoDiscoveryRetry()
     }
 
     override fun onStop() {
+        activityStarted = false
+        window.decorView.removeCallbacks(autoDiscoveryRetry)
+        wifiDiscoveryWatcher?.close()
+        wifiDiscoveryWatcher = null
         speakerStateSubscription?.close()
         speakerStateSubscription = null
+        rendererStatusSubscription?.close()
+        rendererStatusSubscription = null
         physicalPresetSubscription?.close()
         physicalPresetSubscription = null
         super.onStop()
@@ -809,7 +885,8 @@ class MainActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
-        LauncherQuickActions.sync(applicationContext)
+        val appContext = applicationContext
+        shortcutExecutor.execute { LauncherQuickActions.sync(appContext) }
         if (::statusView.isInitialized) refreshStatus()
         if (currentDestination == MainDestination.RADIO) renderRadioStations()
         if (currentDestination == MainDestination.SETTINGS) refreshSleepTimerState()
@@ -822,11 +899,29 @@ class MainActivity : Activity() {
         controlExecutor.shutdownNow()
         presetExecutor.shutdownNow()
         timerExecutor.shutdownNow()
+        shortcutExecutor.shutdownNow()
         super.onDestroy()
+    }
+
+    private fun clearActiveDiscoveryStage() {
+        SpeakerStateStore.update { snapshot ->
+            if (snapshot.discovery in setOf(
+                    SpeakerDiscoveryStage.CHECKING_SAVED,
+                    SpeakerDiscoveryStage.SSDP,
+                    SpeakerDiscoveryStage.LAN_SCAN,
+                )
+            ) {
+                snapshot.copy(discovery = SpeakerDiscoveryStage.IDLE, status = "Discovery cancelled")
+            } else snapshot
+        }
     }
 
     private fun cancelAutoDiscovery() {
         autoDiscoveryGeneration.incrementAndGet()
+        manualDiscoveryActive = false
+        autoDiscoveryRetryPending = false
+        if (discoveryOwnsStatus) clearActiveDiscoveryStage()
+        discoveryOwnsStatus = false
         window.decorView.removeCallbacks(autoDiscoveryRetry)
         if (::discoverButton.isInitialized) MobileUi.setEnabled(discoverButton, true)
     }
@@ -836,6 +931,7 @@ class MainActivity : Activity() {
     private fun runDiscovery(manual: Boolean) {
         if (isFinishing || isDestroyed || discoveryExecutor.isShutdown) return
         window.decorView.removeCallbacks(autoDiscoveryRetry)
+        if (manual) autoDiscoveryRetryPending = false
 
         if (RendererService.busy || RadioService.active) {
             if (manual) {
@@ -844,17 +940,19 @@ class MainActivity : Activity() {
                     "Stop renderer/radio playback before discovery.",
                     Toast.LENGTH_SHORT,
                 ).show()
-            } else {
-                window.decorView.postDelayed(autoDiscoveryRetry, 1_000L)
             }
+            if (!manual) autoDiscoveryRetryPending = true
             return
         }
 
         val savedBefore = preferences.getString(RendererService.KEY_SPEAKER_IP, "").orEmpty().trim()
+        val networkAtStart = WifiLan.endpoints(applicationContext)
         val previous = savedBefore
         val inputRevision = speakerInputRevision.get()
         val generation = autoDiscoveryGeneration.incrementAndGet()
 
+        discoveryOwnsStatus = true
+        manualDiscoveryActive = manual
         MobileUi.setEnabled(discoverButton, false)
         MobileUi.setStatus(
             statusView,
@@ -868,15 +966,20 @@ class MainActivity : Activity() {
                     persist = false,
                     forceDiscovery = manual,
                     shouldContinue = {
-                        autoDiscoveryStillCurrent(generation, inputRevision, savedBefore)
+                        autoDiscoveryStillCurrent(generation, inputRevision, savedBefore) &&
+                            wifiDiscoveryEndpoints == networkAtStart
                     },
                     onStage = { stage ->
-                        SpeakerStateStore.update {
-                            it.copy(
-                                discovery = stage,
-                                status = discoveryStatus(stage),
-                                lastError = null,
-                            )
+                        if (autoDiscoveryStillCurrent(generation, inputRevision, savedBefore) &&
+                            wifiDiscoveryEndpoints == networkAtStart
+                        ) {
+                            SpeakerStateStore.update {
+                                it.copy(
+                                    discovery = stage,
+                                    status = discoveryStatus(stage),
+                                    lastError = null,
+                                )
+                            }
                         }
                     },
                 )
@@ -886,7 +989,26 @@ class MainActivity : Activity() {
                 if (isFinishing || isDestroyed || autoDiscoveryGeneration.get() != generation) {
                     return@runOnUiThread
                 }
+                if (RendererService.busy || RadioService.active) {
+                    MobileUi.setEnabled(discoverButton, true)
+                    manualDiscoveryActive = false
+                    discoveryOwnsStatus = false
+                    clearActiveDiscoveryStage()
+                    refreshStatus()
+                    return@runOnUiThread
+                }
+                if (WifiLan.endpoints(applicationContext) != networkAtStart) {
+                    MobileUi.setEnabled(discoverButton, true)
+                    manualDiscoveryActive = false
+                    discoveryOwnsStatus = false
+                    clearActiveDiscoveryStage()
+                    scheduleAutoDiscoveryRetry()
+                    return@runOnUiThread
+                }
                 MobileUi.setEnabled(discoverButton, true)
+                manualDiscoveryActive = false
+                // Keep the speaker-selection instruction visible until resolved.
+                discoveryOwnsStatus = result.getOrNull() is SpeakerTarget.ResolveOutcome.Ambiguous
 
                 result.fold(
                     onSuccess = { outcome ->
@@ -915,6 +1037,16 @@ class MainActivity : Activity() {
                         )
                     },
                 )
+                if (!manual && autoDiscoveryRetriesRemaining > 0 &&
+                    (result.isFailure || result.getOrNull() is SpeakerTarget.ResolveOutcome.NotFound)
+                ) {
+                    autoDiscoveryRetriesRemaining--
+                    scheduleAutoDiscoveryRetry(5_000L)
+                }
+                if (result.getOrNull() is SpeakerTarget.ResolveOutcome.Cancelled) {
+                    clearActiveDiscoveryStage()
+                    refreshStatus()
+                }
             }
         }
     }
@@ -926,6 +1058,7 @@ class MainActivity : Activity() {
     ): Boolean = autoDiscoveryGeneration.get() == generation &&
         speakerInputRevision.get() == inputRevision &&
         preferences.getString(RendererService.KEY_SPEAKER_IP, "").orEmpty().trim() == savedBefore &&
+        !RendererService.busy && !RadioService.active &&
         !Thread.currentThread().isInterrupted
 
     private fun applyDiscoveryOutcome(
@@ -965,6 +1098,13 @@ class MainActivity : Activity() {
             }
 
             is SpeakerTarget.ResolveOutcome.Ambiguous -> {
+                SpeakerStateStore.update {
+                    it.copy(
+                        discovery = SpeakerDiscoveryStage.AMBIGUOUS,
+                        status = discoveryStatus(SpeakerDiscoveryStage.AMBIGUOUS),
+                        lastError = null,
+                    )
+                }
                 if (manual) {
                     chooseDiscoveredSpeaker(outcome.speakers)
                 } else {
@@ -1057,6 +1197,7 @@ class MainActivity : Activity() {
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 MobileUi.setEnabled(discoverButton, true)
+                discoveryOwnsStatus = false
                 result.fold(
                     onSuccess = { resolution ->
                         MobileUi.setStatus(
@@ -1164,6 +1305,7 @@ class MainActivity : Activity() {
     }
 
     private fun toggleRenderer() {
+        discoveryOwnsStatus = false
         if (RendererService.busy) {
             startService(
                 Intent(this, RendererService::class.java).apply {
@@ -1171,7 +1313,7 @@ class MainActivity : Activity() {
                 },
             )
             MobileUi.setStatus(homeStatusView, "Stopping DLNA renderer…")
-            refreshUntilSettled()
+            refreshStatus()
         } else {
             startRenderer()
             MobileUi.setStatus(homeStatusView, "Starting DLNA renderer…")
@@ -1179,40 +1321,52 @@ class MainActivity : Activity() {
     }
 
     private fun startRenderer() {
+        discoveryOwnsStatus = false
         cancelAutoDiscovery()
         val intent = Intent(this, RendererService::class.java).apply {
             action = RendererService.ACTION_START
         }
         startForegroundService(intent)
         MobileUi.setStatus(statusView, "Finding M5 and starting renderer…")
-        refreshUntilSettled()
-    }
-
-    private fun refreshUntilSettled(minimumPolls: Int = 2) {
         refreshStatus()
-        if (minimumPolls > 0 || RendererService.transitioning) {
-            window.decorView.postDelayed(
-                { refreshUntilSettled((minimumPolls - 1).coerceAtLeast(0)) },
-                250,
-            )
-        }
     }
 
     private fun refreshStatus() {
+        // External tile/widget starts also take over status from manual discovery.
+        if (RendererService.busy) discoveryOwnsStatus = false
+        val snapshot = SpeakerStateStore.current()
         val marker = when (RendererService.phase) {
             RendererService.Phase.RUNNING -> "●"
             RendererService.Phase.STARTING, RendererService.Phase.STOPPING -> "◐"
             RendererService.Phase.STOPPED -> "○"
         }
-        MobileUi.setStatus(
-            statusView,
-            "$marker ${RendererService.lastStatus}",
-            if (RendererService.phase == RendererService.Phase.RUNNING) {
-                MobileUi.StatusKind.SUCCESS
-            } else {
-                MobileUi.StatusKind.INFO
-            },
-        )
+        if (!discoveryOwnsStatus) {
+            val message = when {
+                RendererService.busy -> "$marker ${RendererService.lastStatus}"
+                snapshot.discovery == SpeakerDiscoveryStage.READY &&
+                    preferences.getString(RendererService.KEY_SPEAKER_IP, "").orEmpty().trim() == snapshot.speakerIp ->
+                    "● M5 ready" + snapshot.speakerIp?.let { " at $it" }.orEmpty()
+                snapshot.discovery == SpeakerDiscoveryStage.READY ->
+                    "○ Configured M5 changed; test the connection"
+                snapshot.discovery == SpeakerDiscoveryStage.FAILED ->
+                    "○ " + (snapshot.lastError ?: "M5 not found")
+                snapshot.discovery == SpeakerDiscoveryStage.AMBIGUOUS ||
+                    snapshot.discovery == SpeakerDiscoveryStage.NEEDS_VERIFICATION ->
+                    "○ " + discoveryStatus(snapshot.discovery)
+                snapshot.discovery == SpeakerDiscoveryStage.WAITING_FOR_WIFI ->
+                    "○ Waiting for Wi-Fi…"
+                else -> "$marker ${RendererService.lastStatus}"
+            }
+            val kind = when {
+                RendererService.running ||
+                    (!RendererService.busy && snapshot.discovery == SpeakerDiscoveryStage.READY) ->
+                    MobileUi.StatusKind.SUCCESS
+                !RendererService.busy && snapshot.discovery == SpeakerDiscoveryStage.FAILED ->
+                    MobileUi.StatusKind.ERROR
+                else -> MobileUi.StatusKind.INFO
+            }
+            MobileUi.setStatus(statusView, message, kind)
+        }
         if (::homeDlnaButton.isInitialized) {
             homeDlnaButton.text = when (RendererService.phase) {
                 RendererService.Phase.RUNNING -> "DLNA ● On"

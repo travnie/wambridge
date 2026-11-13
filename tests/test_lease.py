@@ -200,25 +200,89 @@ class DiscardSupersededTests(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
         self.directory = Path(self._tmp.name)
 
-    def _dead_lease(self, speaker_ip: str, speaker_port: int) -> Lease:
+    def _dead_lease(
+        self,
+        speaker_ip: str,
+        speaker_port: int,
+        device_id: str | None = None,
+    ) -> Lease:
         # A genuinely different, genuinely dead pid - write_lease always
         # stamps the calling process's own pid into the payload, so two
         # calls from this same test process would be indistinguishable by
         # pid regardless of filename.
         dead_pid = _finished_pid()
         path = self.directory / f"{dead_pid}.json"
-        path.write_text(
-            json.dumps(
-                {
-                    "version": 1,
-                    "pid": dead_pid,
-                    "speaker_ip": speaker_ip,
-                    "speaker_port": speaker_port,
-                }
-            ),
-            encoding="utf-8",
+        payload = {
+            "version": 1,
+            "pid": dead_pid,
+            "speaker_ip": speaker_ip,
+            "speaker_port": speaker_port,
+        }
+        if device_id is not None:
+            payload["device_id"] = device_id
+        path.write_text(json.dumps(payload), encoding="utf-8")
+        return Lease(
+            path=path,
+            pid=dead_pid,
+            speaker_ip=speaker_ip,
+            speaker_port=speaker_port,
+            device_id=device_id,
         )
-        return Lease(path=path, pid=dead_pid, speaker_ip=speaker_ip, speaker_port=speaker_port)
+
+    def test_removes_a_recovering_claim_for_the_same_device_at_an_old_address(self) -> None:
+        # The 2026-10-25 case: a failed recovery left `<pid>.json.recovering-*`
+        # naming the M5's old address; the speaker had since moved.
+        lease = self._dead_lease("10.0.0.103", 55001, device_id="BC148548958C")
+        claimed = claim_lease(lease)
+        assert claimed is not None
+
+        discard_superseded(
+            "10.0.0.102",
+            55001,
+            keep_pid=os.getpid(),
+            directory=self.directory,
+            device_id="bc:14:85:48:95:8c",
+        )
+
+        self.assertFalse(claimed.path.exists())
+
+    def test_keeps_a_lease_for_another_device_at_another_address(self) -> None:
+        other = self._dead_lease("10.0.0.200", 55001, device_id="AABBCCDDEEFF")
+
+        discard_superseded(
+            "10.0.0.102",
+            55001,
+            keep_pid=os.getpid(),
+            directory=self.directory,
+            device_id="BC148548958C",
+        )
+
+        self.assertTrue(other.path.exists())
+
+    def test_a_legacy_lease_without_an_id_is_only_matched_by_address(self) -> None:
+        legacy = self._dead_lease("10.0.0.103", 55001)
+
+        discard_superseded(
+            "10.0.0.102",
+            55001,
+            keep_pid=os.getpid(),
+            directory=self.directory,
+            device_id="BC148548958C",
+        )
+
+        self.assertTrue(legacy.path.exists())
+
+    def test_write_lease_records_the_normalized_device_id(self) -> None:
+        lease = write_lease(
+            "10.0.0.102",
+            55001,
+            directory=self.directory,
+            device_id="bc:14:85:48:95:8c",
+        )
+
+        self.assertEqual(lease.device_id, "BC148548958C")
+        stored = json.loads(lease.path.read_text(encoding="utf-8"))
+        self.assertEqual(stored["device_id"], "BC148548958C")
 
     def test_removes_another_lease_naming_the_same_speaker(self) -> None:
         other = self._dead_lease("10.0.0.118", 55001)

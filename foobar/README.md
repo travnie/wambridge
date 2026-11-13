@@ -11,6 +11,10 @@ the default, validated WAV transport, and reduced the default extra host buffer 
 Support outside the measured physical M5 (`SPK-WAM550`) remains experimental. WAM551 is
 an intended M5-family target, but is not yet hardware-validated.
 
+This is the **user and hardware-acceptance guide**. Implementation decisions and timing
+experiments belong in [the component design notes](../docs/FOOBAR_PLUGIN.md) and the
+[dated lab journal](../docs/DEVELOPMENT_STATUS.md).
+
 ## Requirements
 
 - foobar2000 2.x x64
@@ -145,6 +149,16 @@ WAMBRIDGE PLAYING volume=3
 ```
 
 ## Physical M5 checklist
+
+**Latest baseline recheck (2026-10-21):** A short instrument-only smoke passed
+start, pause/resume, next, seek and cleanup at raw volume 3. But three full-track
+runs of a 249-second source took about **305–310 seconds**: the M5 intermittently
+stopped pulling the stream for 20–50 seconds and reported `MEDIA_BUFFER_ERROR`.
+The Wi-Fi link showed packet loss; its role has not been isolated, and no one
+listened or measured acoustic control latency. These tests used the unchanged
+`main` component, not the proposed SDK upgrade. Full-track reliability remains
+**unverified**. See the [smoke](https://github.com/travnie/wambridge/pull/234#issuecomment-6320693289)
+and [corrected full-track report](https://github.com/travnie/wambridge/pull/234#issuecomment-6321793511).
 
 Before merging an output candidate:
 
