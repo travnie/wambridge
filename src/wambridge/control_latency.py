@@ -18,7 +18,7 @@ from pathlib import Path
 COMMANDS = frozenset({"pause", "resume", "volume", "release", "discard", "sleep"})
 METRICS = frozenset({"dispatch_ms", "audible_ms"})
 TIMING_LINE = re.compile(
-    r"\bWAMBRIDGE CONTROL_TIMING command=(pause|resume|volume|release|discard|sleep)"
+    r"\bWAMBRIDGE CONTROL_TIMING command=(" + "|".join(map(re.escape, sorted(COMMANDS))) + r")"
     r" dispatch_ms=([0-9]+(?:\.[0-9]+)?)\b"
 )
 Samples = dict[tuple[str, str], list[float]]
@@ -30,9 +30,12 @@ def read_samples(text: str) -> Samples:
     stripped = text.lstrip("\ufeff \t\r\n")
     if stripped.startswith("command,"):
         reader = csv.DictReader(io.StringIO(stripped))
-        if not {"command", "metric", "ms"}.issubset(reader.fieldnames or []):
-            raise ValueError("CSV needs command,metric,ms columns")
+        fields = reader.fieldnames or []
+        if len(fields) != 3 or set(fields) != {"command", "metric", "ms"}:
+            raise ValueError("CSV needs exactly command,metric,ms columns")
         for number, row in enumerate(reader, start=2):
+            if None in row or any(value is None for value in row.values()):
+                raise ValueError(f"Invalid CSV field count at row {number}")
             command = (row["command"] or "").strip()
             metric = (row["metric"] or "").strip()
             if command not in COMMANDS or metric not in METRICS:

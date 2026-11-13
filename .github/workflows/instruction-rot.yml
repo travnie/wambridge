@@ -46,4 +46,4 @@ jobs:
       contents: read
       issues: write
       pull-requests: write
-    uses: trvny/.github/.github/workflows/instruction-rot.yml@b89675008df80a128bd1ff956c665a196314cd15
+    uses: trvny/.github/.github/workflows/instruction-rot.yml@d7332abe6dd2f493b594f28fd5fcdeb76cd65816

@@ -32,6 +32,9 @@ class ControlLatencyTests(unittest.TestCase):
             "command,metric,ms\npause,audible_ms,NaN\n",
             "command,metric,ms\npause,unknown,200\n",
             "command,metric,ms\npause,audible_ms,infinity\n",
+            "command,metric,ms\npause,audible_ms,500,extra\n",
+            "command,metric,ms,extra\npause,audible_ms,500,data\n",
+            "command,metric,ms\npause,audible_ms\n",
         ):
             with self.subTest(data=data), self.assertRaises(ValueError):
                 read_samples(data)
