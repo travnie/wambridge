@@ -21,6 +21,7 @@ import logging
 import secrets
 import socket
 import threading
+import time
 from collections.abc import Callable
 
 from .samsung import MAX_SLEEP_TIMER_SECONDS
@@ -168,7 +169,21 @@ class ControlChannel:
         with self._dispatch_lock:
             if self._stop.is_set():
                 return None
-            return self._dispatch_locked(line)
+            command = line.partition(" ")[0]
+            if command not in {"pause", "resume", "volume", "release", "discard", "sleep"}:
+                return self._dispatch_locked(line)
+            # Callback duration, not acoustic latency. Pause/resume may await a
+            # speaker response; volume dispatch only measures the send path.
+            start_ns = time.perf_counter_ns()
+            try:
+                return self._dispatch_locked(line)
+            finally:
+                elapsed_ms = (time.perf_counter_ns() - start_ns) / 1_000_000
+                LOGGER.info(
+                    "WAMBRIDGE CONTROL_TIMING command=%s dispatch_ms=%.3f",
+                    command,
+                    elapsed_ms,
+                )
 
     def _dispatch_locked(self, line: str) -> str | None:
         command, _, argument = line.partition(" ")

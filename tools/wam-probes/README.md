@@ -60,3 +60,49 @@ cover them.
 The preserved Samsung Multiroom session is not reproducible with the equipment still
 available. Identifiers and addresses were replaced consistently; timings, protocol fields
 and track titles remain intact.
+
+
+## Native control latency experiment (hardware pending)
+
+The foobar PCM helper already routes pause/resume through raw M5 volume on its
+existing port-55001 connection. It retains paced PCM silence as the fallback.
+Do **not** replace this with UIC pause (acknowledged but inaudible on URL/PCM)
+or SetMute (closes the active HTTP pull on the measured M5). Stop/discard must
+still release the speaker session without opening another control connection.
+
+Every authenticated helper command now logs, for example:
+
+    INFO: WAMBRIDGE CONTROL_TIMING command=pause dispatch_ms=125.000
+
+This measures time inside the helper's **serialized callback**, not time from
+a foobar click, actual loudness change, or speaker acknowledgement in every
+case. Pause/resume may wait up to one second for a volume response; regular
+volume dispatch only sends. A successful dispatch is **not** an acoustic
+success signal. No extra probe connection is opened.
+
+Capture the *current, unmodified* playback as the baseline before experimenting
+with stop/skip. Save foobar/helper logs separately before and after any code
+change. Run the comparison offline (no M5 access needed for the script):
+
+    python -m wambridge.control_latency baseline.log candidate.log
+
+Manual audible measurements may instead be saved in either file as CSV:
+
+    command,metric,ms
+    pause,audible_ms,5030
+    resume,audible_ms,5910
+
+Use screen/audio recordings or another consistent synchronized method; record
+from button press to **audible** transition. Repeat at least five trials per
+command, on the same track, profile, volume, network and warmed-up conditions.
+Keep the baseline and candidate methods identical. The report groups command
+and metric separately and outputs sample counts, median, nearest-rank p95 and
+candidate-minus-baseline median in milliseconds. Negative deltas mean faster.
+Never compare a helper dispatch measurement to an audible one.
+
+The historical 2026-08-08 roughly 5 s pause / 6 s resume observations describe
+the **older PCM-only path**, not the current raw-volume pause implementation.
+No current hardware acoustic baseline has been captured. Keep raw M5 volume
+at 3 or below for initial physical tests. Before shipping any stop/skip
+transport change, run complete track, seekbar, next track, pause/resume,
+stop/change and clean-shutdown checks on the physical M5.
