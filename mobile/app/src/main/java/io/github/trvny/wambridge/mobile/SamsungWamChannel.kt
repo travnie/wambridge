@@ -75,6 +75,7 @@ internal class SamsungWamChannel(
     interface Listener {
         fun onPlaybackStarted()
         fun onReportedError(source: Any, method: String?, code: String)
+        fun onPlaybackEvent(source: Any, method: String) {}
         fun onVolumeChanged(source: Any, raw: Int) {}
         fun onSleepTimerChanged(source: Any, state: SleepTimerState) {}
     }
@@ -237,6 +238,10 @@ internal class SamsungWamChannel(
 
         if (!errorCode.isNullOrBlank() && errorCode !in SUCCESS_ERROR_CODES) {
             listener?.onReportedError(this, method, errorCode)
+        }
+        if (method in setOf("StartPlaybackEvent", "PausePlaybackEvent", "StopPlaybackEvent",
+                "EndPlaybackEvent", "MediaBufferStartEvent", "MediaBufferEndEvent", "ErrorEvent")) {
+            listener?.onPlaybackEvent(this, method.orEmpty())
         }
         if (method.equals("StartPlaybackEvent", ignoreCase = true)) {
             listener?.onPlaybackStarted()
