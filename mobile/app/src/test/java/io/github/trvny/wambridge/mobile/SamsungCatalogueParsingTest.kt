@@ -89,6 +89,26 @@ class SamsungCatalogueParsingTest {
     }
 
     @Test
+    fun entitySyntaxInCatalogueTextAndCommentsIsAllowed() {
+        val body = ROOT_BODY.replace(
+            "<title>Favorites</title>",
+            "<!-- <!ENTITY example> --><title><![CDATA[Learn <!ENTITY syntax]]></title>",
+        )
+
+        assertEquals("Learn <!ENTITY syntax", SamsungCatalogue.parsePage(body).entries.first().title)
+    }
+
+    @Test
+    fun entitySyntaxInStationDetailIsAllowed() {
+        val body = STATION_BODY.replace(
+            "<description>Hity Na Czasie</description>",
+            "<description><![CDATA[Learn <!ENTITY syntax]]></description>",
+        )
+
+        assertEquals("Learn <!ENTITY syntax", SamsungCatalogue.parseStationDetail(body).description)
+    }
+
+    @Test
     fun malformedXmlIsReportedRatherThanReturnedEmpty() {
         val error = runCatching { SamsungCatalogue.parsePage("<CPM><response") }.exceptionOrNull()
 
