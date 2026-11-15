@@ -610,7 +610,7 @@ internal class UpnpRenderer(
                     } else {
                         val probe = if (timeline.enabled) RelayFormatProbe(baseType) else null
                         copyStream(input, out, onProgress, onStage) { bytes, count ->
-                            if (timeline.enabled) probe?.observe(bytes, count)?.let {
+                            probe?.observe(bytes, count, timeline.enabled)?.let {
                                 timeline.record("HTTP #$connectionId $it")
                             }
                         }

@@ -50,8 +50,12 @@ internal class RelayFormatProbe(private val format: String) {
     private var size = 0
     private var done = false
 
-    fun observe(buffer: ByteArray, count: Int): String? {
+    fun observe(buffer: ByteArray, count: Int, enabled: Boolean = true): String? {
         if (done || count <= 0) return null
+        if (!enabled) {
+            done = true
+            return null
+        }
         val copied = minOf(count, header.size - size)
         buffer.copyInto(header, size, 0, copied)
         size += copied

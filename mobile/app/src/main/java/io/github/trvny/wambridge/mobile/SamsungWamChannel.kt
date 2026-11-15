@@ -239,9 +239,8 @@ internal class SamsungWamChannel(
         if (!errorCode.isNullOrBlank() && errorCode !in SUCCESS_ERROR_CODES) {
             listener?.onReportedError(this, method, errorCode)
         }
-        if (method in setOf("StartPlaybackEvent", "PausePlaybackEvent", "StopPlaybackEvent",
-                "EndPlaybackEvent", "MediaBufferStartEvent", "MediaBufferEndEvent", "ErrorEvent")) {
-            listener?.onPlaybackEvent(this, method.orEmpty())
+        PLAYBACK_EVENTS.firstOrNull { it.equals(method, ignoreCase = true) }?.let {
+            listener?.onPlaybackEvent(this, it)
         }
         if (method.equals("StartPlaybackEvent", ignoreCase = true)) {
             listener?.onPlaybackStarted()
@@ -385,6 +384,10 @@ internal class SamsungWamChannel(
     }
 
     companion object {
+        private val PLAYBACK_EVENTS = listOf(
+            "StartPlaybackEvent", "PausePlaybackEvent", "StopPlaybackEvent", "EndPlaybackEvent",
+            "MediaBufferStartEvent", "MediaBufferEndEvent", "ErrorEvent",
+        )
         private const val PORT = 55001
         private const val CONNECT_TIMEOUT_MS = 3_000
         private const val READ_TIMEOUT_MS = 1_000

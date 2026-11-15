@@ -34,13 +34,25 @@ class ExtendedRelayDiagnosticsTest {
             4, 0, 16, 0,
         )
         val probe = RelayFormatProbe("audio/wav")
-        val first = header.copyOfRange(0, 7)
-        val second = header.copyOfRange(7, header.size)
+        val first = header.copyOfRange(0, 25)
+        val second = header.copyOfRange(25, header.size)
         assertNull(probe.observe(first, first.size))
         assertEquals("WAV codec=1 rate=44100Hz channels=2 bits=16", probe.observe(second, second.size))
-        assertTrue(first.contentEquals(header.copyOfRange(0, 7)))
-        assertTrue(second.contentEquals(header.copyOfRange(7, header.size)))
+        assertTrue(first.contentEquals(header.copyOfRange(0, 25)))
+        assertTrue(second.contentEquals(header.copyOfRange(25, header.size)))
         assertNull(probe.observe(second, second.size))
+    }
+
+    @Test
+    fun skippedBytesInvalidatePartialHeader() {
+        val probe = RelayFormatProbe("audio/wav")
+        val prefix = byteArrayOf(
+            82, 73, 70, 70, 0, 0, 0, 0, 87, 65, 86, 69,
+            102, 109, 116, 32, 16, 0, 0, 0,
+        )
+        assertNull(probe.observe(prefix, prefix.size))
+        assertNull(probe.observe(ByteArray(16), 16, enabled = false))
+        assertNull(probe.observe(ByteArray(16), 16))
     }
 
     @Test
@@ -52,6 +64,10 @@ class ExtendedRelayDiagnosticsTest {
         header[19] = -60
         header[20] = 66
         header[21] = -16
-        assertEquals("FLAC rate=44100Hz channels=2 bits=16", RelayFormatProbe("audio/flac").observe(header, header.size))
+        val probe = RelayFormatProbe("audio/flac")
+        val first = header.copyOfRange(0, 19)
+        val second = header.copyOfRange(19, header.size)
+        assertNull(probe.observe(first, first.size))
+        assertEquals("FLAC rate=44100Hz channels=2 bits=16", probe.observe(second, second.size))
     }
 }
