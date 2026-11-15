@@ -55,6 +55,9 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
 
     override fun onCreate() {
         super.onCreate()
+        ExtendedRelayDiagnostics.timeline.setEnabled(
+            getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean(ExtendedRelayDiagnostics.PREF, true),
+        )
         createNotificationChannel()
         wifiWatcher = runCatching { WifiLan.watch(this, ::onWifiChanged) }.getOrElse { error ->
             Log.w(TAG, "Wi-Fi callback unavailable; using polling fallback", error)
@@ -703,6 +706,13 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         publish("Streaming player → M5 · confirmed")
     }
 
+    override fun onPlaybackEvent(source: Any, method: String) {
+        if (!ExtendedRelayDiagnostics.timeline.enabled) return
+        synchronized(channelLock) {
+            if (source === wamChannel) ExtendedRelayDiagnostics.timeline.record("M5 $method")
+        }
+    }
+
     override fun onReportedError(source: Any, method: String?, code: String) {
         val suffix = method?.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()
         val message = "M5 error $code$suffix"
@@ -710,6 +720,9 @@ class RendererService : Service(), RendererCallbacks, SamsungWamChannel.Listener
         synchronized(channelLock) {
             if (source !== wamChannel) return
             diagnosticHistory.recordSpeakerError(speakerIp, message)
+            if (ExtendedRelayDiagnostics.timeline.enabled) {
+                ExtendedRelayDiagnostics.timeline.record("M5 error ${code.take(80)}")
+            }
         }
         dispatchWamEvent {
             if (source !== wamChannel) return@dispatchWamEvent
