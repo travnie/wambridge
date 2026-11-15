@@ -353,12 +353,16 @@ internal object SamsungCatalogue {
         if (body.contains("<!DOCTYPE", ignoreCase = true)) {
             throw IOException("Samsung WAM returned invalid $what XML: DOCTYPE is not allowed")
         }
-        if (body.contains("<!ENTITY", ignoreCase = true)) {
-            throw IOException("Samsung WAM returned invalid $what XML: ENTITY declarations are not allowed")
+        val factory = DocumentBuilderFactory.newInstance()
+        // Keep the standard DTD control visible to static analysis. Android
+        // providers that lack it still have the pre-parse guard above.
+        try {
+            factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
+        } catch (_: ParserConfigurationException) {
+            // DOCTYPE already rejected.
         }
-        val factory = DocumentBuilderFactory.newInstance().apply {
+        factory.apply {
             harden(XMLConstants.FEATURE_SECURE_PROCESSING)
-            harden("http://apache.org/xml/features/disallow-doctype-decl")
             harden("http://xml.org/sax/features/external-general-entities", false)
             harden("http://xml.org/sax/features/external-parameter-entities", false)
             harden("http://apache.org/xml/features/nonvalidating/load-external-dtd", false)
