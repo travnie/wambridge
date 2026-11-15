@@ -1,4 +1,4 @@
-![DLNA](https://img.shields.io/badge/DLNA-48A842?logo=dlna&logoColor=fff&style=for-the-badge) ![Android](https://img.shields.io/badge/Android-3DDC84?logo=android&logoColor=fff&style=for-the-badge)
+![DLNA](https://img.shields.io/badge/DLNA-48A842?logo=dlna&logoColor=fff&style=for-the-badge) ![Android](https://img.shields.io/badge/Android-3DDC84?logo=android&logoColor=fff&style=for-the-badge) ![Kotlin](https://img.shields.io/badge/Kotlin-7F52FF?logo=kotlin&logoColor=fff&style=for-the-badge) ![Gradle](https://img.shields.io/badge/Gradle-02303A?logo=gradle&logoColor=fff&style=for-the-badge)
 
 # WAM Bridge Mobile Adapter
 
@@ -68,7 +68,11 @@ The Android adapter provides:
 
 Physical phone + M5 playback through Neutron is confirmed. HLS and Ogg/Opus radio use the isolated phone-side Media3 transcoder, which normalizes decoded audio to PCM16 stereo 44.1 kHz and serves endless WAV to the M5. MP3/AAC/FLAC remain on the lightweight direct relay. The first physical M5 pass on 2026-09-28 confirmed BBC Radio 1 HLS, Trójka Ogg with `StreamTitle`, HLS -> Ogg switching, Stop -> restart and unchanged direct MP3 playback. The remaining hardware checks are tracked in `docs/ANDROID_VNEXT.md` section 8.
 
-### Android navigation
+### Extended relay diagnostics
+
+Settings → Diagnostics → Extended diagnostics (on by default). Copy diagnostics after a dropout. The bounded in-memory timeline includes HTTP connection IDs, DLNA commands, M5 playback events/errors, stalled/resumed relay progress and WAV/FLAC/L16 parameters when available. Off clears history and stops capture without changing playback. No extra speaker requests, audio buffering, pacing or disk logs. Parameters are inspected only from bytes already read; enabling mid-stream may not recover its header.
+
+## Android navigation
 
 The launcher now opens a persistent **Home · Radio · Settings** shell. Home is the default
 daily-driver screen: Now Playing, shared play/pause/mute/raw-volume controls, connection state

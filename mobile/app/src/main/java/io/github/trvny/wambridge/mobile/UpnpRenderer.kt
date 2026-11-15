@@ -337,6 +337,10 @@ internal class UpnpRenderer(
 
     private fun handleAvTransport(out: BufferedOutputStream, request: HttpRequest) {
         val action = soapAction(request)
+        val timeline = ExtendedRelayDiagnostics.timeline
+        if (timeline.enabled && action in setOf("SetAVTransportURI", "SetNextAVTransportURI", "Play", "Pause", "Stop", "Seek")) {
+            timeline.record("DLNA $action")
+        }
         when (action) {
             "SetAVTransportURI" -> {
                 state.currentUri = soapValue(request.body, "CurrentURI")
@@ -476,6 +480,9 @@ internal class UpnpRenderer(
     private fun proxyStream(client: Socket, out: BufferedOutputStream) {
         var watchdog: ScheduledFuture<*>? = null
         val startedMs = SystemClock.elapsedRealtime()
+        val timeline = ExtendedRelayDiagnostics.timeline
+        val connectionId = timeline.connection()
+        val stalled = AtomicBoolean(false)
         val lastProgressMs = AtomicLong(startedMs)
         val forwarded = AtomicLong()
         val stage = AtomicReference("opening")
@@ -490,6 +497,9 @@ internal class UpnpRenderer(
             synchronized(reportLock) {
                 if (activeStream.get() === client && !terminal.get()) {
                     if (finish) terminal.set(true)
+                    if (timeline.enabled && (finish || message.startsWith("Relay active · phase=opening"))) {
+                        timeline.record("HTTP #$connectionId $message")
+                    }
                     callbacks.onStreamDiagnostic(this, message)
                 }
             }
@@ -515,6 +525,16 @@ internal class UpnpRenderer(
             watchdog = streamWatchdog.scheduleWithFixedDelay(
                 {
                     if (activeStream.get() === client && !terminal.get()) {
+                        if (timeline.enabled) {
+                            val idle = SystemClock.elapsedRealtime() - lastProgressMs.get()
+                            if (idle >= 10_000 && stalled.compareAndSet(false, true)) {
+                                timeline.record("HTTP #$connectionId stalled · ${describe()}")
+                            } else if (idle < 10_000 && stalled.compareAndSet(true, false)) {
+                                timeline.record("HTTP #$connectionId resumed · ${describe()}")
+                            }
+                        } else {
+                            stalled.set(false)
+                        }
                         if (streamRelayStalled(
                                 lastProgressMs = lastProgressMs.get(),
                                 nowMs = SystemClock.elapsedRealtime(),
@@ -558,6 +578,13 @@ internal class UpnpRenderer(
                 val baseType = contentType.substringBefore(';').trim().lowercase(Locale.ROOT)
                 val l16 = baseType == "audio/l16"
                 val outgoing = if (l16) "audio/wav" else contentType.ifBlank { "application/octet-stream" }
+                if (timeline.enabled) {
+                    val name = when (baseType) {
+                        "audio/wav", "audio/x-wav", "audio/flac", "audio/x-flac", "audio/l16", "audio/mpeg" -> baseType
+                        else -> "other"
+                    }
+                    timeline.record("HTTP #$connectionId type=$name length=${connection.getHeaderFieldLong("Content-Length", -1)}")
+                }
                 headers(
                     out,
                     200,
@@ -575,12 +602,18 @@ internal class UpnpRenderer(
                     if (l16) {
                         val rate = parameter(contentType, "rate")?.toIntOrNull() ?: 44_100
                         val channels = parameter(contentType, "channels")?.toIntOrNull() ?: 2
+                        if (timeline.enabled) timeline.record("HTTP #$connectionId L16 rate=${rate}Hz channels=$channels bits=16")
                         stage.set(PHASE_SENDING_TO_M5)
                         out.write(wavHeader(rate, channels, 16))
                         lastProgressMs.set(SystemClock.elapsedRealtime())
                         copyL16(input, out, onProgress, onStage)
                     } else {
-                        copyStream(input, out, onProgress, onStage)
+                        val probe = if (timeline.enabled) RelayFormatProbe(baseType) else null
+                        copyStream(input, out, onProgress, onStage) { bytes, count ->
+                            probe?.observe(bytes, count, timeline.enabled)?.let {
+                                timeline.record("HTTP #$connectionId $it")
+                            }
+                        }
                     }
                     stage.set("flushing to M5")
                     out.flush()
@@ -625,12 +658,14 @@ internal class UpnpRenderer(
         out: BufferedOutputStream,
         onProgress: (Int) -> Unit,
         onStage: (String) -> Unit,
+        observe: (ByteArray, Int) -> Unit,
     ) {
         val buffer = ByteArray(64 * 1024)
         while (true) {
             onStage(PHASE_WAITING_FOR_NEUTRON)
             val count = input.read(buffer)
             if (count < 0) return
+            observe(buffer, count)
             onStage(PHASE_SENDING_TO_M5)
             out.write(buffer, 0, count)
             onProgress(count)

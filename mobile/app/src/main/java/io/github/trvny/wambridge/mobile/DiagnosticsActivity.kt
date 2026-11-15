@@ -9,6 +9,7 @@ import android.os.SystemClock
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Switch
 import android.widget.Toast
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
@@ -38,6 +39,21 @@ class DiagnosticsActivity : Activity() {
         content.addView(statusView)
 
         reportCard = MobileUi.card(this)
+        val preferences = getSharedPreferences(RendererService.PREFS, MODE_PRIVATE)
+        val timeline = ExtendedRelayDiagnostics.timeline
+        timeline.setEnabled(preferences.getBoolean(ExtendedRelayDiagnostics.PREF, true))
+        val settings = MobileUi.card(this)
+        settings.addView(Switch(this).apply {
+            text = "Extended diagnostics"
+            isChecked = timeline.enabled
+            setOnCheckedChangeListener { _, checked ->
+                timeline.setEnabled(checked)
+                preferences.edit().putBoolean(ExtendedRelayDiagnostics.PREF, checked).apply()
+                renderReport()
+            }
+        })
+        settings.addView(MobileUi.body(this, "Recent DLNA and M5 events in RAM. Turning off clears history."))
+        content.addView(settings)
         content.addView(reportCard)
 
         content.addView(MobileUi.sectionTitle(this, "Actions"))
@@ -80,7 +96,7 @@ class DiagnosticsActivity : Activity() {
             packageManager.getPackageInfo(packageName, 0).versionName
         }.getOrNull().orEmpty().ifBlank { "Unknown" }
         val rendererDiagnostics = RendererService.diagnosticSnapshot
-        return diagnosticsReport(
+        val report = diagnosticsReport(
             snapshot = SpeakerStateStore.current(),
             wifiEndpoint = WifiLan.preferredTarget(applicationContext)?.endpoint,
             appVersion = version,
@@ -97,6 +113,7 @@ class DiagnosticsActivity : Activity() {
                 rendererDiagnostics.speakerError.speakerIp, rendererDiagnostics.speakerError.message,
             ),
         )
+        return DiagnosticsReport(report.rows + ("Extended relay timeline" to ExtendedRelayDiagnostics.timeline.report()))
     }
 
     private fun renderReport() {
