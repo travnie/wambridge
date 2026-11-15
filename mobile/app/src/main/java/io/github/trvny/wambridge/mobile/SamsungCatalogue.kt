@@ -353,6 +353,9 @@ internal object SamsungCatalogue {
         if (body.contains("<!DOCTYPE", ignoreCase = true)) {
             throw IOException("Samsung WAM returned invalid $what XML: DOCTYPE is not allowed")
         }
+        if (body.contains("<!ENTITY", ignoreCase = true)) {
+            throw IOException("Samsung WAM returned invalid $what XML: ENTITY declarations are not allowed")
+        }
         val factory = DocumentBuilderFactory.newInstance().apply {
             harden(XMLConstants.FEATURE_SECURE_PROCESSING)
             harden("http://apache.org/xml/features/disallow-doctype-decl")
