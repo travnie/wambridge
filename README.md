@@ -379,17 +379,6 @@ py -m unittest discover -s tests -v
 
 ---
 
-## 📰 Mininewsy
-
-<!--README_FEED:START-->
-- [How Climate Change Is Reshaping India’s Demographic Dividend](https://carnegieendowment.org/research/2026/11/how-climate-change-is-reshaping-indias-demographic-dividend)
-- [Naresh Bhatt Convicted: The Road to Justice for Mamta's Family | Case by Case | "48 Hours" Podcast](https://www.cbsnews.com/video/111326-48-hours-case-by-case-episode-30/)
-- [FAA issues nationwide ground stop, stranding thousands](https://www.cbsnews.com/news/faa-issues-nationwide-ground-stop/)
-- [Flights grounded across US after air traffic communications outage](https://www.reuters.com/world/us/faa-issues-national-ground-stop-due-extraordinary-circumstance-reasons-safety-2026-11-13/)
-- [Passengers rescued after tanker hit river cruise in New Orleans](https://www.cbsnews.com/news/tanker-cruise-collision-mississippi-river-new-orleans/)
-- [EXCLUSIVE: Investors flock to Anthropic IPO but question durability of AI lead](https://www.reuters.com/business/finance/investors-flock-anthropic-ipo-question-durability-ai-lead-2026-11-13/)
-<!--README_FEED:END-->
-
 ## 💬 Cytat z szuflady
 
 <!-- markdownlint-disable MD033 -->
