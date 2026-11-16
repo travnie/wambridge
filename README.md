@@ -383,7 +383,7 @@ py -m unittest discover -s tests -v
 
 <!-- markdownlint-disable MD033 -->
 <!--STARTS_HERE_QUOTE_README-->
-<i>❝If you don't read the newspaper, you're uninformed. If you read the newspaper, you're mis-informed. — Mark Twain❞</i>
+<i>❝“In an information economy, the most valuable company assets drive themselves home every night.  If they are not treated well, they do not return the next morning.”— Peter Chang❞</i>
 <!--ENDS_HERE_QUOTE_README-->
 <!-- markdownlint-enable MD033 -->
 
