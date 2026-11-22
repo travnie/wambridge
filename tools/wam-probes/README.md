@@ -62,7 +62,7 @@ available. Identifiers and addresses were replaced consistently; timings, protoc
 and track titles remain intact.
 
 
-## Native control latency experiment (hardware pending)
+## Native control latency experiment (dispatch timing shipped; audible comparison pending)
 
 The foobar PCM helper already routes pause/resume through raw M5 volume on its
 existing port-55001 connection. It retains paced PCM silence as the fallback.
@@ -102,7 +102,8 @@ Never compare a helper dispatch measurement to an audible one.
 
 The historical 2026-08-08 roughly 5 s pause / 6 s resume observations describe
 the **older PCM-only path**, not the current raw-volume pause implementation.
-No current hardware acoustic baseline has been captured. Keep raw M5 volume
+No current hardware acoustic baseline has been captured (2026-11-22: dispatch timings and a
+full-track run were measured, see `docs/WAM_PROTOCOL.md`; nobody listened). Keep raw M5 volume
 at 3 or below for initial physical tests. Before shipping any stop/skip
 transport change, run complete track, seekbar, next track, pause/resume,
 stop/change and clean-shutdown checks on the physical M5.
