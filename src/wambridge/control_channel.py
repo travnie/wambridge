@@ -30,6 +30,8 @@ LOGGER = logging.getLogger(__name__)
 
 MAX_COMMAND_BYTES = 256
 """A command is a short ASCII line. Anything longer is not one of ours."""
+# Commands whose dispatch time is logged as CONTROL_TIMING; control_latency parses exactly these.
+TIMED_COMMANDS = frozenset({"pause", "resume", "volume", "release", "discard", "sleep"})
 
 ACCEPT_TIMEOUT = 0.5
 """How often the accept loop checks whether the session is shutting down."""
@@ -170,7 +172,7 @@ class ControlChannel:
             if self._stop.is_set():
                 return None
             command = line.partition(" ")[0]
-            if command not in {"pause", "resume", "volume", "release", "discard", "sleep"}:
+            if command not in TIMED_COMMANDS:
                 return self._dispatch_locked(line)
             # Callback duration, not acoustic latency. Pause/resume may await a
             # speaker response; volume dispatch only measures the send path.

@@ -91,6 +91,13 @@ Manual audible measurements may instead be saved in either file as CSV:
     command,metric,ms
     pause,audible_ms,5030
     resume,audible_ms,5910
+    stop,audible_ms,900
+    skip,audible_ms,1200
+
+`dispatch_ms` rows come from helper logs and cover only the helper's timed commands
+(pause, resume, volume, release, discard, sleep). Hand-measured `audible_ms` rows may also
+use `stop` and `skip`. `release`/`discard` timings also include teardown calls whose callback
+is absent or malformed, so read them as callback time, not as proof that a release happened.
 
 Use screen/audio recordings or another consistent synchronized method; record
 from button press to **audible** transition. Repeat at least five trials per

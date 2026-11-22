@@ -15,10 +15,19 @@ import statistics
 from collections import defaultdict
 from pathlib import Path
 
-COMMANDS = frozenset({"pause", "resume", "volume", "release", "discard", "sleep"})
-METRICS = frozenset({"dispatch_ms", "audible_ms"})
+from .control_channel import TIMED_COMMANDS
+
+# dispatch_ms comes only from helper logs; hand-measured audible_ms also covers stop and skip,
+# which the helper does not time.
+COMMANDS_BY_METRIC = {
+    "dispatch_ms": TIMED_COMMANDS,
+    "audible_ms": TIMED_COMMANDS | frozenset({"stop", "skip"}),
+}
+METRICS = frozenset(COMMANDS_BY_METRIC)
 TIMING_LINE = re.compile(
-    r"\bWAMBRIDGE CONTROL_TIMING command=(" + "|".join(map(re.escape, sorted(COMMANDS))) + r")"
+    r"\bWAMBRIDGE CONTROL_TIMING command=("
+    + "|".join(map(re.escape, sorted(TIMED_COMMANDS)))
+    + r")"
     r" dispatch_ms=([0-9]+(?:\.[0-9]+)?)\b"
 )
 Samples = dict[tuple[str, str], list[float]]
@@ -28,7 +37,9 @@ def read_samples(text: str) -> Samples:
     """Read helper logs or a CSV with command,metric,ms columns."""
     samples: Samples = defaultdict(list)
     stripped = text.lstrip("\ufeff \t\r\n")
-    if stripped.startswith("command,"):
+    first_line = stripped.splitlines()[0] if stripped else ""
+    header = next(csv.reader([first_line]), [])
+    if any(field.strip().lower() == "command" for field in header):
         reader = csv.DictReader(io.StringIO(stripped))
         fields = reader.fieldnames or []
         if len(fields) != 3 or set(fields) != {"command", "metric", "ms"}:
@@ -38,7 +49,7 @@ def read_samples(text: str) -> Samples:
                 raise ValueError(f"Invalid CSV field count at row {number}")
             command = (row["command"] or "").strip()
             metric = (row["metric"] or "").strip()
-            if command not in COMMANDS or metric not in METRICS:
+            if metric not in METRICS or command not in COMMANDS_BY_METRIC[metric]:
                 raise ValueError(f"Invalid command or metric at CSV row {number}")
             try:
                 ms = float(row["ms"] or "")
@@ -49,7 +60,10 @@ def read_samples(text: str) -> Samples:
             samples[(command, metric)].append(ms)
     else:
         for match in TIMING_LINE.finditer(text):
-            samples[(match.group(1), "dispatch_ms")].append(float(match.group(2)))
+            ms = float(match.group(2))
+            if not math.isfinite(ms):  # an absurdly long digit run converts to inf
+                raise ValueError("Invalid duration in timing log")
+            samples[(match.group(1), "dispatch_ms")].append(ms)
     if not samples:
         raise ValueError("No control timings found")
     return dict(samples)

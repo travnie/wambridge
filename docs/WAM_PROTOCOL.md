@@ -17,20 +17,21 @@ Primary evidence is preserved in PR #7, PR #21 and `tools/wam-probes/`.
 
 | Path | What confirms or anchors it | Current state |
 | --- | --- | --- |
-| URL/PCM through `SetUrlPlayback` | `AUDIO_STARTED` anchors bounded host flow | 2026-08-02 full checklist passed (median 1.00x); 2026-10-21 unchanged-main full-track recheck stalled (dated observation below) |
+| URL/PCM through `SetUrlPlayback` | `AUDIO_STARTED` anchors bounded host flow | 2026-08-02 full checklist passed (median 1.00x); 2026-10-21 unchanged-main full-track recheck stalled, 2026-11-22 recheck on the #234 build ran at 0.98x without stalls (dated observation below) |
 | Share/DLNA through `SetSharePlaybackControl` | `StartPlaybackEvent` | CLI path validated on the M5 (2026-09-13); foobar `Send to WAM (Share)` context-menu helper is built and packaged, but its foobar-to-M5 physical path remains unverified; not a PCM output transport |
 | Generic UPnP AVTransport | none exists on this M5 | Rejected |
 
 **2026-11-22 URL/PCM recheck (instrument-only, #234 build `7e6bae2`, M5 volume 2-3):**
 Three 241-second runs finished in about 245 s (0.98x) with no stall over 6 s and no
-`MEDIA_BUFFER_ERROR`. Idle ping to the M5: avg 56 ms, max 261 ms, 0 of 30 lost (below: avg
-72 ms, max 355 ms, 5 % lost); during the runs avg 8-10 ms, max 98 ms. `GetApInfo` still
+`MEDIA_BUFFER_ERROR`. Idle ping to the M5: avg 56 ms, max 261 ms, 0 of 30 lost (2026-10-21: 5 % lost, see below;
+avg 72 ms and max 355 ms are in the linked PR comment); during the runs avg 8-10 ms, max 98 ms. `GetApInfo` still
 showed the M5 on 2.4 GHz, ch 1, rssi 3, while the Legion had moved to 5 GHz. This does not
 isolate the cause of the 2026-10-21 stalls below (`CLOCK` lines were off). `WAMBRIDGE
 CONTROL_TIMING` showed pause 61 ms, resume 122 ms, discard 61-123 ms and release 124-448 ms
 (helper callback time, not audible latency). The speaker answered `SetPlaybackControl fail`
 at each startup/release check; the same warning is in console logs back to 2026-08-27, before
-this branch, and playback was not affected. Nobody listened.
+this branch, and playback was not affected. Nobody listened: position and error logs do not
+show whether playback was audible or glitch-free.
 
 **2026-10-21 URL/PCM baseline recheck (instrument-only, volume 3):** Three
 249-second source runs failed the wall-clock acceptance gate (recorded wall durations

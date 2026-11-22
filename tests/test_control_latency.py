@@ -24,6 +24,28 @@ class ControlLatencyTests(unittest.TestCase):
         )
         self.assertEqual(parsed, {("pause", "audible_ms"): [5000.0, 5200.0]})
 
+    def test_csv_header_is_parsed_not_prefix_matched(self) -> None:
+        for data in (
+            '"command","metric","ms"\npause,audible_ms,5000\n',
+            "metric,command,ms\naudible_ms,pause,5000\n",
+            "\ufeffcommand,metric,ms\r\npause,audible_ms,5000\r\n",
+        ):
+            with self.subTest(data=data):
+                self.assertEqual(read_samples(data), {("pause", "audible_ms"): [5000.0]})
+
+    def test_audible_rows_accept_stop_and_skip_but_dispatch_rows_do_not(self) -> None:
+        parsed = read_samples("command,metric,ms\nstop,audible_ms,900\nskip,audible_ms,1200\n")
+        self.assertEqual(
+            parsed, {("stop", "audible_ms"): [900.0], ("skip", "audible_ms"): [1200.0]}
+        )
+        with self.assertRaises(ValueError):
+            read_samples("command,metric,ms\nstop,dispatch_ms,10\n")
+
+    def test_reject_overflowing_log_duration(self) -> None:
+        huge = "9" * 400
+        with self.assertRaises(ValueError):
+            read_samples(f"INFO: WAMBRIDGE CONTROL_TIMING command=pause dispatch_ms={huge}.0\n")
+
     def test_reject_invalid_and_missing_measurements(self) -> None:
         for data in (
             "",
@@ -42,6 +64,8 @@ class ControlLatencyTests(unittest.TestCase):
     def test_nearest_rank_p95_never_extrapolates(self) -> None:
         self.assertEqual(stats([2.0]), (1, 2.0, 2.0))
         self.assertEqual(stats([1.0, 2.0, 3.0, 4.0]), (4, 2.5, 4.0))
+        # 40 samples: nearest-rank p95 is the 38th value, below the maximum
+        self.assertEqual(stats([float(n) for n in range(1, 41)]), (40, 20.5, 38.0))
 
     def test_comparison_preserves_distinct_scopes_and_missing_baseline(self) -> None:
         before = read_samples("command,metric,ms\npause,audible_ms,5000\n")
