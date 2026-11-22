@@ -17,7 +17,7 @@ Primary evidence is preserved in PR #7, PR #21 and `tools/wam-probes/`.
 
 | Path | What confirms or anchors it | Current state |
 | --- | --- | --- |
-| URL/PCM through `SetUrlPlayback` | `AUDIO_STARTED` anchors bounded host flow | 2026-08-02 full checklist passed (median 1.00x); 2026-10-21 unchanged-main full-track recheck stalled, 2026-11-22 recheck on the #234 build ran at 0.98x without stalls (dated observation below) |
+| URL/PCM through `SetUrlPlayback` | `AUDIO_STARTED` anchors bounded host flow | 2026-08-02 full checklist passed (median 1.00x); 2026-10-21 unchanged-main full-track recheck stalled, 2026-11-22 recheck on the #234 build ran at 0.98x with no position stall over 6 s (dated observation below) |
 | Share/DLNA through `SetSharePlaybackControl` | `StartPlaybackEvent` | CLI path validated on the M5 (2026-09-13); foobar `Send to WAM (Share)` context-menu helper is built and packaged, but its foobar-to-M5 physical path remains unverified; not a PCM output transport |
 | Generic UPnP AVTransport | none exists on this M5 | Rejected |
 
