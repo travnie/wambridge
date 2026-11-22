@@ -10,6 +10,21 @@ investigation log is **not the current task queue**. Read [the documentation ind
 
 ## Current status pointers
 
+- **Open: audible control latency (pause/resume/stop/skip).** Still unmeasured; #234 only
+  ships `WAMBRIDGE CONTROL_TIMING` (helper callback time, not click-to-sound). Needs a phone or
+  USB microphone recording next to the speaker (the Legion's built-in mic has AGC) plus
+  timestamped beefweb commands, baseline vs candidate, at least five trials per command,
+  raw volume 3 or below, one control socket only. Method: `tools/wam-probes/README.md`.
+- **foobar URL/PCM full-track recheck (2026-11-22, #234 build `7e6bae2`):** Three
+  241-second runs at M5 volume 2-3 (foobar -52 dB) took 245 s (0.98x), about 244 s (read
+  from the log; the runner then advanced to the next track) and 245 s, with no position
+  stall over 6 s and no `MEDIA_BUFFER_ERROR`. Idle ping to the M5 beforehand: avg 56 ms,
+  max 261 ms, 0 of 30 lost (2026-10-21: avg 72 ms, max 355 ms, 5 % lost); during the runs
+  avg 8-10 ms, max 98 ms. `GetApInfo` showed the M5 on the same 2.4 GHz link as before
+  (ch 1, rssi 3); the Legion has since moved to 5 GHz. That fits the earlier stalls involving
+  the PC's own Wi-Fi, but it is **not proven** (`CLOCK` diagnostics were off, three runs on
+  one day). Pause, resume, next, stop and play-another all worked; no `ffmpeg`/helper was
+  left behind and the M5 still answered. Nobody listened.
 - **foobar URL/PCM full-track recheck (2026-10-21, unchanged `main`):** Three
   249-second source runs failed wall-clock acceptance (reported wall durations include
   305 and 310 seconds). Instrument logs showed 20–50-second gaps with full host buffering
