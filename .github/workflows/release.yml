@@ -40,7 +40,17 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  reuse:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Check SPDX metadata before publishing
+        run: pipx run --spec reuse==6.3.0 reuse lint
+
   version:
+    needs: reuse
     runs-on: ubuntu-slim
     outputs:
       tag: ${{ steps.parse.outputs.tag }}
