@@ -23,6 +23,13 @@ def project_version() -> str:
     raise AssertionError("pyproject.toml has no version line")
 
 
+def project_license() -> str:
+    for line in PYPROJECT.read_text(encoding="utf-8").splitlines():
+        if line.startswith("license = "):
+            return line.split('"')[1]
+    raise AssertionError("pyproject.toml has no license line")
+
+
 def declaration() -> list[str]:
     source = COMPONENT.read_text(encoding="utf-8")
     start = source.index("DECLARE_COMPONENT_VERSION(")
@@ -71,7 +78,7 @@ class ComponentVersionTests(TestCase):
         self.assertIn("https://github.com/travnie/wambridge", about)
         self.assertIn("Copyright", about)
         self.assertIn("2026 trvny", about)
-        self.assertIn("ISC", about)
+        self.assertIn(project_license(), about)
 
     def test_the_source_stays_ascii(self) -> None:
         # The copyright sign is written as explicit UTF-8 bytes rather than as

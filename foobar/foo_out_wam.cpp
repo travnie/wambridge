@@ -1901,7 +1901,7 @@ DECLARE_COMPONENT_VERSION(
     "\n"
     "https://github.com/travnie/wambridge\n"
     "\n"
-    "Copyright \xC2\xA9 2026 trvny. ISC licensed."
+    "Copyright \xC2\xA9 2026 trvny. MPL-2.0 licensed."
 );
 
 VALIDATE_COMPONENT_FILENAME("foo_out_wam.dll");
