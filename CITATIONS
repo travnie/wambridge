@@ -26,4 +26,4 @@ identifiers:
     description: "Zenodo concept DOI for all archived versions."
 repository-code: "https://github.com/travnie/wambridge"
 url: "https://github.com/travnie/wambridge"
-license: ISC
+license: MPL-2.0

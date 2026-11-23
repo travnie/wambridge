@@ -1,6 +1,6 @@
 # Third-party materials
 
-The ISC license applies only to original source code and documentation in this repository.
+MPL-2.0 covers repository-owned source code and documentation. The bundled Gradle wrapper retains Apache-2.0; see REUSE.toml and LICENSES/ for SPDX metadata.
 
 Samsung, Wireless Audio Multiroom, Shape, WAM550, WAM551 and related product names, firmware interfaces, trademarks, photographs and logos belong to Samsung Electronics or their respective owners. foobar2000 and its SDK belong to their respective copyright holders.
 

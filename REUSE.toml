@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 trvny
+# SPDX-License-Identifier: MPL-2.0
+
+version = 1
+
+# Repository-owned source, documentation, and configuration.
+[[annotations]]
+path = "**"
+SPDX-FileCopyrightText = "2026 trvny"
+SPDX-License-Identifier = "MPL-2.0"
+
+# Generated Gradle wrapper is not relicensed.
+[[annotations]]
+path = [
+  "mobile/gradlew",
+  "mobile/gradlew.bat",
+  "mobile/gradle/wrapper/gradle-wrapper.jar",
+  "mobile/gradle/wrapper/gradle-wrapper.properties",
+]
+precedence = "override"
+SPDX-FileCopyrightText = "2015 Gradle original authors and contributors"
+SPDX-License-Identifier = "Apache-2.0"
