@@ -6,6 +6,7 @@ and foobar component against drifting independently again.
 """
 
 import re
+import tomllib
 from pathlib import Path
 from unittest import TestCase
 
@@ -24,10 +25,7 @@ def project_version() -> str:
 
 
 def project_license() -> str:
-    for line in PYPROJECT.read_text(encoding="utf-8").splitlines():
-        if line.startswith("license = "):
-            return line.split('"')[1]
-    raise AssertionError("pyproject.toml has no license line")
+    return tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))["project"]["license"]
 
 
 def declaration() -> list[str]:
