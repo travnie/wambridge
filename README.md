@@ -376,7 +376,7 @@ When exactly one WAM speaker is discovered, `--speaker` may be omitted.
 
 ## License
 
-Original code and documentation: [MPL-2.0](LICENSE). SPDX/REUSE metadata: [REUSE.toml](REUSE.toml). Third-party terms: [notices](docs/THIRD_PARTY_NOTICES.md).
+Original code and documentation: [MPL-2.0](https://github.com/travnie/wambridge/blob/main/LICENSE). SPDX/REUSE metadata: [REUSE.toml](https://github.com/travnie/wambridge/blob/main/REUSE.toml). Third-party terms: [notices](https://github.com/travnie/wambridge/blob/main/docs/THIRD_PARTY_NOTICES.md).
 
 ## Validate
 
