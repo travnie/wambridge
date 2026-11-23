@@ -21,6 +21,9 @@ on:
       - "src/**"
       - "tools/**"
       - "pyproject.toml"
+      - "LICENSE"
+      - "LICENSES/**"
+      - "REUSE.toml"
       - "uv.lock"
   workflow_dispatch:
     inputs:
