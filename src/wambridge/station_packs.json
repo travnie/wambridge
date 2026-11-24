@@ -3,9 +3,6 @@
     {
       "alias": "travny",
       "url": "https://travny-radio.taild44c6c.ts.net/radio.mp3",
-      "fallback_urls": [
-        "https://radio.bartek.lol/radio.mp3"
-      ],
       "artwork_url": "https://bartek.lol/radio/logo.png"
     },
     {
