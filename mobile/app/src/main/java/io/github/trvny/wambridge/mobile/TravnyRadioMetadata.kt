@@ -4,7 +4,6 @@ import android.content.Context
 import java.io.IOException
 import java.net.URI
 import java.net.URL
-import java.nio.charset.StandardCharsets
 import org.json.JSONObject
 
 private const val TRAVNY_METADATA_URL = "https://travny-radio.taild44c6c.ts.net/api/now.json"
@@ -13,13 +12,15 @@ private const val TRAVNY_REFRESH_MS = 15_000L
 private const val TRAVNY_TIMEOUT_MS = 5_000
 private val TRAVNY_COVER_PATH = Regex("^/artwork/[a-f0-9]{20}\\.(?:jpg|png)$")
 
+internal fun isTravnyRadioStream(raw: String): Boolean {
+    val uri = runCatching { URI(raw) }.getOrNull() ?: return false
+    return uri.host?.lowercase() in setOf("radio.bartek.lol", "travny-radio.taild44c6c.ts.net") &&
+        uri.path == "/radio.mp3" &&
+        uri.scheme.equals("https", ignoreCase = true)
+}
+
 internal fun hasTravnyRadioMetadata(station: MobileRadioStation): Boolean =
-    station.urls.any { raw ->
-        val uri = runCatching { URI(raw) }.getOrNull() ?: return@any false
-        uri.host?.lowercase() in setOf("radio.bartek.lol", "travny-radio.taild44c6c.ts.net") &&
-            uri.path == "/radio.mp3" &&
-            uri.scheme.equals("https", ignoreCase = true)
-    }
+    station.urls.any(::isTravnyRadioStream)
 
 /** Only allow cover paths from the trusted radio's own artwork directory. */
 internal fun parseTravnyRadioNowPlaying(text: String): RadioMetadataPoll {
