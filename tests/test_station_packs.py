@@ -18,8 +18,12 @@ class StationPackTests(TestCase):
         stations = get_station_pack("favorites")
         aliases = [station.alias for station in stations]
 
-        self.assertEqual(len(stations), 17)
-        self.assertEqual(aliases[:3], ["bbc1", "trojka", "czworka"])
+        self.assertEqual(len(stations), 18)
+        self.assertEqual(aliases[:4], ["travny", "bbc1", "trojka", "czworka"])
+        self.assertEqual(
+            stations[0].all_urls,
+            ("https://travny-radio.taild44c6c.ts.net/radio.mp3",),
+        )
         self.assertIn("radioparadise", aliases)
         self.assertIn("bbc6", aliases)
         self.assertIn("radiozet", aliases)

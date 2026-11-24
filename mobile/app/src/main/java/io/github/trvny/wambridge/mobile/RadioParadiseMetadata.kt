@@ -56,7 +56,7 @@ internal fun fetchRadioParadiseNowPlaying(context: Context): RadioMetadataPoll {
             if (connection.responseCode !in 200..299) {
                 throw IOException("Radio Paradise metadata HTTP ${connection.responseCode}")
             }
-            return parseRadioParadiseNowPlaying(readBounded(connection))
+            return parseRadioParadiseNowPlaying(readBoundedRadioMetadata(connection))
         } catch (error: Exception) {
             lastError = error
         } finally {
@@ -66,9 +66,9 @@ internal fun fetchRadioParadiseNowPlaying(context: Context): RadioMetadataPoll {
     throw lastError ?: IOException("No active Wi-Fi network for Radio Paradise metadata")
 }
 
-private fun readBounded(connection: HttpURLConnection): String {
+internal fun readBoundedRadioMetadata(connection: HttpURLConnection): String {
     val declared = connection.contentLengthLong
-    if (declared > MAX_RESPONSE_BYTES) throw IOException("Radio Paradise metadata too large")
+    if (declared > MAX_RESPONSE_BYTES) throw IOException("Radio metadata too large")
     val output = ByteArrayOutputStream()
     val buffer = ByteArray(4 * 1024)
     connection.inputStream.use { input ->
@@ -76,7 +76,7 @@ private fun readBounded(connection: HttpURLConnection): String {
             val count = input.read(buffer)
             if (count < 0) break
             if (output.size() + count > MAX_RESPONSE_BYTES) {
-                throw IOException("Radio Paradise metadata too large")
+                throw IOException("Radio metadata too large")
             }
             output.write(buffer, 0, count)
         }

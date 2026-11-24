@@ -1,6 +1,11 @@
 {
   "stations": [
     {
+      "alias": "travny",
+      "url": "https://travny-radio.taild44c6c.ts.net/radio.mp3",
+      "artwork_url": "https://bartek.lol/radio/logo.png"
+    },
+    {
       "alias": "bbc1",
       "url": "https://as-hls-ww-live.akamaized.net/pool_01505109/live/ww/bbc_radio_one/bbc_radio_one.isml/bbc_radio_one-audio=320000.norewind.m3u8",
       "fallback_urls": [
@@ -116,6 +121,7 @@
   ],
   "packs": {
     "favorites": [
+      "travny",
       "bbc1",
       "trojka",
       "czworka",

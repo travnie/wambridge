@@ -18,6 +18,17 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal fun radioOwnerActive(starting: Boolean, running: Boolean, recovering: Boolean): Boolean =
     starting || running || recovering
 
+internal fun metadataPollMatchesSession(
+    requestedAlias: String,
+    activeAlias: String?,
+    requestedSource: String,
+    activeSource: String?,
+    scheduledGeneration: Long,
+    currentGeneration: Long,
+): Boolean = scheduledGeneration == currentGeneration &&
+    requestedSource == activeSource &&
+    requestedAlias.equals(activeAlias, ignoreCase = true)
+
 internal fun shouldIgnoreStartupVolumeZero(
     raw: Int,
     safeVolumeApplied: Boolean,
@@ -82,6 +93,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
     private var providerNowPlaying = RadioNowPlaying()
     private var artworkRequestUrl: String? = null
     private var metadataRefresh: ScheduledFuture<*>? = null
+    private var metadataGeneration = 0L
     private var safeVolumeApplied = false
     private var startupZeroIgnoreUntilMs = 0L
     private var targetVolume = SAFE_START_VOLUME
@@ -337,7 +349,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             // at the safe step unless it replaces a station that was already audible.
             running = true
             cancelWifiRecovery()
-            startMetadataProvider(selected)
+            // Wait for the proxy to confirm the actual stream before polling metadata.
+            cancelMetadataProvider()
             lastStatus = "Starting ${selected.alias}…"
             publish(lastStatus)
         } catch (error: Exception) {
@@ -516,7 +529,16 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             activeChannel.setMute(false)
             safeVolumeApplied = true
         }
+        val sourceChanged = activeSourceUrl != sourceUrl
         activeSourceUrl = sourceUrl
+        if (sourceChanged) {
+            // Initial stream metadata may arrive before the first audio bytes.
+            if (currentStation != null) {
+                startMetadataProvider(currentStation, sourceUrl)
+            } else {
+                cancelMetadataProvider()
+            }
+        }
         val position = radioFallbackPosition(sourceUrl, canonicalSources)
         activeFallback = position
             ?.takeIf { (current, _) -> current > 1 }
@@ -544,6 +566,12 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         if (destroyed || source !== proxy) return@execute
         // A Wi-Fi handoff is a transport failure, not evidence that this station URL is bad.
         if (shouldRecoverFromWifiChange()) return@execute
+        if (activeSourceUrl == sourceUrl) {
+            // Clear the departed source before the next one's metadata can arrive.
+            streamNowPlaying = RadioNowPlaying()
+            cancelMetadataProvider()
+            publishMetadataUpdate()
+        }
         station?.let { RadioFallbackStore(this).recordFailure(it.alias, sourceUrl) }
     }
 
@@ -814,33 +842,47 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         publish(lastStatus)
     }
 
-    private fun startMetadataProvider(selected: MobileRadioStation) {
+    private fun startMetadataProvider(selected: MobileRadioStation, sourceUrl: String) {
         cancelMetadataProvider()
-        if (hasRadioParadiseMetadata(selected)) {
-            scheduleRadioParadiseMetadata(selected.alias, 0L)
+        val openedStation = selected.copy(urls = listOf(sourceUrl))
+        if (hasRadioParadiseMetadata(openedStation) || isTravnyRadioStream(sourceUrl)) {
+            scheduleMetadataProvider(selected.alias, sourceUrl, 0L)
         }
     }
 
-    private fun scheduleRadioParadiseMetadata(alias: String, delayMs: Long) {
+    private fun scheduleMetadataProvider(alias: String, sourceUrl: String, delayMs: Long) {
         if (destroyed) return
+        val generation = metadataGeneration
+        metadataRefresh?.cancel(false)
         metadataRefresh = metadataWorker.schedule(
             {
-                val result = runCatching { fetchRadioParadiseNowPlaying(applicationContext) }
+                val result = runCatching {
+                    when {
+                        isTravnyRadioStream(sourceUrl) ->
+                            fetchTravnyRadioNowPlaying(applicationContext)
+                        hasRadioParadiseMetadata(MobileRadioStation(alias, listOf(sourceUrl))) ->
+                            fetchRadioParadiseNowPlaying(applicationContext)
+                        else -> null
+                    }
+                }
                 val poll = result.getOrNull()
                 execute {
                     if (
                         destroyed ||
                         !running ||
-                        !station?.alias.equals(alias, ignoreCase = true)
+                        !metadataPollMatchesSession(
+                            alias, station?.alias, sourceUrl, activeSourceUrl,
+                            generation, metadataGeneration,
+                        )
                     ) {
                         return@execute
                     }
                     if (poll != null) {
                         providerNowPlaying = poll.nowPlaying
                         publishMetadataUpdate()
-                        scheduleRadioParadiseMetadata(alias, poll.refreshAfterMs)
+                        scheduleMetadataProvider(alias, sourceUrl, poll.refreshAfterMs)
                     } else {
-                        scheduleRadioParadiseMetadata(alias, METADATA_RETRY_MS)
+                        scheduleMetadataProvider(alias, sourceUrl, METADATA_RETRY_MS)
                     }
                 }
             },
@@ -850,6 +892,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
     }
 
     private fun cancelMetadataProvider() {
+        metadataGeneration++
         metadataRefresh?.cancel(false)
         metadataRefresh = null
         providerNowPlaying = RadioNowPlaying()
