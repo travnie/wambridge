@@ -52,6 +52,15 @@ class TravnyRadioMetadataTest {
     }
 
     @Test
+    fun rejectsMetadataFromRetiredPlaybackSession() {
+        val source = "https://travny-radio.taild44c6c.ts.net/radio.mp3"
+        assertTrue(metadataPollMatchesSession("travny", "TRAVNY", source, source, 1L, 1L))
+        assertFalse(metadataPollMatchesSession("travny", "travny", source, source, 1L, 2L))
+        assertFalse(metadataPollMatchesSession("travny", "bbc1", source, source, 1L, 1L))
+        assertFalse(metadataPollMatchesSession("travny", "travny", source, "https://example.org/live", 1L, 1L))
+    }
+
+    @Test
     fun detectsOnlyKnownSecureStreamHosts() {
         assertTrue(
             hasTravnyRadioMetadata(
