@@ -18,6 +18,17 @@ import java.util.concurrent.atomic.AtomicBoolean
 internal fun radioOwnerActive(starting: Boolean, running: Boolean, recovering: Boolean): Boolean =
     starting || running || recovering
 
+internal fun metadataPollMatchesSession(
+    requestedAlias: String,
+    activeAlias: String?,
+    requestedSource: String,
+    activeSource: String?,
+    scheduledGeneration: Long,
+    currentGeneration: Long,
+): Boolean = scheduledGeneration == currentGeneration &&
+    requestedSource == activeSource &&
+    requestedAlias.equals(activeAlias, ignoreCase = true)
+
 internal fun shouldIgnoreStartupVolumeZero(
     raw: Int,
     safeVolumeApplied: Boolean,
@@ -859,9 +870,10 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                     if (
                         destroyed ||
                         !running ||
-                        generation != metadataGeneration ||
-                        activeSourceUrl != sourceUrl ||
-                        !station?.alias.equals(alias, ignoreCase = true)
+                        !metadataPollMatchesSession(
+                            alias, station?.alias, sourceUrl, activeSourceUrl,
+                            generation, metadataGeneration,
+                        )
                     ) {
                         return@execute
                     }
