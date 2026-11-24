@@ -29,6 +29,11 @@ class TravnyRadioMetadataTest {
             poll.nowPlaying.artworkUrl,
         )
         assertEquals(15_000L, poll.refreshAfterMs)
+        assertTrue(isTravnyRadioArtworkUrl(poll.nowPlaying.artworkUrl!!))
+        assertFalse(isTravnyRadioArtworkUrl("https://untrusted.example/artwork/0123456789abcdefabcd.jpg"))
+        assertFalse(isTravnyRadioArtworkUrl(
+            "https://travny-radio.taild44c6c.ts.net/artwork/0123456789abcdefabcd.jpg?redirect=1",
+        ))
     }
 
     @Test
