@@ -22,10 +22,7 @@ class StationPackTests(TestCase):
         self.assertEqual(aliases[:4], ["travny", "bbc1", "trojka", "czworka"])
         self.assertEqual(
             stations[0].all_urls,
-            (
-                "https://travny-radio.taild44c6c.ts.net/radio.mp3",
-                "https://radio.bartek.lol/radio.mp3",
-            ),
+            ("https://travny-radio.taild44c6c.ts.net/radio.mp3",),
         )
         self.assertIn("radioparadise", aliases)
         self.assertIn("bbc6", aliases)
