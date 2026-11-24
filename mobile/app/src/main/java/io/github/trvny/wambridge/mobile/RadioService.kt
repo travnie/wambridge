@@ -816,16 +816,26 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
 
     private fun startMetadataProvider(selected: MobileRadioStation) {
         cancelMetadataProvider()
-        if (hasRadioParadiseMetadata(selected)) {
-            scheduleRadioParadiseMetadata(selected.alias, 0L)
+        if (hasRadioParadiseMetadata(selected) || hasTravnyRadioMetadata(selected)) {
+            scheduleMetadataProvider(selected.alias, 0L)
         }
     }
 
-    private fun scheduleRadioParadiseMetadata(alias: String, delayMs: Long) {
+    private fun scheduleMetadataProvider(alias: String, delayMs: Long) {
         if (destroyed) return
         metadataRefresh = metadataWorker.schedule(
             {
-                val result = runCatching { fetchRadioParadiseNowPlaying(applicationContext) }
+                val result = runCatching {
+                    val current = station?.takeIf { it.alias.equals(alias, ignoreCase = true) }
+                    when {
+                        current == null -> null
+                        hasTravnyRadioMetadata(current) ->
+                            fetchTravnyRadioNowPlaying(applicationContext)
+                        hasRadioParadiseMetadata(current) ->
+                            fetchRadioParadiseNowPlaying(applicationContext)
+                        else -> null
+                    }
+                }
                 val poll = result.getOrNull()
                 execute {
                     if (
@@ -838,9 +848,9 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                     if (poll != null) {
                         providerNowPlaying = poll.nowPlaying
                         publishMetadataUpdate()
-                        scheduleRadioParadiseMetadata(alias, poll.refreshAfterMs)
+                        scheduleMetadataProvider(alias, poll.refreshAfterMs)
                     } else {
-                        scheduleRadioParadiseMetadata(alias, METADATA_RETRY_MS)
+                        scheduleMetadataProvider(alias, METADATA_RETRY_MS)
                     }
                 }
             },
