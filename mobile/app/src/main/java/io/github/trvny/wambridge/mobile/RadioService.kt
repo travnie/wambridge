@@ -82,6 +82,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
     private var providerNowPlaying = RadioNowPlaying()
     private var artworkRequestUrl: String? = null
     private var metadataRefresh: ScheduledFuture<*>? = null
+    private var metadataGeneration = 0L
     private var safeVolumeApplied = false
     private var startupZeroIgnoreUntilMs = 0L
     private var targetVolume = SAFE_START_VOLUME
@@ -834,6 +835,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
 
     private fun scheduleMetadataProvider(alias: String, sourceUrl: String, delayMs: Long) {
         if (destroyed) return
+        val generation = metadataGeneration
+        metadataRefresh?.cancel(false)
         metadataRefresh = metadataWorker.schedule(
             {
                 val result = runCatching {
@@ -850,6 +853,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                     if (
                         destroyed ||
                         !running ||
+                        generation != metadataGeneration ||
                         activeSourceUrl != sourceUrl ||
                         !station?.alias.equals(alias, ignoreCase = true)
                     ) {
@@ -870,6 +874,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
     }
 
     private fun cancelMetadataProvider() {
+        metadataGeneration++
         metadataRefresh?.cancel(false)
         metadataRefresh = null
         providerNowPlaying = RadioNowPlaying()
