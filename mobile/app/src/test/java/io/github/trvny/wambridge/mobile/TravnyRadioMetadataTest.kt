@@ -71,5 +71,15 @@ class TravnyRadioMetadataTest {
                 MobileRadioStation("untrusted", listOf("http://radio.bartek.lol/radio.mp3")),
             ),
         )
+        val mixed = MobileRadioStation(
+            "mixed",
+            listOf(
+                "https://example.org/other.mp3",
+                "https://travny-radio.taild44c6c.ts.net/radio.mp3",
+            ),
+        )
+        assertTrue(hasTravnyRadioMetadata(mixed))
+        assertFalse(isTravnyRadioStream(mixed.urls.first()))
+        assertTrue(isTravnyRadioStream(mixed.urls.last()))
     }
 }
