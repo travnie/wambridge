@@ -22,6 +22,14 @@ internal fun isTravnyRadioStream(raw: String): Boolean {
 internal fun hasTravnyRadioMetadata(station: MobileRadioStation): Boolean =
     station.urls.any(::isTravnyRadioStream)
 
+internal fun isTravnyRadioArtworkUrl(raw: String): Boolean {
+    val uri = runCatching { URI(raw) }.getOrNull() ?: return false
+    return uri.scheme.equals("https", ignoreCase = true) &&
+        uri.host.equals("travny-radio.taild44c6c.ts.net", ignoreCase = true) &&
+        TRAVNY_COVER_PATH.matches(uri.path.orEmpty()) &&
+        uri.rawQuery == null && uri.rawFragment == null
+}
+
 /** Only allow cover paths from the trusted radio's own artwork directory. */
 internal fun parseTravnyRadioNowPlaying(text: String): RadioMetadataPoll {
     val root = JSONObject(text)
