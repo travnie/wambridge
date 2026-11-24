@@ -337,7 +337,8 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             // at the safe step unless it replaces a station that was already audible.
             running = true
             cancelWifiRecovery()
-            startMetadataProvider(selected)
+            // Wait for the proxy to confirm the actual stream before polling metadata.
+            cancelMetadataProvider()
             lastStatus = "Starting ${selected.alias}…"
             publish(lastStatus)
         } catch (error: Exception) {
@@ -516,7 +517,16 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
             activeChannel.setMute(false)
             safeVolumeApplied = true
         }
+        val sourceChanged = activeSourceUrl != sourceUrl
         activeSourceUrl = sourceUrl
+        if (sourceChanged) {
+            streamNowPlaying = RadioNowPlaying()
+            if (currentStation != null) {
+                startMetadataProvider(currentStation, sourceUrl)
+            } else {
+                cancelMetadataProvider()
+            }
+        }
         val position = radioFallbackPosition(sourceUrl, canonicalSources)
         activeFallback = position
             ?.takeIf { (current, _) -> current > 1 }
@@ -814,24 +824,23 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         publish(lastStatus)
     }
 
-    private fun startMetadataProvider(selected: MobileRadioStation) {
+    private fun startMetadataProvider(selected: MobileRadioStation, sourceUrl: String) {
         cancelMetadataProvider()
-        if (hasRadioParadiseMetadata(selected) || hasTravnyRadioMetadata(selected)) {
-            scheduleMetadataProvider(selected.alias, 0L)
+        val openedStation = selected.copy(urls = listOf(sourceUrl))
+        if (hasRadioParadiseMetadata(openedStation) || isTravnyRadioStream(sourceUrl)) {
+            scheduleMetadataProvider(selected.alias, sourceUrl, 0L)
         }
     }
 
-    private fun scheduleMetadataProvider(alias: String, delayMs: Long) {
+    private fun scheduleMetadataProvider(alias: String, sourceUrl: String, delayMs: Long) {
         if (destroyed) return
         metadataRefresh = metadataWorker.schedule(
             {
                 val result = runCatching {
-                    val current = station?.takeIf { it.alias.equals(alias, ignoreCase = true) }
                     when {
-                        current == null -> null
-                        hasTravnyRadioMetadata(current) ->
+                        isTravnyRadioStream(sourceUrl) ->
                             fetchTravnyRadioNowPlaying(applicationContext)
-                        hasRadioParadiseMetadata(current) ->
+                        hasRadioParadiseMetadata(MobileRadioStation(alias, listOf(sourceUrl))) ->
                             fetchRadioParadiseNowPlaying(applicationContext)
                         else -> null
                     }
@@ -841,6 +850,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                     if (
                         destroyed ||
                         !running ||
+                        activeSourceUrl != sourceUrl ||
                         !station?.alias.equals(alias, ignoreCase = true)
                     ) {
                         return@execute
@@ -848,9 +858,9 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
                     if (poll != null) {
                         providerNowPlaying = poll.nowPlaying
                         publishMetadataUpdate()
-                        scheduleMetadataProvider(alias, poll.refreshAfterMs)
+                        scheduleMetadataProvider(alias, sourceUrl, poll.refreshAfterMs)
                     } else {
-                        scheduleMetadataProvider(alias, METADATA_RETRY_MS)
+                        scheduleMetadataProvider(alias, sourceUrl, METADATA_RETRY_MS)
                     }
                 }
             },
