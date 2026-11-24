@@ -126,7 +126,8 @@ internal object ArtworkLoader {
                 connectTimeout = TIMEOUT_MS
                 readTimeout = TIMEOUT_MS
                 useCaches = true
-                instanceFollowRedirects = true
+                // Keep TRAVNY cover URLs on the trusted artwork origin.
+                instanceFollowRedirects = !isTravnyRadioArtworkUrl(address)
                 requestMethod = "GET"
             }
             try {
