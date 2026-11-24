@@ -521,7 +521,7 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         val sourceChanged = activeSourceUrl != sourceUrl
         activeSourceUrl = sourceUrl
         if (sourceChanged) {
-            streamNowPlaying = RadioNowPlaying()
+            // Initial stream metadata may arrive before the first audio bytes.
             if (currentStation != null) {
                 startMetadataProvider(currentStation, sourceUrl)
             } else {
@@ -555,6 +555,12 @@ class RadioService : Service(), RadioProxyServer.Listener, SamsungWamChannel.Lis
         if (destroyed || source !== proxy) return@execute
         // A Wi-Fi handoff is a transport failure, not evidence that this station URL is bad.
         if (shouldRecoverFromWifiChange()) return@execute
+        if (activeSourceUrl == sourceUrl) {
+            // Clear the departed source before the next one's metadata can arrive.
+            streamNowPlaying = RadioNowPlaying()
+            cancelMetadataProvider()
+            publishMetadataUpdate()
+        }
         station?.let { RadioFallbackStore(this).recordFailure(it.alias, sourceUrl) }
     }
 
