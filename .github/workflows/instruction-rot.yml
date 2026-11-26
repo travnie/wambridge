@@ -27,7 +27,7 @@ jobs:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
-          # Match the former path filters; PRs use a three-dot diff.
+          # Include nested instruction paths; PRs use a three-dot diff.
           range="$BASE_SHA..$HEAD_SHA"
           if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
             range="$BASE_SHA...$HEAD_SHA"
@@ -36,7 +36,7 @@ jobs:
           if [[ -n "$BASE_SHA" ]] && git diff --quiet --no-renames "$range" -- \
             ':(glob)**/AGENTS.md' ':(glob)**/CLAUDE.md' \
             ':(glob)**/GEMINI.md' ':(glob)**/CODEX.md' \
-            ':(glob)**/copilot-instructions.md' ':(glob).github/instructions/**' \
+            ':(glob)**/copilot-instructions.md' ':(glob)**/.github/instructions/**' \
             ':(glob)**/.cursor/rules/**' ':(glob)**/.cursorrules' \
             ':(glob)**/.windsurfrules' ':(glob)**/.clinerules' \
             '.github/workflows/instruction-rot.yml'; then
