@@ -3,43 +3,27 @@ name: Instruction Rot
 
 on: # yamllint disable-line rule:truthy
   pull_request:
-    paths:
-      - AGENTS.md
-      - CLAUDE.md
-      - GEMINI.md
-      - CODEX.md
-      - "**/AGENTS.md"
-      - "**/CLAUDE.md"
-      - "**/GEMINI.md"
-      - "**/CODEX.md"
-      - "**/copilot-instructions.md"
-      - ".github/instructions/**"
-      - "**/.cursor/rules/**"
-      - "**/.cursorrules"
-      - "**/.windsurfrules"
-      - "**/.clinerules"
-      - ".github/workflows/instruction-rot.yml"
   push:
     branches: [main]
-    paths:
-      - AGENTS.md
-      - CLAUDE.md
-      - GEMINI.md
-      - CODEX.md
-      - "**/AGENTS.md"
-      - "**/CLAUDE.md"
-      - "**/GEMINI.md"
-      - "**/CODEX.md"
-      - "**/copilot-instructions.md"
-      - ".github/instructions/**"
-      - "**/.cursor/rules/**"
-      - "**/.cursorrules"
-      - "**/.windsurfrules"
-      - "**/.clinerules"
-      - ".github/workflows/instruction-rot.yml"
   workflow_dispatch:
 
 jobs:
+  lint:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10
+        with:
+          enable-cache: false
+      - name: Check SPDX metadata
+        run: uvx --python 3.13 --from reuse==6.3.0 reuse lint
+
+  # Shared harness detects changed instruction files before running checks.
   # Shared implementation lives in trvny/.github.
   instruction-rot:
     permissions:

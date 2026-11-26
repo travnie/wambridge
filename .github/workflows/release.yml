@@ -44,13 +44,17 @@ concurrency:
 
 jobs:
   reuse:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10
+        with:
+          enable-cache: false
       - name: Check SPDX metadata before publishing
-        run: pipx run --spec reuse==6.3.0 reuse lint
+        run: uvx --python 3.13 --from reuse==6.3.0 reuse lint
 
   version:
     needs: reuse
