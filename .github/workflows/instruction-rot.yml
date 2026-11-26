@@ -11,21 +11,50 @@ jobs:
   lint:
     runs-on: ubuntu-slim
     timeout-minutes: 10
+    outputs:
+      instructions: ${{ steps.scope.outputs.instructions }}
     permissions:
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: Detect instruction changes
+        id: scope
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          # Match the former path filters; PRs use a three-dot diff.
+          range="$BASE_SHA..$HEAD_SHA"
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            range="$BASE_SHA...$HEAD_SHA"
+          fi
+          # Manual dispatch, missing history or diff errors: scan conservatively.
+          if [[ -n "$BASE_SHA" ]] && git diff --quiet --no-renames "$range" -- \
+            ':(glob)**/AGENTS.md' ':(glob)**/CLAUDE.md' \
+            ':(glob)**/GEMINI.md' ':(glob)**/CODEX.md' \
+            ':(glob)**/copilot-instructions.md' ':(glob).github/instructions/**' \
+            ':(glob)**/.cursor/rules/**' ':(glob)**/.cursorrules' \
+            ':(glob)**/.windsurfrules' ':(glob)**/.clinerules' \
+            '.github/workflows/instruction-rot.yml'; then
+            echo "instructions=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "instructions=true" >> "$GITHUB_OUTPUT"
+          fi
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10
         with:
           enable-cache: false
       - name: Check SPDX metadata
         run: uvx --python 3.13 --from reuse==6.3.0 reuse lint
 
-  # Shared harness detects changed instruction files before running checks.
+  # Skip unrelated changes; REUSE still checks every PR and main push.
   # Shared implementation lives in trvny/.github.
   instruction-rot:
+    needs: lint
+    if: ${{ !cancelled() && needs.lint.outputs.instructions != 'false' }}
     permissions:
       contents: read
       issues: write
